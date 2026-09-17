@@ -4,6 +4,7 @@ import base64
 import hashlib
 import os
 import re
+from contextvars import ContextVar
 from zoneinfo import ZoneInfo
 
 try:
@@ -4611,22 +4612,35 @@ def _load_json_app_setting(setting_key, default_value=None):
 
 
 def _save_json_app_setting(setting_key, payload):
-    db = get_db()
-    db.execute(
-        """
-        INSERT INTO app_settings (setting_key, setting_value, updated_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(setting_key) DO UPDATE SET
-            setting_value = excluded.setting_value,
-            updated_at = excluded.updated_at
-        """,
-        (
-            setting_key,
-            json.dumps(payload, ensure_ascii=False),
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        ),
-    )
-    db.commit()
+    def _write():
+        db = get_db()
+        db.execute(
+            """
+            INSERT INTO app_settings (setting_key, setting_value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(setting_key) DO UPDATE SET
+                setting_value = excluded.setting_value,
+                updated_at = excluded.updated_at
+            """,
+            (
+                setting_key,
+                json.dumps(payload, ensure_ascii=False),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+        )
+        db.commit()
+
+    try:
+        _write()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        # EDB discovery can take longer than a database-side idle connection
+        # lifetime. Do not let one severed request-scoped socket discard an
+        # otherwise valid, already-fetched indicator mapping.
+        app.logger.warning("App setting write lost its database connection; retrying once key=%s", setting_key)
+        reset_request_runtime_state()
+        _write()
     return copy.deepcopy(payload)
 
 
@@ -8000,7 +8014,7 @@ def sync_local_llm_registry_from_staging():
 
 
 def is_db_unavailable_error(error):
-    return isinstance(error, OperationalError)
+    return isinstance(error, (OperationalError, psycopg2.InterfaceError))
 
 
 def build_default_demo_profiles(site_config=None):
@@ -8374,16 +8388,19 @@ def ensure_default_admin_tasks():
                 and str(existing.get("task_type") or "") == "sync_market_snapshot"
             ):
                 db.execute(
-                    "UPDATE admin_task_configs SET task_name = ?, description = ?, schedule_type = ?, schedule_value = ?, enabled = ?, updated_at = ? WHERE task_code = ?",
-                    (item["task_name"], item["description"], item["schedule_type"], item["schedule_value"], item["enabled"], timestamp, item["task_code"]),
+                    # Defaults must never overwrite an operator's schedule or
+                    # a pending stop request. New tasks receive defaults on
+                    # INSERT; existing tasks retain their lifecycle settings.
+                    "UPDATE admin_task_configs SET task_name = ?, description = ?, updated_at = ? WHERE task_code = ?",
+                    (item["task_name"], item["description"], timestamp, item["task_code"]),
                 )
             if (
                 item["task_code"] == "news_title_impact_sync"
                 and str(existing.get("task_type") or "") in {"sync_news_sources", "sync_news_title_classifications", "sync_v4_news_top20"}
             ):
                 db.execute(
-                    "UPDATE admin_task_configs SET task_name = ?, task_type = ?, description = ?, schedule_type = ?, schedule_value = ?, enabled = ?, updated_at = ? WHERE task_code = ?",
-                    (item["task_name"], item["task_type"], item["description"], item["schedule_type"], item["schedule_value"], item["enabled"], timestamp, item["task_code"]),
+                    "UPDATE admin_task_configs SET task_name = ?, task_type = ?, description = ?, updated_at = ? WHERE task_code = ?",
+                    (item["task_name"], item["task_type"], item["description"], timestamp, item["task_code"]),
                 )
             continue
         db.execute(
@@ -8996,6 +9013,7 @@ def update_admin_task_status(task_code, **fields):
 
 _admin_task_cancel_lock = threading.Lock()
 _admin_task_cancel_requests = set()
+_admin_task_current_run_code = ContextVar("admin_task_current_run_code", default="")
 
 
 def request_admin_task_stop(task_code):
@@ -9017,6 +9035,72 @@ def request_admin_task_stop(task_code):
     return get_admin_task_config(normalized_task_code)
 
 
+def force_admin_task_stop(task_code):
+    """Cancel a stuck run record so an operator can safely start a new run."""
+    normalized_task_code = slugify_code(task_code, "task")
+    task = request_admin_task_stop(normalized_task_code)
+    db = get_db()
+    timestamp = now_ts()
+    forced_runs = db.execute(
+        """
+        UPDATE admin_task_runs
+        SET run_status = 'cancelled', finished_at = ?, summary = ?, error_message = ?
+        WHERE task_code = ? AND run_status = 'running'
+        """,
+        (timestamp, "任务已强制停止", "operator_force_stop", normalized_task_code),
+    ).rowcount or 0
+    db.execute(
+        """
+        UPDATE admin_task_configs
+        SET enabled = 0, last_run_finished_at = ?, last_run_status = ?, last_run_message = ?,
+            last_error_at = ?, last_error_message = ?, updated_at = ?
+        WHERE task_code = ?
+        """,
+        (
+            timestamp,
+            "cancelled",
+            "任务已强制停止，可重新启动",
+            timestamp,
+            "operator_force_stop",
+            timestamp,
+            normalized_task_code,
+        ),
+    )
+    db.commit()
+    return {"task": get_admin_task_config(normalized_task_code), "forced_runs": int(forced_runs)}
+
+
+def resume_admin_task(task_code):
+    """Re-enable one platform task after an explicit operator stop request."""
+    normalized_task_code = slugify_code(task_code, "task")
+    if not get_admin_task_config(normalized_task_code):
+        raise ValueError("task_not_found")
+    with _admin_task_cancel_lock:
+        _admin_task_cancel_requests.discard(normalized_task_code)
+    db = get_db()
+    db.execute(
+        """
+        UPDATE admin_task_configs
+        SET enabled = 1, last_next_run_at = '', last_run_message = ?, updated_at = ?
+        WHERE task_code = ?
+        """,
+        ("已恢复调度，等待执行", now_ts(), normalized_task_code),
+    )
+    db.commit()
+    return get_admin_task_config(normalized_task_code)
+
+
+def restart_admin_task(task_code, trigger_mode="manual_restart", force=True):
+    """Restart a stopped platform task without ever replacing a running execution."""
+    task = get_admin_task_config(task_code)
+    if not task:
+        raise ValueError("task_not_found")
+    if str(task.get("last_run_status") or "").strip().lower() == "running":
+        raise RuntimeError("admin_task_already_running")
+    resume_admin_task(task["task_code"])
+    return run_admin_task(task["task_code"], trigger_mode=trigger_mode, force=force)
+
+
 def clear_admin_task_stop_request(task_code):
     normalized_task_code = slugify_code(task_code, "task")
     with _admin_task_cancel_lock:
@@ -9026,7 +9110,27 @@ def clear_admin_task_stop_request(task_code):
 def is_admin_task_stop_requested(task_code):
     normalized_task_code = slugify_code(task_code, "task")
     with _admin_task_cancel_lock:
-        return normalized_task_code in _admin_task_cancel_requests
+        if normalized_task_code in _admin_task_cancel_requests:
+            return True
+    # The in-memory flag only reaches the Worker that handled the POST. Read
+    # the shared task state as well so cancellation works across Gunicorn
+    # Workers during a long-running provider sync.
+    try:
+        current_run_code = str(_admin_task_current_run_code.get() or "").strip()
+        if current_run_code:
+            current_run = get_db().execute(
+                "SELECT run_status FROM admin_task_runs WHERE run_code = ?",
+                (current_run_code,),
+            ).fetchone()
+            if current_run and str(current_run.get("run_status") or "").strip().lower() == "cancelled":
+                return True
+        row = get_db().execute(
+            "SELECT enabled FROM admin_task_configs WHERE task_code = ?",
+            (normalized_task_code,),
+        ).fetchone()
+        return bool(row) and not bool(row.get("enabled"))
+    except Exception:
+        return False
 
 
 def assert_admin_task_not_stopped(task_code):
@@ -9084,11 +9188,11 @@ def finish_admin_task_run(run_code, task_code, success, started_at_perf, summary
     run_status = str(status_override or "").strip().lower() or ("success" if success else "failed")
     if run_status not in {"success", "failed", "cancelled"}:
         run_status = "failed"
-    db.execute(
+    update = db.execute(
         """
         UPDATE admin_task_runs
         SET run_status = ?, finished_at = ?, duration_ms = ?, summary = ?, error_message = ?, result_json = ?
-        WHERE run_code = ?
+        WHERE run_code = ? AND run_status = 'running'
         """,
         (
             run_status,
@@ -9101,6 +9205,10 @@ def finish_admin_task_run(run_code, task_code, success, started_at_perf, summary
         ),
     )
     db.commit()
+    # A force-stop may have cancelled this run while a provider request was
+    # returning. Never let that stale worker overwrite the newer task state.
+    if getattr(update, "rowcount", 1) == 0:
+        return
     updates = {
         "last_run_finished_at": finished_at,
         "last_run_status": run_status,
@@ -9250,9 +9358,13 @@ def run_admin_task(task_code, trigger_mode="manual", force=False, tenant_slug=""
     task = get_admin_task_config(task_code)
     if not task:
         raise ValueError("task_not_found")
-    clear_admin_task_stop_request(task_code)
     start_perf = time.perf_counter()
     run_code = create_admin_task_run(task, trigger_mode=trigger_mode)
+    # Do not clear a pending cancellation until the run lock was successfully
+    # acquired. Otherwise a second manual click could revive a task being
+    # stopped by another operator.
+    clear_admin_task_stop_request(task_code)
+    run_context_token = _admin_task_current_run_code.set(run_code)
     try:
         result = execute_admin_task(task, force=force, tenant_slug=tenant_slug)
         summary = "任务执行完成"
@@ -9338,6 +9450,7 @@ def run_admin_task(task_code, trigger_mode="manual", force=False, tenant_slug=""
         raise
     finally:
         clear_admin_task_stop_request(task_code)
+        _admin_task_current_run_code.reset(run_context_token)
 
 
 def build_admin_task_center_payload():

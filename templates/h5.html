@@ -46,8 +46,8 @@ body { background: var(--surface-2); color: var(--text-main); }
 .featured-insight-meta { display:flex; justify-content:space-between; gap:8px; align-items:center; margin-top:12px; color:var(--gray-400); font-size:10px; }
 .featured-insight-cta { color:var(--gold); font-weight:700; white-space:nowrap; }
 .feed-market-economy { margin:0 0 14px; }
-.feed-market-economy-title { font-size:15px; font-weight:750; color:var(--white); }
-.feed-market-economy-desc { margin-top:4px; font-size:11px; color:var(--gray-400); line-height:1.6; }
+.feed-market-economy-title { font-size:15px; font-weight:750; color:#183A62; }
+.feed-market-economy-desc { margin-top:4px; font-size:11px; color:#62758A; line-height:1.6; }
 .feed-market-economy-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin-top:10px; }
 .feed-market-chart { min-width:0; overflow:hidden; padding:12px; border:1px solid rgba(200,169,110,.12); border-radius:12px; background:var(--navy-mid); }
 .feed-market-sync-time { margin-top:8px; color:var(--gray-400); font-size:10px; line-height:1.5; }
@@ -66,6 +66,34 @@ body { background: var(--surface-2); color: var(--text-main); }
 .feed-market-bar.up { background:var(--red); }
 .feed-market-bar.down { background:var(--green); }
 .feed-market-bar-label { width:100%; min-width:0; align-self:end; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; font-size:8px; line-height:1.4; color:var(--gray-400); }
+.market-layout-summary { border:1px solid #DCE8F5; border-radius:10px; background:#F7FBFF; padding:12px; }
+.market-layout-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+.market-layout-summary-card { min-width:0; padding:10px; border:1px solid #DCE8F5; border-radius:8px; background:#FFFFFF; }
+.market-layout-summary-title { color:#183A62; font-size:12px; font-weight:700; }
+.market-layout-count { color:#2F74C0; font-size:12px; font-weight:750; font-variant-numeric:tabular-nums; }
+.market-layout-chip { display:inline-flex; align-items:center; max-width:100%; min-height:24px; padding:2px 7px; border:1px solid #CFE2F6; border-radius:5px; background:#EAF4FF; color:#245B94; font-size:10px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.market-picker-modal { width:100%; max-width:540px; max-height:88vh; overflow-y:auto; border-radius:18px 18px 0 0; background:#FFFFFF; color:#183A62; border:1px solid #DCE8F5; box-shadow:0 18px 45px rgba(31,73,125,.18); }
+.market-picker-tabs { display:flex; gap:6px; padding:4px; border-radius:9px; background:#EEF6FD; }
+.market-picker-tab { flex:1; min-height:36px; border:0; border-radius:7px; background:transparent; color:#62758A; font-size:12px; font-weight:700; }
+.market-picker-tab.active { background:#FFFFFF; color:#2F74C0; box-shadow:0 2px 8px rgba(31,73,125,.10); }
+.market-picker-tile { position:relative; display:flex; align-items:center; justify-content:center; min-height:76px; width:100%; padding:8px; border:1px solid #DCE8F5; border-radius:9px; background:#FFFFFF; color:#294A6B; font-size:11px; font-weight:700; line-height:1.35; text-align:center; overflow:hidden; }
+.market-picker-tile:hover { border-color:#7EB4E8; background:#F5FAFF; }
+.market-picker-tile.is-selected { border-color:#2F74C0; background:#E7F2FF; color:#17528B; box-shadow:inset 0 0 0 1px rgba(47,116,192,.12); }
+.market-picker-check { position:absolute; right:6px; top:5px; color:#2F74C0; font-size:13px; font-weight:800; }
+.market-quote-section { margin-top:12px; }
+.market-quote-section-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:0 1px 8px; }
+.market-quote-section-title { color:#183A62; font-size:12px; font-weight:750; }
+.market-quote-section-meta { color:#7A8C9F; font-size:10px; white-space:nowrap; }
+.market-quote-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.market-quote-card { min-width:0; min-height:104px; padding:11px; border:1px solid #DCE8F5; border-radius:9px; background:#FFFFFF; box-shadow:0 4px 12px rgba(31,73,125,.045); }
+.market-quote-name { overflow:hidden; color:#294A6B; font-size:12px; font-weight:750; text-overflow:ellipsis; white-space:nowrap; }
+.market-quote-code { overflow:hidden; margin-top:3px; color:#7A8C9F; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.market-quote-value { margin-top:12px; color:#183A62; font-size:18px; font-weight:750; font-variant-numeric:tabular-nums; }
+.market-quote-change { margin-top:4px; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
+.market-quote-change.up { color:#D94040; }
+.market-quote-change.down { color:#16865A; }
+.market-quote-change.flat { color:#62758A; }
+.market-quote-empty { grid-column:1/-1; padding:18px 12px; border:1px dashed #CFE2F6; border-radius:9px; color:#62758A; font-size:11px; text-align:center; background:#FFFFFF; }
 .review-draft-library-page { padding:2px 0 18px; }
 .review-draft-library-card { padding:14px; background:#FFFFFF; border:1px solid rgba(47,116,192,.13); border-radius:14px; box-shadow:0 5px 16px rgba(13,27,42,.05); }
 .review-draft-library-card-title { color:var(--text-main); font-size:14px; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2114,6 +2142,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   .desktop-user-app .modal-overlay { align-items:center; padding:28px; }
   .desktop-user-app .modal-sheet,
   .desktop-user-app .h5-onboarding-sheet { width:min(720px, 100%); max-width:720px; border-radius:16px; }
+  .desktop-user-app .market-picker-modal { border-radius:14px; }
   .desktop-user-app .review-production-page { max-width:1120px; margin:0 auto; }
 }
 .h5-onboarding-section + .h5-onboarding-section { margin-top:12px; }
@@ -4609,7 +4638,7 @@ body,
     </div>
 
     <div class="h5-section" id="fundamental-watchlist-boards">
-      <div class="h5-section-title">我的所有自选股涨跌Top10</div>
+      <div class="h5-section-title">我的所有自选股涨跌</div>
       <div id="fundamental-watchlist-chart"></div>
     </div>
 
@@ -4864,6 +4893,12 @@ body,
     </div>
   </div>
 
+  <div class="modal-overlay" id="h5-market-layout-modal" onclick="if(event.target===this)closeH5MarketDisplayModal()">
+    <div class="modal-sheet market-picker-modal">
+      <div id="h5-market-layout-modal-content"></div>
+    </div>
+  </div>
+
   <!-- ===== TAB 4: 行情 ===== -->
   <div id="page-market" class="page" data-feature="watchlist">
     <div class="h5-section">
@@ -4874,6 +4909,7 @@ body,
         <button id="market-overview-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('overview')">市场一览</button>
         <button id="market-macro-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('macro')">宏观经济</button>
       </div>
+      <div id="h5-market-display-config" style="display:none;margin:0 0 12px"></div>
       <div id="market-overview-panel" role="tabpanel">
         <div id="market-overview-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">市场一览由大V选择，Gangtise OpenAPI 统一采集后写入共享快照。</div>
         <div id="market-overview-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
@@ -8107,9 +8143,31 @@ function renderFeedMarketEconomyPanel(overviewPayload, sectorPayload) {
   if (!host) return;
   const overview = overviewPayload && typeof overviewPayload === 'object' ? overviewPayload : {};
   const sectors = sectorPayload && typeof sectorPayload === 'object' ? sectorPayload : {};
-  const canConfigure = String((currentDemoUser || {}).role || '').toLowerCase() === 'dav';
-  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">由大V发布本租户展示指标，Gangtise OpenAPI 统一采集共享快照。</div>${canConfigure ? '<div id="h5-market-display-config" style="margin:12px 0"></div>' : ''}<div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectors.items || [], '热门行业涨跌', 'feed-market-sector-chart', 10, '正增长红柱 · 负增长绿柱 · Gangtise OpenAPI 共享快照', sectors.updated_at, sectors.stale)}${renderFeedMarketEconomy(overview.items || [], '市场一览涨跌', 'feed-market-overview-chart', 4, '正增长红柱 · 负增长绿柱 · Gangtise OpenAPI 共享快照', overview.updated_at, overview.stale)}</div></div>`;
-  if (canConfigure) window.setTimeout(loadH5MarketDisplayConfig, 0);
+  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">本租户统一行情快照，展示大V发布的市场与行业指标。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectors.items, '热门行业涨跌', 'feed-sector-chart', 10, '申万一级行业指数行情，按涨跌幅从高到低排列。数据由后台 Gangtise 采集任务入库。', sectors.updated_at, sectors.stale)}${renderFeedMarketEconomy(overview.items, '市场一览涨跌', 'feed-overview-chart', 10, '标准市场指数按涨跌幅从高到低排列。数据由后台 Gangtise 采集任务入库。', overview.updated_at, overview.stale)}</div></div>`;
+}
+
+function renderMarketQuoteCards(items, type) {
+  return (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false).map((item) => {
+    const name = type === 'sector' ? item.sector : item.name;
+    const value = type === 'sector' ? item.value : (item.price ?? item.current_price ?? item.close ?? item.value);
+    const rawChange = Number(item.change ?? item.change_amount);
+    const hasChange = item.change != null || item.change_amount != null;
+    const pct = Number(item.change_pct);
+    const hasPct = item.change_pct != null && Number.isFinite(pct);
+    const directionValue = hasChange && Number.isFinite(rawChange) ? rawChange : (hasPct ? pct : 0);
+    const direction = directionValue > 0 ? 'up' : (directionValue < 0 ? 'down' : 'flat');
+    const arrow = directionValue > 0 ? '▲' : (directionValue < 0 ? '▼' : '—');
+    const valueText = Number.isFinite(Number(value)) ? Number(value).toFixed(2) : '--';
+    const changeText = hasChange && Number.isFinite(rawChange)
+      ? `${arrow} ${rawChange > 0 ? '+' : ''}${rawChange.toFixed(2)}${hasPct ? ` (${rawChange > 0 ? '+' : ''}${pct.toFixed(2)}%)` : ''}`
+      : (hasPct ? `${arrow} ${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : '暂无涨跌数据');
+    const code = item.code || item.security_code || (type === 'sector' ? '申万一级行业' : item.market || '--');
+    return `<article class="market-quote-card"><div class="market-quote-name">${escapeHtml(name || '--')}</div><div class="market-quote-code">${escapeHtml(code)}</div><div class="market-quote-value">${valueText}</div><div class="market-quote-change ${direction}">${changeText}</div></article>`;
+  }).join('');
+}
+
+function renderMarketQuoteSection(title, rows, syncTime, emptyText) {
+  return `<section class="market-quote-section"><div class="market-quote-section-head"><div class="market-quote-section-title">${escapeHtml(title)}</div><div class="market-quote-section-meta">${syncTime ? `同步：${escapeHtml(syncTime)}` : '等待同步'}</div></div><div class="market-quote-grid">${rows || `<div class="market-quote-empty">${escapeHtml(emptyText)}</div>`}</div></section>`;
 }
 
 function marketSnapshotTenantQuery() {
@@ -8119,7 +8177,8 @@ function marketSnapshotTenantQuery() {
 
 let h5MarketDisplayConfigLoading = false;
 let h5MarketDisplayConfig = { settings: {}, catalog: {} };
-let h5MarketDisplayEditing = false;
+let h5MarketDisplayDraft = { market_overview_codes: [], sector_names: [] };
+let h5MarketPickerTab = 'sectors';
 
 function h5MarketDisplayTenantSlug() {
   return String((currentDemoUser && currentDemoUser.tenant && currentDemoUser.tenant.slug) || '').trim().toLowerCase();
@@ -8129,26 +8188,50 @@ function renderH5MarketDisplayConfig(payload) {
   h5MarketDisplayConfig = payload || { settings: {}, catalog: {} };
   const host = document.getElementById('h5-market-display-config');
   if (!host) return;
+  host.style.display = '';
   const settings = h5MarketDisplayConfig.settings || {};
   const catalog = h5MarketDisplayConfig.catalog || {};
   const marketRows = Array.isArray(catalog.market_overview) ? catalog.market_overview : [];
-  const sectorRows = Array.isArray(catalog.hot_industries) ? catalog.hot_industries : [];
-  const makeSlots = (field, values, options, count, optionValue, optionLabel) => Array.from({length: count}, (_, index) => {
-    const selected = String(values[index] || '');
-    return `<label style="display:grid;grid-template-columns:26px minmax(0,1fr);gap:7px;align-items:center;font-size:11px;color:var(--gray-400)"><span>${index + 1}</span><select data-h5-market-slot="${field}" style="width:100%;min-width:0;padding:7px 8px;border:1px solid rgba(47,116,192,.18);border-radius:7px;background:var(--white);color:var(--navy);font-size:12px"><option value="">空置</option>${options.map((item) => { const value = optionValue(item); return `<option value="${escapeAttr(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(optionLabel(item))}</option>`; }).join('')}</select></label>`;
-  }).join('');
   const chips = (values, labelOf, emptyText) => values.length
-    ? values.map((value) => `<span style="display:inline-flex;align-items:center;min-height:24px;padding:2px 8px;border:1px solid rgba(47,116,192,.14);border-radius:5px;background:#fff;color:#183A62;font-size:11px;font-weight:600">${escapeHtml(labelOf(value))}</span>`).join('')
-    : `<span style="font-size:11px;color:var(--gray-400)">${emptyText}</span>`;
+    ? values.map((value) => `<span class="market-layout-chip">${escapeHtml(labelOf(value))}</span>`).join('')
+    : `<span style="font-size:11px;color:#7A8C9F">${emptyText}</span>`;
   const marketName = (code) => ((marketRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
-  const summary = `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><div style="padding:10px;border:1px solid rgba(47,116,192,.12);border-radius:7px;background:#fff"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong style="font-size:12px;color:var(--navy)">热门行业</strong><span style="font-size:11px;color:#2F74C0;font-variant-numeric:tabular-nums">${(settings.sector_names || []).length}/10</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(settings.sector_names || [], (value) => value, '尚未选择')}</div></div><div style="padding:10px;border:1px solid rgba(47,116,192,.12);border-radius:7px;background:#fff"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong style="font-size:12px;color:var(--navy)">市场一览</strong><span style="font-size:11px;color:#2F74C0;font-variant-numeric:tabular-nums">${(settings.market_overview_codes || []).length}/4</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(settings.market_overview_codes || [], marketName, '尚未选择')}</div></div></div>`;
-  const editor = h5MarketDisplayEditing ? `<div style="display:grid;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(47,116,192,.12)"><div><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><strong style="font-size:13px;color:var(--navy)">热门行业席位</strong><span style="font-size:11px;color:var(--gray-400)">最多 10 个</span></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px">${makeSlots('sector_names', settings.sector_names || [], sectorRows, 10, (item) => String(item || ''), (item) => String(item || ''))}</div></div><div><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><strong style="font-size:13px;color:var(--navy)">市场一览席位</strong><span style="font-size:11px;color:var(--gray-400)">最多 4 个</span></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px">${makeSlots('market_overview_codes', settings.market_overview_codes || [], marketRows, 4, (item) => String(item.code || ''), (item) => item.name || item.code || '--')}</div></div><div style="display:flex;gap:8px"><button type="button" class="btn-gold" style="min-height:38px;padding:7px 12px;font-size:12px" onclick="saveH5MarketDisplayConfig()">发布版面</button><button type="button" class="btn-outline" style="min-height:38px;padding:7px 12px;font-size:12px" onclick="toggleH5MarketDisplayEditor(false)">取消</button></div></div>` : '';
-  host.innerHTML = `<section style="border:1px solid rgba(47,116,192,.16);border-radius:8px;background:#F7FAFE;padding:12px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="font-size:12px;font-weight:700;color:var(--navy)">粉丝端行情版面</div><div style="font-size:11px;color:var(--gray-400);margin-top:3px">${settings.configured ? `已发布 · ${escapeHtml(settings.updated_at || '--')}` : '未发布时显示平台推荐项'}</div></div>${h5MarketDisplayEditing ? '' : '<button type="button" class="btn-outline" style="min-height:34px;padding:6px 9px;font-size:12px" onclick="toggleH5MarketDisplayEditor(true)">编辑版面</button>'}</div><div style="margin-top:10px">${summary}</div>${editor}</section>`;
+  const summary = `<div class="market-layout-summary-grid"><div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">热门行业</strong><span class="market-layout-count">${(settings.sector_names || []).length}/10</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(settings.sector_names || [], (value) => value, '尚未配置')}</div></div><div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">市场一览</strong><span class="market-layout-count">${(settings.market_overview_codes || []).length}/4</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(settings.market_overview_codes || [], marketName, '尚未配置')}</div></div></div>`;
+  host.innerHTML = `<section class="market-layout-summary"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="font-size:12px;font-weight:750;color:#183A62">粉丝端行情版面</div><div style="font-size:11px;color:#62758A;margin-top:3px">${settings.configured ? `已发布 · ${escapeHtml(settings.updated_at || '--')}` : '尚未发布，可按需选择，不必填满'}</div></div><button type="button" class="btn btn-outline-primary btn-sm" onclick="openH5MarketDisplayModal()">调整版面</button></div>${summary}</section>`;
 }
 
-function toggleH5MarketDisplayEditor(open) {
-  h5MarketDisplayEditing = Boolean(open);
-  renderH5MarketDisplayConfig(h5MarketDisplayConfig);
+function openH5MarketDisplayModal() {
+  const settings = h5MarketDisplayConfig.settings || {};
+  h5MarketDisplayDraft = { market_overview_codes: [...(settings.market_overview_codes || [])], sector_names: [...(settings.sector_names || [])] };
+  h5MarketPickerTab = 'sectors';
+  renderH5MarketDisplayModal();
+  document.getElementById('h5-market-layout-modal')?.classList.add('show');
+}
+
+function closeH5MarketDisplayModal() { document.getElementById('h5-market-layout-modal')?.classList.remove('show'); }
+
+function setH5MarketPickerTab(tab) { h5MarketPickerTab = tab; renderH5MarketDisplayModal(); }
+
+function toggleH5MarketDraftSelection(field, value, limit) {
+  const values = [...(h5MarketDisplayDraft[field] || [])];
+  const index = values.indexOf(value);
+  if (index >= 0) values.splice(index, 1);
+  else if (values.length >= limit) { showToast(`最多选择 ${limit} 个指标`); return; }
+  else values.push(value);
+  h5MarketDisplayDraft[field] = values;
+  renderH5MarketDisplayModal();
+}
+
+function renderH5MarketDisplayModal() {
+  const host = document.getElementById('h5-market-layout-modal-content');
+  if (!host) return;
+  const catalog = h5MarketDisplayConfig.catalog || {};
+  const isSector = h5MarketPickerTab === 'sectors';
+  const field = isSector ? 'sector_names' : 'market_overview_codes';
+  const limit = isSector ? 10 : 4;
+  const options = isSector ? (catalog.hot_industries || []).map((item) => ({ value: String(item || ''), label: String(item || '') })) : (catalog.market_overview || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' }));
+  const selected = h5MarketDisplayDraft[field] || [];
+  host.innerHTML = `<div class="p-3 p-md-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="fw-bold" style="color:#183A62">配置粉丝端行情版面</div><div class="small mt-1" style="color:#62758A">选择需要展示的指标即可，未选满不会影响发布。</div></div><button type="button" class="btn-close" aria-label="关闭" onclick="closeH5MarketDisplayModal()"></button></div><div class="market-picker-tabs mt-3"><button type="button" class="market-picker-tab ${isSector ? 'active' : ''}" data-h5-market-picker="sectors" onclick="setH5MarketPickerTab('sectors')">热门行业</button><button type="button" class="market-picker-tab ${isSector ? '' : 'active'}" data-h5-market-picker="market" onclick="setH5MarketPickerTab('market')">市场一览</button></div><div class="d-flex justify-content-between align-items-center mt-3"><strong style="font-size:13px;color:#183A62">${isSector ? '选择热门行业' : '选择市场指标'}</strong><span class="badge text-bg-light border" style="color:#2F74C0!important;border-color:#CFE2F6!important">已选择 ${selected.length} / ${limit} · 可留空</span></div><div class="row row-cols-3 g-2 mt-1">${options.map((item) => `<div class="col"><button type="button" class="market-picker-tile ${selected.includes(item.value) ? 'is-selected' : ''}" data-h5-market-picker-tile="${escapeAttr(item.value)}" onclick="toggleH5MarketDraftSelection('${field}','${escapeAttr(item.value)}',${limit})">${selected.includes(item.value) ? '<span class="market-picker-check">✓</span>' : ''}<span>${escapeHtml(item.label)}</span></button></div>`).join('') || '<div class="col-12 small text-center py-4" style="color:#62758A">暂无可选择的指标</div>'}</div><div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top"><button type="button" class="btn btn-light border" onclick="closeH5MarketDisplayModal()">取消</button><button type="button" class="btn btn-primary" onclick="publishH5MarketDisplayDraft()">发布版面</button></div></div>`;
 }
 
 async function loadH5MarketDisplayConfig() {
@@ -8171,13 +8254,8 @@ async function loadH5MarketDisplayConfig() {
 async function saveH5MarketDisplayConfig() {
   const tenantSlug = h5MarketDisplayTenantSlug();
   if (!tenantSlug) return;
-  const selected = (field) => Array.from(document.querySelectorAll(`select[data-h5-market-slot="${field}"]`)).map((node) => node.value).filter(Boolean);
-  const market = selected('market_overview_codes');
-  const sectors = selected('sector_names');
-  if (new Set(market).size !== market.length || new Set(sectors).size !== sectors.length) {
-    showToast('同一指标不能重复占用多个格子');
-    return;
-  }
+  const market = [...(h5MarketDisplayDraft.market_overview_codes || [])];
+  const sectors = [...(h5MarketDisplayDraft.sector_names || [])];
   try {
     const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, {
       method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
@@ -8186,13 +8264,15 @@ async function saveH5MarketDisplayConfig() {
     const payload = await response.json();
     if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_save_failed');
     h5MarketDisplayConfig.settings = payload.settings || {};
-    h5MarketDisplayEditing = false;
-    showToast('已发布给本租户全部粉丝');
-    await loadFeedMarketEconomy();
+    closeH5MarketDisplayModal();
+    renderH5MarketDisplayConfig(h5MarketDisplayConfig);
+    showToast(payload.refresh && payload.refresh.queued ? '已发布，新增指标正在立即同步' : '已发布给本租户全部粉丝');
   } catch (error) {
     showToast(error.message || '展示指标保存失败');
   }
 }
+
+async function publishH5MarketDisplayDraft() { await saveH5MarketDisplayConfig(); }
 
 function renderFundamentalWatchlistChart() {
   const host = document.getElementById('fundamental-watchlist-chart');
@@ -8207,7 +8287,7 @@ function renderFundamentalWatchlistChart() {
     }));
   host.innerHTML = renderFeedMarketEconomy(
     rows,
-    '我的所有自选股涨跌Top10',
+    '我的所有自选股涨跌',
     'feed-watchlist-chart',
     10,
     '按今日涨跌幅从高到低排列 · 仅展示涨跌幅 Top10 · 正增长红柱 · 负增长绿柱',
@@ -8219,25 +8299,16 @@ async function loadFeedMarketEconomy() {
   if (!host) return;
   try {
     const query = marketSnapshotTenantQuery();
-    const [sectorResponse, overviewResponse] = await Promise.all([fetch(`/api/market-sectors${query}`, {cache: 'no-store'}), fetch(`/api/market-overview${query}`, {cache: 'no-store'})]);
+    const [sectorResponse, overviewResponse] = await Promise.all([
+      fetch(`/api/market-sectors${query}`, {cache: 'no-store'}),
+      fetch(`/api/market-overview${query}`, {cache: 'no-store'}),
+    ]);
     if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
     const sectors = await sectorResponse.json().catch(() => ({}));
     const overview = await overviewResponse.json().catch(() => ({}));
     renderFeedMarketEconomyPanel(overview, sectors);
-    const hasRows = (Array.isArray(sectors.items) && sectors.items.some((item) => item && item.available !== false))
-      || (Array.isArray(overview.items) && overview.items.some((item) => item && item.available !== false));
-    if (hasRows) marketEconomyRetryCount = 0;
-    if (!hasRows && marketEconomyRetryCount < 10) {
-      marketEconomyRetryCount += 1;
-      window.setTimeout(loadFeedMarketEconomy, 2500);
-    }
   } catch (error) {
-    if (marketEconomyRetryCount < 10) {
-      marketEconomyRetryCount += 1;
-      window.setTimeout(loadFeedMarketEconomy, 2500);
-      return;
-    }
-    host.innerHTML = '<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">后台行情快照暂不可用，请稍后刷新。H5 不会直接请求外部行情源。</div></div>';
+    renderFeedMarketEconomyPanel({}, {});
   }
 }
 
@@ -13540,6 +13611,7 @@ function switchTab(tab) {
 
   if (tab === 'market') {
     switchMarketView('watchlist');
+    if (String((currentDemoUser || {}).role || '').toLowerCase() === 'dav') loadH5MarketDisplayConfig();
   }
 
   if (tab === 'knowledge') {
@@ -14780,10 +14852,21 @@ function renderMarketMacro(items) {
     const available = Boolean(item && item.available);
     const value = available && Number.isFinite(Number(item.value)) ? Number(item.value).toFixed(2) : '--';
     const unit = String((item && item.unit) || '');
+    const history = (Array.isArray(item.history_series) ? item.history_series : [])
+      .filter((point) => point && Number.isFinite(Number(point.value)));
+    const latestValue = Number(item && item.value);
+    const previousValue = history.length >= 2 ? Number(history[history.length - 2].value) : NaN;
+    const change = Number.isFinite(latestValue) && Number.isFinite(previousValue) ? latestValue - previousValue : NaN;
+    const direction = Number.isFinite(change) ? (change > 0 ? 'up' : (change < 0 ? 'down' : 'flat')) : 'flat';
+    const arrow = direction === 'up' ? '▲' : (direction === 'down' ? '▼' : '—');
+    const changeText = Number.isFinite(change) ? `${arrow} ${change > 0 ? '+' : ''}${change.toFixed(2)}${unit}` : '— 暂无上期数据';
+    const changeColor = direction === 'up' ? 'var(--red)' : (direction === 'down' ? 'var(--green)' : 'var(--gray-400)');
     return `<div style="min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white);opacity:${available ? '1' : '0.72'}">
-      <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div>
-      <div style="margin-top:8px;font-size:18px;font-weight:700">${value}${unit ? `<span style="font-size:11px;margin-left:3px;color:var(--gray-300)">${escapeHtml(unit)}</span>` : ''}</div>
-      <div style="margin-top:9px;font-size:10px;color:var(--gray-400);line-height:1.5">${available ? `数据期：${escapeHtml(item.updated_at || '--')}` : escapeHtml(item.message || '暂未获取到精确口径数据')}<br>${escapeHtml(item.data_source || 'AKShare')}</div>
+      <div style="display:flex;justify-content:space-between;gap:8px;min-width:0;align-items:flex-start">
+        <div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">宏观经济${unit ? ` · ${escapeHtml(unit)}` : ''}</div></div>
+        <div style="text-align:right;flex:0 0 auto"><div style="font-size:16px;font-weight:700">${value}${unit ? `<span style="font-size:11px;margin-left:3px;color:var(--gray-300)">${escapeHtml(unit)}</span>` : ''}</div><div style="font-size:11px;color:${changeColor}">${available ? changeText : '等待同步'}</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:9px;font-size:10px;color:var(--gray-400)"><span>${available ? (Number.isFinite(change) ? `较上期 ${change > 0 ? '+' : ''}${change.toFixed(2)}${escapeHtml(unit)}` : '暂无上期数据') : escapeHtml(item.message || '暂未获取到精确口径数据')}</span><span>${escapeHtml(item.updated_at || '--')}</span></div>
     </div>`;
   }).join('');
   if (!rows.length) host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">宏观数据正在由后台同步，请稍后查看</div>';

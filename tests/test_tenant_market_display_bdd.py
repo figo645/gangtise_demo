@@ -102,6 +102,27 @@ def test_given_dav_publishes_selection_when_follower_reads_h5_market_api_then_sa
     build.assert_called_once_with(tenant_slug="laowang")
 
 
+def test_given_dav_adds_panel_indicators_when_publishing_then_only_new_indicators_are_queued_for_immediate_fetch():
+    from src.web import api_kol
+
+    previous = {"configured": True, "market_overview_codes": ["source_shanghai_index"], "sector_names": ["电子"]}
+    saved = {"configured": True, "market_overview_codes": ["source_shanghai_index", "source_hsi"], "sector_names": ["电子", "银行"]}
+    with app.test_request_context(
+        "/api/tenant/laowang/market-display-config", method="POST", json={
+            "market_overview_codes": saved["market_overview_codes"], "sector_names": saved["sector_names"]
+        }
+    ), patch.object(api_kol, "get_current_authenticated_user", return_value=DAV), patch.object(
+        api_kol, "load_tenant_market_display_settings", return_value=previous
+    ), patch.object(api_kol, "save_tenant_market_display_settings", return_value=saved), patch.object(
+        api_kol, "request_market_snapshot_selection_refresh", return_value={"queued": True, "started": True}
+    ) as refresh:
+        response = api_kol.api_tenant_market_display_config("laowang")
+
+    assert _status(response) == 200
+    assert _json(response)["refresh"] == {"queued": True, "started": True}
+    refresh.assert_called_once_with(market_codes={"source_hsi"}, sector_names={"银行"})
+
+
 def test_given_shared_market_task_when_scheduled_then_it_is_gangtise_and_runs_at_four_configured_times():
     from src.domain import market_services
 
@@ -109,7 +130,7 @@ def test_given_shared_market_task_when_scheduled_then_it_is_gangtise_and_runs_at
     assert task["task_name"] == "Gangtise 市场与行业指标同步"
     assert task["schedule_type"] == "daily"
     assert task["schedule_value"] == "09:30,12:00,14:00,15:30"
-    assert "Gangtise EDB" in task["description"]
+    assert ".SWI" in task["description"]
 
 
 def test_given_four_daily_collection_slots_when_reading_between_slots_then_shared_snapshot_does_not_expire_in_six_minutes():
@@ -119,17 +140,27 @@ def test_given_four_daily_collection_slots_when_reading_between_slots_then_share
     assert market_services.MARKET_SECTOR_OVERVIEW_CACHE_TTL_SECONDS >= 20 * 60 * 60
 
 
-def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfaces_expose_the_same_fixed_slots():
+def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfaces_expose_the_same_picker_and_h5_keeps_fundamental_charts():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
     h5 = (root / "templates" / "h5.html").read_text(encoding="utf-8")
     web = (root / "templates" / "kol_workbench.html").read_text(encoding="utf-8")
     assert 'id="h5-market-display-config"' in h5
-    assert 'data-h5-market-slot="${field}"' in h5
-    assert "热门行业席位" in h5
+    assert 'id="h5-market-layout-modal"' in h5
+    assert 'data-h5-market-picker=' in h5
+    assert 'data-h5-market-picker-tile=' in h5
     assert "粉丝端行情版面" in h5
-    assert "编辑版面" in h5
-    assert 'data-market-display-slot="${field}"' in web
-    assert "编辑市场一览席位" in web
+    assert "调整版面" in h5
+    market_page = h5.split('id="page-market"', 1)[1].split('id="market-overview-panel"', 1)[0]
+    assert 'id="h5-market-display-config"' in market_page
+    fundamental_panel = h5.split("function renderFeedMarketEconomyPanel", 1)[1].split("function renderMarketQuoteCards", 1)[0]
+    assert "feed-sector-chart" in fundamental_panel
+    assert "feed-overview-chart" in fundamental_panel
+    assert "renderFeedMarketEconomy(sectors.items" in fundamental_panel
+    assert "feed-watchlist-chart" in h5
+    assert 'id="kw-market-layout-modal"' in web
+    assert 'data-kw-market-picker=' in web
+    assert 'data-kw-market-picker-tile=' in web
+    assert "配置粉丝端行情版面" in web
     assert "已发布给本租户粉丝" in web

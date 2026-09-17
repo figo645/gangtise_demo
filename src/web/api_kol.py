@@ -2,7 +2,13 @@ import base64
 
 from src.runtime import *
 from src.services import *
-from src.domain.core_services import _market_display_catalog
+from src.domain.core_services import (
+    _market_display_catalog,
+    force_admin_task_stop,
+    request_admin_task_stop,
+    restart_admin_task,
+)
+from src.domain.market_services import request_market_snapshot_selection_refresh
 
 
 def _knowledge_feature_disabled_response():
@@ -102,6 +108,68 @@ def api_run_tenant_shared_data_task(tenant_slug, task_code):
         return jsonify({"ok": False, "error": str(exc) or "shared_data_task_failed"}), 500
 
 
+@app.route("/api/tenant/<tenant_slug>/shared-data-tasks/<task_code>/stop", methods=["POST"])
+def api_stop_tenant_shared_data_task(tenant_slug, task_code):
+    denied = _daily_broadcast_guard(tenant_slug)
+    if denied:
+        return denied
+    normalized_task_code = str(task_code or "").strip().lower()
+    if normalized_task_code not in _DAV_SHARED_DATA_TASK_CODES:
+        return jsonify({"ok": False, "error": "shared_data_task_not_allowed"}), 404
+    try:
+        # This changes the same platform task that Admin controls.
+        task = request_admin_task_stop(normalized_task_code)
+        return jsonify({"ok": True, "task": task, "message": "停止请求已提交"})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception:
+        app.logger.exception("Failed to stop shared data task from DaV workbench task_code=%s", normalized_task_code)
+        return jsonify({"ok": False, "error": "shared_data_task_stop_failed"}), 500
+
+
+@app.route("/api/tenant/<tenant_slug>/shared-data-tasks/<task_code>/force-stop", methods=["POST"])
+def api_force_stop_tenant_shared_data_task(tenant_slug, task_code):
+    denied = _daily_broadcast_guard(tenant_slug)
+    if denied:
+        return denied
+    normalized_task_code = str(task_code or "").strip().lower()
+    if normalized_task_code not in _DAV_SHARED_DATA_TASK_CODES:
+        return jsonify({"ok": False, "error": "shared_data_task_not_allowed"}), 404
+    try:
+        result = force_admin_task_stop(normalized_task_code)
+        return jsonify({"ok": True, **result, "message": "任务已强制停止，可重新启动"})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception:
+        app.logger.exception("Failed to force-stop shared data task from DaV workbench task_code=%s", normalized_task_code)
+        return jsonify({"ok": False, "error": "shared_data_task_force_stop_failed"}), 500
+
+
+@app.route("/api/tenant/<tenant_slug>/shared-data-tasks/<task_code>/restart", methods=["POST"])
+def api_restart_tenant_shared_data_task(tenant_slug, task_code):
+    denied = _daily_broadcast_guard(tenant_slug)
+    if denied:
+        return denied
+    normalized_task_code = str(task_code or "").strip().lower()
+    if normalized_task_code not in _DAV_SHARED_DATA_TASK_CODES:
+        return jsonify({"ok": False, "error": "shared_data_task_not_allowed"}), 404
+    try:
+        execution = restart_admin_task(normalized_task_code, trigger_mode="tenant_manual_restart", force=True)
+        return jsonify({
+            "ok": True,
+            "run_code": execution.get("run_code") or "",
+            "summary": execution.get("summary") or "",
+            "result": execution.get("result") or {},
+        })
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        app.logger.exception("Failed to restart shared data task from DaV workbench task_code=%s", normalized_task_code)
+        if str(exc).strip() == "admin_task_already_running":
+            return jsonify({"ok": False, "error": "admin_task_already_running"}), 409
+        return jsonify({"ok": False, "error": str(exc) or "shared_data_task_restart_failed"}), 500
+
+
 @app.route("/api/tenant/<tenant_slug>/market-display-config", methods=["GET", "POST"])
 def api_tenant_market_display_config(tenant_slug):
     """DaV-owned presentation selection over the platform shared snapshot."""
@@ -113,16 +181,25 @@ def api_tenant_market_display_config(tenant_slug):
         market_codes, market_names, sector_names = _market_display_catalog()
         if request.method == "POST":
             current_user = get_current_authenticated_user() or {}
+            previous = load_tenant_market_display_settings(normalized_tenant)
             settings = save_tenant_market_display_settings(
                 normalized_tenant,
                 request.get_json(silent=True) or {},
                 updated_by=current_user.get("username") or current_user.get("id") or "",
             )
+            previous_market = set(previous.get("market_overview_codes") or []) if previous.get("configured") else set()
+            previous_sectors = set(previous.get("sector_names") or []) if previous.get("configured") else set()
+            refresh = request_market_snapshot_selection_refresh(
+                market_codes=set(settings.get("market_overview_codes") or []) - previous_market,
+                sector_names=set(settings.get("sector_names") or []) - previous_sectors,
+            )
         else:
             settings = load_tenant_market_display_settings(normalized_tenant)
+            refresh = {"queued": False, "started": False}
         return jsonify({
             "ok": True,
             "settings": settings,
+            "refresh": refresh,
             "catalog": {
                 "market_overview": [{"code": code, "name": market_names.get(code) or code} for code in market_codes],
                 "hot_industries": list(sector_names),

@@ -56,6 +56,51 @@ def test_given_dav_when_running_shared_market_task_then_the_platform_task_is_run
     run_task.assert_called_once_with("market_snapshot_sync", trigger_mode="tenant_manual", force=True)
 
 
+def test_given_dav_when_stopping_or_restarting_shared_task_then_it_uses_the_admin_task_lifecycle():
+    with app.test_request_context("/api/tenant/laowang/shared-data-tasks/market_snapshot_sync/stop", method="POST"), patch.object(
+        api_kol, "get_current_authenticated_user", return_value=DAV
+    ), patch.object(api_kol, "request_admin_task_stop", return_value={"task_code": "market_snapshot_sync", "enabled": False}) as stop_task:
+        stopped = api_kol.api_stop_tenant_shared_data_task("laowang", "market_snapshot_sync")
+
+    with app.test_request_context("/api/tenant/laowang/shared-data-tasks/market_snapshot_sync/restart", method="POST"), patch.object(
+        api_kol, "get_current_authenticated_user", return_value=DAV
+    ), patch.object(
+        api_kol, "restart_admin_task", return_value={"run_code": "market-002", "summary": "完成", "result": {"count": 31}}
+    ) as restart_task:
+        restarted = api_kol.api_restart_tenant_shared_data_task("laowang", "market_snapshot_sync")
+
+    assert _status(stopped) == 200
+    assert _response_json(stopped)["message"] == "停止请求已提交"
+    stop_task.assert_called_once_with("market_snapshot_sync")
+    assert _status(restarted) == 200
+    assert _response_json(restarted)["run_code"] == "market-002"
+    restart_task.assert_called_once_with("market_snapshot_sync", trigger_mode="tenant_manual_restart", force=True)
+
+
+def test_given_shared_task_is_still_running_when_dav_restarts_then_it_returns_the_platform_lock_conflict():
+    with app.test_request_context("/api/tenant/laowang/shared-data-tasks/market_snapshot_sync/restart", method="POST"), patch.object(
+        api_kol, "get_current_authenticated_user", return_value=DAV
+    ), patch.object(api_kol, "restart_admin_task", side_effect=RuntimeError("admin_task_already_running")):
+        response = api_kol.api_restart_tenant_shared_data_task("laowang", "market_snapshot_sync")
+
+    assert _status(response) == 409
+    assert _response_json(response)["error"] == "admin_task_already_running"
+
+
+def test_given_dav_when_a_stop_is_stuck_then_force_stop_releases_the_same_platform_task():
+    with app.test_request_context("/api/tenant/laowang/shared-data-tasks/market_snapshot_sync/force-stop", method="POST"), patch.object(
+        api_kol, "get_current_authenticated_user", return_value=DAV
+    ), patch.object(
+        api_kol, "force_admin_task_stop", return_value={"task": {"task_code": "market_snapshot_sync", "enabled": False}, "forced_runs": 1}
+    ) as force_stop:
+        response = api_kol.api_force_stop_tenant_shared_data_task("laowang", "market_snapshot_sync")
+
+    assert _status(response) == 200
+    assert _response_json(response)["forced_runs"] == 1
+    assert _response_json(response)["message"] == "任务已强制停止，可重新启动"
+    force_stop.assert_called_once_with("market_snapshot_sync")
+
+
 def test_given_dav_when_using_another_tenant_or_non_shared_task_then_access_is_denied():
     with app.test_request_context("/api/tenant/duoge/shared-data-tasks"), patch.object(
         api_kol, "get_current_authenticated_user", return_value=DAV
@@ -79,6 +124,18 @@ def test_given_workbench_template_then_dav_can_read_and_run_the_two_shared_tasks
     assert "新闻源采集同步" in source
     assert "kwLoadSharedDataSyncPanel" in source
     assert "kwRunSharedDataSync" in source
+    assert "kwStopSharedDataSync" in source
+    assert "kwRestartSharedDataSync" in source
+    assert "kwForceStopSharedDataSync" in source
     assert "/shared-data-tasks/${encodeURIComponent(taskCode)}/run" in source
+    assert "/shared-data-tasks/${encodeURIComponent(taskCode)}/stop" in source
+    assert "/shared-data-tasks/${encodeURIComponent(taskCode)}/restart" in source
+    assert "/shared-data-tasks/${encodeURIComponent(taskCode)}/force-stop" in source
+    assert "停止请求已提交" in source
+    assert "重新启动同步" in source
+    assert "重新启动同步（停止中）" in source
+    assert "强制停止" in source
+    assert "kwSharedDataSyncStopRequests" in source
+    assert "setTimeout(() => kwLoadSharedDataSyncPanel(), 3000)" in source
     assert "平台共享任务。Admin 与全部大V查看同一配置" in source
     assert "schedule_type" not in source[source.index('id="workbench-section-shared-data-sync"'):source.index('id="workbench-section-published"')]

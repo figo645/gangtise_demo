@@ -1,7 +1,12 @@
 from src.runtime import *
 from src.services import *
 from src.domain.ai_services import _is_truthy_flag
-from src.domain.core_services import _merge_site_config, refresh_all_tenant_smart_indicator_snapshots
+from src.domain.core_services import (
+    _merge_site_config,
+    force_admin_task_stop,
+    refresh_all_tenant_smart_indicator_snapshots,
+    restart_admin_task,
+)
 
 H5_WECHAT_STATE_SESSION_KEY = "h5_wechat_login_state"
 H5_WECHAT_NEXT_SESSION_KEY = "h5_wechat_login_next"
@@ -1097,6 +1102,32 @@ def api_stop_admin_task(task_code):
         app.logger.exception("Failed to stop admin task")
         return jsonify({"ok": False, "error": str(exc)}), 500
     return jsonify({"ok": True, "task": task, **build_admin_task_center_payload()})
+
+
+@app.route("/api/admin/tasks/<task_code>/force-stop", methods=["POST"])
+def api_force_stop_admin_task(task_code):
+    try:
+        result = force_admin_task_stop(task_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        app.logger.exception("Failed to force-stop admin task")
+        return jsonify({"ok": False, "error": str(exc)}), 500
+    return jsonify({"ok": True, "result": result, **build_admin_task_center_payload()})
+
+
+@app.route("/api/admin/tasks/<task_code>/restart", methods=["POST"])
+def api_restart_admin_task(task_code):
+    body = request.get_json(silent=True) or {}
+    try:
+        result = restart_admin_task(task_code, trigger_mode="manual_restart", force=bool(body.get("force", True)))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if str(exc).strip() == "admin_task_already_running":
+            return jsonify({"ok": False, "error": str(exc)}), 409
+        return jsonify({"ok": False, "error": str(exc)}), 500
+    return jsonify({"ok": True, "result": result, **build_admin_task_center_payload()})
 
 
 @app.route("/api/admin/task-runs")

@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 
 def _daily_response():
@@ -34,18 +34,18 @@ def test_market_index_rejects_gangtise_provider_calls():
     post.assert_not_called()
 
 
-def test_market_snapshot_source_definition_has_no_external_gangtise_endpoint():
+def test_market_snapshot_source_definition_identifies_the_gangtise_shared_snapshot():
     from src.domain import market_services
 
     source = market_services.build_akshare_market_snapshot_source_seed_payload("source_shanghai_index")
 
-    assert source["provider"] == "AKShare"
-    assert source["path"] == "akshare://market_snapshot"
+    assert source["provider"] == "Gangtise OpenAPI"
+    assert source["path"] == "gangtise://application/open-quote/kline/daily"
     assert source["auth_type"] == "none"
-    assert source["response_mapping"]["connector_type"] == "akshare_snapshot"
+    assert source["response_mapping"]["connector_type"] == "gangtise_market_snapshot"
 
 
-def test_market_overview_payload_rejects_non_akshare_snapshot(monkeypatch):
+def test_market_overview_payload_rejects_old_snapshot_versions(monkeypatch):
     from src.domain import market_services
 
     payload = {"ok": True, "snapshot_version": 7, "source": "Gangtise", "items": [{"value": 1}]}
@@ -55,11 +55,11 @@ def test_market_overview_payload_rejects_non_akshare_snapshot(monkeypatch):
     result = market_services.build_market_overview_payload()
 
     assert result["items"] == []
-    assert result["source"] == "AKShare"
+    assert result["source"] == "Gangtise OpenAPI"
     assert result["refreshing"] is True
 
 
-def test_market_sector_payload_rejects_non_akshare_snapshot(monkeypatch):
+def test_market_sector_payload_rejects_old_snapshot_versions(monkeypatch):
     from src.domain import market_services
 
     payload = {"ok": True, "snapshot_version": 7, "source": "Gangtise", "items": [{"sector": "银行"}]}
@@ -69,11 +69,11 @@ def test_market_sector_payload_rejects_non_akshare_snapshot(monkeypatch):
     result = market_services.build_market_sector_overview_payload()
 
     assert result["items"] == []
-    assert result["source"] == "AKShare"
+    assert result["source"] == "Gangtise OpenAPI"
     assert result["refreshing"] is True
 
 
-def test_market_index_detail_rejects_gangtise_history(monkeypatch):
+def test_market_index_detail_rejects_malformed_gangtise_history(monkeypatch):
     from src.domain import market_services
 
     monkeypatch.setattr(
@@ -164,13 +164,13 @@ def test_akshare_sector_sync_accepts_pandas_style_ambiguous_columns_index():
     assert {row["sector"] for row in rows} == set(market_services.SHENWAN_LEVEL1_INDUSTRIES)
 
 
-def test_market_snapshot_task_runs_each_trading_hour_only():
+def test_market_snapshot_task_runs_at_the_four_published_slots():
     from src.domain import market_services
 
     task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "market_snapshot_sync")
 
     assert task["schedule_type"] == "daily"
-    assert task["schedule_value"] == "09:30,10:30,11:30,13:30,14:30,15:30"
+    assert task["schedule_value"] == "09:30,12:00,14:00,15:30"
     assert task["enabled"] == 1
 
 
@@ -247,39 +247,38 @@ def test_disabled_sources_do_not_authenticate_or_call_gangtise():
     assert result["skipped_disabled"] == 1
 
 
-def test_market_snapshot_uses_akshare_and_never_calls_gangtise():
+def test_market_snapshot_uses_report_verified_gangtise_contracts():
     from src.domain import market_services
 
     index_result = {
         "ok": True,
-        "provider": "AKShare",
+        "provider": "Gangtise OpenAPI",
         "points": [
             {"date": "2026-08-07", "open": 100, "high": 101, "low": 99, "close": 100},
             {"date": "2026-08-10", "open": 101, "high": 102, "low": 100, "close": 101},
         ],
     }
-    sector_rows = [{
-        "sector": "银行", "code": "801780.SWI", "value": 102, "change": 2,
-        "change_pct": 2, "updated_at": "2026-08-10", "data_source": "AKShare",
-    }]
-    with patch.object(market_services, "fetch_akshare_market_index_history", return_value=index_result) as index_fetch, \
-        patch.object(market_services, "_fetch_akshare_sector_overview", return_value=sector_rows), \
-        patch.object(market_services, "_load_market_snapshot_payload", return_value=None), \
-        patch.object(market_services, "_load_watchlist_cache", return_value=None), \
+    selected_market = ["source_shanghai_index", "source_hsi"]
+    selected_sectors = ["电子", "银行"]
+    sector_rows = [{"sector": sector, "code": market_services.GANGTISE_SHENWAN_LEVEL1_CODES[sector], "value": 102, "change": 2, "change_pct": 2, "updated_at": "2026-08-10", "data_source": "Gangtise OpenAPI"} for sector in selected_sectors]
+    with patch.object(market_services, "fetch_gangtise_market_index_history", return_value=index_result) as index_fetch, \
+        patch.object(market_services, "_fetch_gangtise_sector_overview", return_value=(sector_rows, [])) as sector_fetch, \
+        patch.object(market_services, "_resolve_shared_market_snapshot_selection", return_value={"market_codes": selected_market, "sector_names": selected_sectors}), \
         patch.object(market_services, "_save_watchlist_cache"), \
-        patch.object(market_services, "_save_market_snapshot_payload") as save_snapshot, \
-        patch.object(market_services, "_load_akshare", return_value=object()):
+        patch.object(market_services, "_save_market_snapshot_payload") as save_snapshot:
         result = market_services.sync_market_snapshot(force=True)
 
-    assert not hasattr(market_services, "_fetch_gangtise_sector_overview")
-    assert not hasattr(market_services, "_load_gangtise_sector_catalog")
-    assert index_fetch.call_count == len(market_services.MARKET_OVERVIEW_INDEX_CODES)
-    assert result["overview_count"] == len(market_services.MARKET_OVERVIEW_INDEX_CODES)
-    assert result["sector_count"] == 0
+    assert [call.args[0] for call in index_fetch.call_args_list] == selected_market
+    assert result["overview_count"] == len(selected_market)
+    assert result["sector_count"] == len(selected_sectors)
+    assert result["selected_market_codes"] == selected_market
+    assert result["selected_sector_names"] == selected_sectors
+    sector_fetch.assert_called_once_with(ANY, ANY, selected_sectors)
     overview = next(call.args[2] for call in save_snapshot.call_args_list if call.args[:2] == ("market_overview", "standard_indices"))
-    assert overview["source"] == "AKShare"
-    assert overview["snapshot_version"] == 7
-    assert not any(call.args[:2] == ("market_sector_overview", "shenwan_level1") for call in save_snapshot.call_args_list)
+    assert overview["source"] == "Gangtise OpenAPI"
+    assert overview["snapshot_version"] == 10
+    assert overview["selection_scope"] == "tenant_union"
+    assert any(call.args[:2] == ("market_sector_overview", "shenwan_level1") for call in save_snapshot.call_args_list)
 
 
 def test_market_snapshot_refreshes_industry_snapshot_on_every_run():
@@ -287,23 +286,63 @@ def test_market_snapshot_refreshes_industry_snapshot_on_every_run():
 
     index_result = {
         "ok": True,
-        "provider": "AKShare",
+        "provider": "Gangtise OpenAPI",
         "points": [
             {"date": "2026-08-07", "close": 100},
             {"date": "2026-08-10", "close": 101},
         ],
     }
-    with patch.object(market_services, "fetch_akshare_market_index_history", return_value=index_result), \
-        patch.object(market_services, "_load_market_snapshot_payload", return_value=None), \
-        patch.object(market_services, "_load_watchlist_cache", return_value=None), \
-        patch.object(market_services, "_load_akshare", return_value=object()), \
-        patch.object(market_services, "_fetch_akshare_sector_overview", return_value=[{"sector": "银行", "value": 102}]) as sector_fetch, \
+    with patch.object(market_services, "fetch_gangtise_market_index_history", return_value=index_result), \
+        patch.object(market_services, "_fetch_gangtise_sector_overview", return_value=([], ["empty"])) as sector_fetch, \
+        patch.object(market_services, "_resolve_shared_market_snapshot_selection", return_value={"market_codes": ["source_shanghai_index"], "sector_names": ["电子"]}), \
         patch.object(market_services, "_save_watchlist_cache"), \
         patch.object(market_services, "_save_market_snapshot_payload"):
         result = market_services.sync_market_snapshot(force=False)
 
     assert result["sector_count"] == 0
     sector_fetch.assert_called_once()
+
+
+def test_market_snapshot_selection_uses_the_deduplicated_dav_union_and_keeps_empty_selection_empty():
+    from src.domain import core_services, market_services
+
+    tenants = [{"slug": "laowang"}, {"slug": "duoge"}, {"slug": "empty"}]
+    settings = {
+        "laowang": {"configured": True, "market_overview_codes": ["source_shanghai_index", "source_hsi"], "sector_names": ["电子", "银行"]},
+        "duoge": {"configured": True, "market_overview_codes": ["source_hsi", "source_dji"], "sector_names": ["银行", "计算机"]},
+        "empty": {"configured": True, "market_overview_codes": [], "sector_names": []},
+    }
+    with patch.object(core_services, "get_tenant_configs", return_value=tenants), patch.object(
+        core_services, "load_tenant_market_display_settings", side_effect=lambda slug: settings[slug]
+    ):
+        selection = market_services._resolve_shared_market_snapshot_selection()
+
+    assert selection == {
+        "market_codes": ["source_shanghai_index", "source_hsi", "source_dji"],
+        "sector_names": ["电子", "银行", "计算机"],
+    }
+
+
+def test_market_snapshot_selection_does_not_call_defaults_when_every_dav_published_an_empty_panel():
+    from src.domain import core_services, market_services
+
+    with patch.object(core_services, "get_tenant_configs", return_value=[{"slug": "empty"}]), patch.object(
+        core_services, "load_tenant_market_display_settings", return_value={"configured": True, "market_overview_codes": [], "sector_names": []}
+    ):
+        selection = market_services._resolve_shared_market_snapshot_selection()
+
+    assert selection == {"market_codes": [], "sector_names": []}
+
+
+def test_empty_dav_sector_selection_makes_no_gangtise_sector_request():
+    from src.domain import market_services
+
+    with patch.object(market_services, "fetch_gangtise_market_kline_series") as fetch:
+        items, errors = market_services._fetch_gangtise_sector_overview("2026-09-01", "2026-09-18", [])
+
+    assert items == []
+    assert errors == []
+    fetch.assert_not_called()
 
 
 def test_market_payload_rejects_old_gangtise_snapshot():
@@ -321,9 +360,9 @@ def test_market_payload_rejects_old_gangtise_snapshot():
         sectors = market_services.build_market_sector_overview_payload()
 
     assert overview["items"] == []
-    assert overview["source"] == "AKShare"
+    assert overview["source"] == "Gangtise OpenAPI"
     assert sectors["items"] == []
-    assert sectors["source"] == "AKShare"
+    assert sectors["source"] == "Gangtise OpenAPI"
 
 
 def test_page_watchlist_catalog_never_fetches_a_provider_when_cache_is_missing(monkeypatch):

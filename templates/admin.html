@@ -5787,9 +5787,9 @@
                 <td>
                   <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminTaskDetail('{{ task.task_code }}')">详情</button>
                   <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminTaskEditor('{{ task.task_code }}')">编辑</button>
-                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="runAdminTask('{{ task.task_code }}', false)">执行</button>
-                  <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="runAdminTask('{{ task.task_code }}', true)">{% if task.task_code == 'market_snapshot_sync' %}人工刷新{% else %}强制刷新{% endif %}</button>
-                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;color:#F3A6A6;border-color:rgba(243,166,166,0.35)" onclick="stopAdminTask('{{ task.task_code }}')">停止</button>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="runAdminTask('{{ task.task_code }}', false, this)">执行</button>
+                  <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="runAdminTask('{{ task.task_code }}', true, this)">{% if task.task_code == 'market_snapshot_sync' %}人工刷新{% else %}强制刷新{% endif %}</button>
+                  {% if task.last_run_status == 'running' and not task.enabled %}<button class="btn-outline" style="padding:3px 9px;font-size:11px;color:#F3A6A6;border-color:rgba(243,166,166,0.35)" onclick="forceStopAdminTask('{{ task.task_code }}')">强制停止</button>{% elif task.enabled %}<button class="btn-outline" style="padding:3px 9px;font-size:11px;color:#F3A6A6;border-color:rgba(243,166,166,0.35)" onclick="stopAdminTask('{{ task.task_code }}')">停止</button>{% else %}<button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="restartAdminTask('{{ task.task_code }}', this)">重新启动</button>{% endif %}
                 </td>
               </tr>
               {% endfor %}
@@ -7165,9 +7165,9 @@ function renderAdminTaskCenter() {
         <td>
           <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminTaskDetail('${escapeHtml(task.task_code || '')}')">详情</button>
           <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminTaskEditor('${escapeHtml(task.task_code || '')}')">编辑</button>
-          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="runAdminTask('${escapeHtml(task.task_code || '')}', false)">执行</button>
-          <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="runAdminTask('${escapeHtml(task.task_code || '')}', true)">${task.task_code === 'market_snapshot_sync' ? '人工刷新' : '强制刷新'}</button>
-          <button class="btn-outline" style="padding:3px 9px;font-size:11px;color:#F3A6A6;border-color:rgba(243,166,166,0.35)" onclick="stopAdminTask('${escapeHtml(task.task_code || '')}')">停止</button>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="runAdminTask('${escapeHtml(task.task_code || '')}', false, this)">执行</button>
+          <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="runAdminTask('${escapeHtml(task.task_code || '')}', true, this)">${task.task_code === 'market_snapshot_sync' ? '人工刷新' : '强制刷新'}</button>
+          ${String(task.last_run_status || '').toLowerCase() === 'running' && !task.enabled ? `<button class="btn-outline" style="padding:3px 9px;font-size:11px;color:#F3A6A6;border-color:rgba(243,166,166,0.35)" onclick="forceStopAdminTask('${escapeHtml(task.task_code || '')}')">强制停止</button>` : (task.enabled ? `<button class="btn-outline" style="padding:3px 9px;font-size:11px;color:#F3A6A6;border-color:rgba(243,166,166,0.35)" onclick="stopAdminTask('${escapeHtml(task.task_code || '')}')">停止</button>` : `<button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="restartAdminTask('${escapeHtml(task.task_code || '')}', this)">重新启动</button>`) }
         </td>
       </tr>
     `).join('') || '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:20px 0">暂无任务</td></tr>';
@@ -8603,13 +8603,30 @@ function openAdminTaskDetail(taskCode) {
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
       <button class="btn-outline" type="button" style="padding:8px 16px;font-size:12px" onclick="openAdminTaskEditor('${escapeAttr(task.task_code || '')}')">编辑任务</button>
-      <button class="btn-gold" type="button" style="padding:8px 16px;font-size:12px" onclick="runAdminTask('${escapeAttr(task.task_code || '')}', false)">立即执行</button>
+      <button class="btn-gold" type="button" style="padding:8px 16px;font-size:12px" onclick="runAdminTask('${escapeAttr(task.task_code || '')}', false, this)">立即执行</button>
     </div>
   `;
   modal.classList.add('show');
 }
 
-async function runAdminTask(taskCode, forceRun) {
+function setAdminTaskActionFeedback(button, label) {
+  if (!button) return;
+  button.dataset.originalLabel = button.dataset.originalLabel || button.textContent;
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  button.textContent = label;
+}
+
+function clearAdminTaskActionFeedback(button) {
+  if (!button) return;
+  button.disabled = false;
+  button.removeAttribute('aria-busy');
+  if (button.dataset.originalLabel) button.textContent = button.dataset.originalLabel;
+}
+
+async function runAdminTask(taskCode, forceRun, button) {
+  setAdminTaskActionFeedback(button, forceRun ? '正在刷新…' : '正在执行…');
+  showToast(`任务 ${taskCode} 请求已提交，正在执行`);
   const res = await fetch(`/api/admin/tasks/${encodeURIComponent(taskCode)}/run`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -8617,6 +8634,7 @@ async function runAdminTask(taskCode, forceRun) {
   });
   const data = await res.json();
   if (!res.ok || !data.ok) {
+    clearAdminTaskActionFeedback(button);
     showToast((data && data.error) || '任务执行失败');
     return;
   }
@@ -8624,7 +8642,7 @@ async function runAdminTask(taskCode, forceRun) {
   if (taskCode === 'indicator_prepare' || taskCode === 'indicator_gangtise_openapi_sync' || taskCode === 'indicator_market_cache_sync') {
     await refreshAdminIndicatorHub(false);
   }
-  showToast(`任务 ${taskCode} 已执行`);
+  showToast(data.result && data.result.summary ? data.result.summary : `任务 ${taskCode} 已执行完成`);
 }
 
 async function stopAdminTask(taskCode) {
@@ -8640,6 +8658,36 @@ async function stopAdminTask(taskCode) {
   }
   applyAdminTaskCenterPayload(data);
   showToast(`任务 ${taskCode} 已停止`);
+}
+
+async function restartAdminTask(taskCode, button) {
+  setAdminTaskActionFeedback(button, '正在重启…');
+  showToast(`任务 ${taskCode} 正在重新启动并执行`);
+  const res = await fetch(`/api/admin/tasks/${encodeURIComponent(taskCode)}/restart`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({force: true}),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    clearAdminTaskActionFeedback(button);
+    showToast((data && data.error) || '任务重新启动失败');
+    return;
+  }
+  applyAdminTaskCenterPayload(data);
+  showToast(data.result && data.result.summary ? data.result.summary : `任务 ${taskCode} 已重新启动并完成`);
+}
+
+async function forceStopAdminTask(taskCode) {
+  if (!window.confirm(`确认强制停止任务 ${taskCode} 吗？未完成的旧同步结果将被丢弃，之后可重新启动。`)) return;
+  const res = await fetch(`/api/admin/tasks/${encodeURIComponent(taskCode)}/force-stop`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    showToast((data && data.error) || '任务强制停止失败');
+    return;
+  }
+  applyAdminTaskCenterPayload(data);
+  showToast(`任务 ${taskCode} 已强制停止`);
 }
 
 async function refreshAdminIndicatorHub(showMessage) {
