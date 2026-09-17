@@ -883,6 +883,21 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(denied.status_code, 403)
         self.assertEqual(denied.get_json()["error"], "tenant_scope_forbidden")
 
+    def test_h5_hermes_quick_actions_match_declared_consultation_and_task_modes(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="hermes-quick-actions"', html)
+        self.assertIn("function renderHermesQuickActions()", html)
+        self.assertIn("function runHermesQuickAction(actionId)", html)
+        self.assertIn("今日大盘", html)
+        self.assertIn("个股深研", html)
+        self.assertIn("上传报告解读", html)
+        self.assertIn("今日互动简报", html)
+        self.assertIn("全年互动趋势", html)
+        self.assertIn("openHermesFilePicker()", html)
+
     def test_h5_hermes_history_and_send_scroll_to_bottom(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 
