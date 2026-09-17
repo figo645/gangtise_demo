@@ -275,6 +275,13 @@ DATABASE_POOL_MAX_CONNECTIONS = max(
     DATABASE_POOL_MIN_CONNECTIONS,
     int(os.environ.get("DATABASE_POOL_MAX_CONNECTIONS", "12")),
 )
+# Protect the database from application paths that leave a transaction open.
+# This is deliberately not an idle-session timeout: pooled, healthy idle
+# connections are expected between requests and should remain reusable.
+DATABASE_IDLE_IN_TRANSACTION_TIMEOUT_MS = max(
+    0,
+    int(os.environ.get("DATABASE_IDLE_IN_TRANSACTION_TIMEOUT_MS", "60000")),
+)
 AUTO_INIT_DB_MODE = str(os.environ.get("AUTO_INIT_DB", "dev")).strip().lower()
 MARKET_DASHBOARD_REGISTRY_PATH = Path(
     os.environ.get(

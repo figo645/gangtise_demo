@@ -14,6 +14,7 @@ import signal
 import subprocess
 import threading
 import time
+from contextlib import closing, contextmanager
 from datetime import datetime, timedelta
 from hmac import compare_digest
 from pathlib import Path
@@ -30,6 +31,7 @@ PRODUCTION_TO_STAGING_SCRIPT = ROOT / "scripts" / "sync_production_to_staging.sh
 STAGING_TO_PRODUCTION_SCRIPT = ROOT / "scripts" / "sync_staging_to_production.sh"
 CLEAR_DATABASE_SCRIPT = ROOT / "scripts" / "clear_database_release.sh"
 USER_DATA_CLEANUP_SCRIPT = ROOT / "scripts" / "cleanup_user_runtime_data.sh"
+POSTGRES_UPDATES_SCRIPT = ROOT / "scripts" / "apply_postgres_updates.sh"
 PACKAGES_DIR = ROOT / "database_release_packages"
 RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
 USER_DATA_BACKUPS_DIR = ROOT / ".deploy" / "user_data_backups"
@@ -38,6 +40,7 @@ CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".databa
 _config_loaded = False
 _release_lock = threading.Lock()
 _delta_generation_lock = threading.Lock()
+_migration_ledger_reconciliation_lock = threading.Lock()
 _release_job = {"status": "idle", "id": "", "target": "", "operation": "", "log": "", "started_at": "", "finished_at": "", "returncode": None, "pid": None, "package_plan": [], "progress": {}, "events": [], "cancel_requested": False, "cancel_requested_at": "", "cancellable": False}
 _release_job_loaded = False
 
@@ -47,7 +50,7 @@ FULL_RELEASE_WORKFLOW = (
     ("preserving", "保留目标用户数据"),
     ("restoring", "恢复临时数据库"),
     ("migrating", "应用结构与主数据迁移"),
-    ("validating", "迁移后校验"),
+    ("validating", "最终结构等价核验"),
     ("switching", "切换目标数据库"),
     ("completed", "健康检查与完成"),
 )
@@ -55,9 +58,20 @@ DIFF_RELEASE_WORKFLOW = (
     ("preflight", "迁移前检查"),
     ("auditing", "核对差异与指纹"),
     ("applying", "执行差异包"),
-    ("validating", "迁移后校验"),
+    ("validating", "最终结构等价核验"),
     ("completed", "完成与记录"),
 )
+
+
+@contextmanager
+def _managed_release_connection(**kwargs):
+    """Commit or roll back a release query, then always close its socket."""
+    connection = psycopg2.connect(**kwargs)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 def _release_workflow(operation):
@@ -252,9 +266,10 @@ def get_database_release_package_plan(target_name):
     released_checksums = {}
     ledger_initialized = False
     try:
-        with psycopg2.connect(
+        with _managed_release_connection(
             host=target["db_host"], port=target["db_port"], dbname=target["db_name"],
             user=target["db_user"], password=target["db_password"], connect_timeout=5,
+            application_name="gangtise-release-plan",
         ) as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT to_regclass('public.database_release_packages')")
@@ -318,6 +333,191 @@ def scan_database_release_delta(target_name):
         "schema_migration_difference": report["schema_migration_difference"],
         "excluded_runtime_tables": report["data"]["runtime_data_difference_tables"],
         "raw_master_data_difference_tables": report["data"]["raw_master_data_difference_tables"],
+    }
+
+
+def scan_database_release_schema(target_name):
+    """Read only schema metadata for the safe production upgrade path."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    from tools.audit_database_release_diff import audit_schema_only
+    from src.domain.core_services import get_local_app_db_target
+    try:
+        report = audit_schema_only(get_local_app_db_target(), target)
+    except psycopg2.Error as exc:
+        detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+        raise RuntimeError(f"database_release_schema_scan_failed: {detail}") from exc
+    output = _database_release_diff_report_path(target["name"])
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "target": target["name"],
+        "mode": report["mode"],
+        "report_path": str(output.relative_to(ROOT)),
+        "summary": report["summary"],
+        "schema": report["schema"],
+        "schema_migration_difference": report["schema_migration_difference"],
+    }
+
+
+def verify_database_release_schema(target_name):
+    """Run the final read-only equivalence check used by the UI workflow."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    from tools.audit_database_release_diff import verify_schema_equivalence
+    from src.domain.core_services import get_local_app_db_target
+    try:
+        return verify_schema_equivalence(get_local_app_db_target(), target)
+    except psycopg2.Error as exc:
+        detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+        raise RuntimeError(f"database_release_schema_verify_failed: {detail}") from exc
+
+
+def get_database_release_schema_summary():
+    """Return read-only structural drift totals for the 5051 overview.
+
+    This deliberately uses the schema-only auditor: no business-table rows are
+    read, hashed, copied, or changed. A busy target is reported independently
+    so the overview remains available when one environment is unavailable.
+    """
+    from tools.audit_database_release_diff import audit_schema_only
+    from src.domain.core_services import get_local_app_db_target
+
+    local_target = get_local_app_db_target()
+    results = []
+    for target_name in ("staging", "production"):
+        target = get_database_release_target(target_name)
+        if not target:
+            results.append({
+                "target": target_name,
+                "label": "Staging" if target_name == "staging" else "Production",
+                "available": False,
+                "error": "目标环境未配置。",
+                "summary": {},
+            })
+            continue
+        try:
+            report = audit_schema_only(local_target, target)
+            summary = report["summary"]
+            migration = report["schema_migration_difference"]
+            structural_difference_count = (
+                int(summary.get("local_only_tables", 0))
+                + int(summary.get("target_only_tables", 0))
+                + int(summary.get("schema_difference_tables", 0))
+                + int(summary.get("migration_local_only", 0))
+                + int(summary.get("migration_target_only", 0))
+                + int(summary.get("migration_checksum_mismatch", 0))
+            )
+            results.append({
+                "target": target_name,
+                "label": "Staging" if target_name == "staging" else "Production",
+                "available": True,
+                "generated_at": report["generated_at"],
+                "summary": {
+                    "local_table_count": summary.get("local_table_count", 0),
+                    "target_table_count": summary.get("target_table_count", 0),
+                    "local_only_tables": summary.get("local_only_tables", 0),
+                    "target_only_tables": summary.get("target_only_tables", 0),
+                    "schema_difference_tables": summary.get("schema_difference_tables", 0),
+                    "migration_local_only": summary.get("migration_local_only", 0),
+                    "migration_target_only": summary.get("migration_target_only", 0),
+                    "migration_checksum_mismatch": summary.get("migration_checksum_mismatch", 0),
+                    "structural_difference_count": structural_difference_count,
+                },
+                "migration_difference": migration,
+            })
+        except Exception as exc:  # A target outage must not make the overview unusable.
+            detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+            results.append({
+                "target": target_name,
+                "label": "Staging" if target_name == "staging" else "Production",
+                "available": False,
+                "error": f"目标环境暂不可用：{detail}",
+                "summary": {},
+            })
+    return {
+        "mode": "read_only_schema_only",
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "source": {
+            "label": "本地开发库",
+            "host": local_target.get("host") or local_target.get("db_host"),
+            "database": local_target.get("dbname") or local_target.get("db_name"),
+        },
+        "targets": results,
+    }
+
+
+def _classify_database_table(table_name):
+    """Return the release/data ownership classification shown in 5051."""
+    name = str(table_name or "")
+    if name in {"schema_migrations", "database_release_packages"}:
+        return {"key": "release_control", "label": "发布控制数据", "owner": "5051 发布控制面", "policy": "仅由发布流程维护，不参与业务数据覆盖。", "description": "迁移文件 checksum、发布状态和执行记录。"}
+    if name == "users":
+        return {"key": "user_accounts", "label": "用户账户数据", "owner": "账户与权限模块", "policy": "生产账户默认保留，禁止本地覆盖。", "description": "用户账户、角色、租户归属和登录状态。"}
+    if name in {"app_settings", "admin_task_configs", "tenant_registry", "tenant_subscription_products", "tenant_fan_qr_invites"}:
+        return {"key": "configuration", "label": "配置数据", "owner": "平台配置与租户管理", "policy": "按环境和租户隔离，生产敏感配置禁止覆盖。", "description": "系统、租户、订阅和后台任务配置。"}
+    if name in {"security_master", "indicator_definitions", "indicator_mapping_rules", "indicator_source_defs", "market_snapshot_payloads", "indicator_series", "indicator_kline_points", "indicator_latest_values", "indicator_raw_records", "indicator_load_batches", "daily_quiz_sets", "quiz_questions"}:
+        return {"key": "master_data", "label": "主数据", "owner": "平台数据服务", "policy": "可通过审核后的版本包发布，目标端独有记录不应被删除。", "description": "证券、指标、行情快照和平台统一内容目录。"}
+    if name in {"knowledge_embeddings", "review_voice_embeddings"}:
+        return {"key": "knowledge_index", "label": "知识索引数据", "owner": "知识与检索模块", "policy": "独立重建或清理，不随结构升级覆盖用户业务数据。", "description": "知识库索引和语音内容索引。"}
+    if name in {"access_logs", "admin_task_runs", "indicator_source_tests", "token_usage_logs", "user_async_jobs", "indicator_anomalies", "indicator_clean_jobs", "hermes_interception_audits"}:
+        return {"key": "audit_operations", "label": "审计与运行数据", "owner": "平台运行控制面", "policy": "按环境保留，发布流程只做结构升级，不复制运行记录。", "description": "访问、任务、用量、异常和智能体审计记录。"}
+    if name in {"simulated_data_batches"}:
+        return {"key": "simulation_data", "label": "模拟数据", "owner": "测试数据管理", "policy": "只允许通过模拟数据工具操作，禁止进入生产业务数据。", "description": "BDD 和演示用模拟数据批次。"}
+    return {"key": "user_generated", "label": "用户生成数据", "owner": "用户与内容业务", "policy": "生产数据默认保留，禁止本地结构发布覆盖行数据。", "description": "粉丝互动、智能体会话、自选股、评论、标注、洞见、订阅等用户产生的内容。"}
+
+
+def get_database_table_inventory(target_name):
+    """List local/target tables and their data ownership policy."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    from tools.audit_database_release_diff import _connect, _public_tables
+    from src.domain.core_services import get_local_app_db_target
+    local_target = get_local_app_db_target()
+    try:
+        with closing(_connect(local_target)) as local_connection:
+            local_tables = set(_public_tables(local_connection))
+    except psycopg2.Error as exc:
+        detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+        raise RuntimeError(f"database_release_inventory_source_unavailable: {detail}") from exc
+
+    target_error = ""
+    try:
+        with closing(_connect(target)) as target_connection:
+            target_tables = set(_public_tables(target_connection))
+    except psycopg2.Error as exc:
+        # The governance list remains useful when a target is temporarily at
+        # capacity. Do not turn a read-only UI query into a generic HTTP 500.
+        target_tables = set()
+        detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+        target_error = f"目标环境暂不可用：{detail}"
+    rows = []
+    for name in sorted(local_tables | target_tables):
+        classification = _classify_database_table(name)
+        rows.append({
+            "table_name": name,
+            "category": classification["key"],
+            "category_label": classification["label"],
+            "owner": classification["owner"],
+            "policy": classification["policy"],
+            "description": classification["description"],
+            "local_present": name in local_tables,
+            "target_present": name in target_tables,
+            "status": "目标暂不可用" if target_error else ("两边都有" if name in local_tables and name in target_tables else ("仅本地" if name in local_tables else "仅目标")),
+        })
+    counts = {}
+    for row in rows:
+        counts[row["category_label"]] = counts.get(row["category_label"], 0) + 1
+    return {
+        "target": target["name"],
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "target_available": not bool(target_error),
+        "target_error": target_error,
+        "counts": counts,
+        "rows": rows,
     }
 
 
@@ -449,6 +649,51 @@ def _write_generated_database_release_package(package_type, version, title, sql_
     }
 
 
+def _sql_literal(value):
+    return "'" + str(value or "").replace("'", "''") + "'"
+
+
+def _schema_migration_ledger_baseline_sql(local_target, target, report):
+    """Build insert-only ledger rows proven by the schema release plan.
+
+    Only migrations classified as ``schema`` in the source ledger qualify.
+    Master-data migrations can alter configuration or content, which cannot be
+    proved from table metadata and therefore remain outside this path.
+    """
+    from tools.audit_database_release_diff import _connect
+
+    migration_difference = report.get("schema_migration_difference") or {}
+    missing_names = list(migration_difference.get("local_only") or [])
+    if not missing_names:
+        return {"sql": "", "rows": [], "blockers": []}
+    with closing(_connect(local_target)) as local_connection, closing(_connect(target)) as target_connection:
+        local_rows = _migration_ledger_rows(local_connection)
+        target_rows = _migration_ledger_rows(target_connection)
+    rows, blockers = [], []
+    for migration_name in missing_names:
+        row = local_rows.get(migration_name)
+        if not row:
+            blockers.append({"migration": migration_name, "reason": "source_migration_ledger_row_missing"})
+            continue
+        if migration_name in target_rows:
+            blockers.append({"migration": migration_name, "reason": "target_migration_ledger_changed"})
+            continue
+        if row["migration_scope"] != "schema":
+            blockers.append({"migration": migration_name, "reason": "non_schema_migration_ledger_requires_manual_verification"})
+            continue
+        rows.append(row)
+    statements = [
+        "INSERT INTO schema_migrations (migration_name, migration_scope, checksum_sha256, execution_ms) "
+        "VALUES ({name}, 'schema', {checksum}, 0) "
+        "ON CONFLICT (migration_name) DO NOTHING;".format(
+            name=_sql_literal(row["migration_name"]),
+            checksum=_sql_literal(row["checksum_sha256"]),
+        )
+        for row in rows
+    ]
+    return {"sql": "\n".join(statements), "rows": rows, "blockers": blockers}
+
+
 def generate_database_release_delta(target_name, include_schema=True, include_master_data=True, include_runtime_data=False):
     """Create new versioned SQL packages from a fresh local-to-target diff.
 
@@ -524,7 +769,251 @@ def generate_database_release_delta(target_name, include_schema=True, include_ma
         }
 
 
-def start_database_release_delta(target_name, report_path, diff_fingerprint, package_ids, confirm_production=False):
+def generate_database_release_schema(target_name):
+    """Create only an additive, schema-only package for an approved target."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    with _delta_generation_lock:
+        from tools.audit_database_release_diff import build_schema_only_delta
+        from src.domain.core_services import get_local_app_db_target
+        delta = build_schema_only_delta(get_local_app_db_target(), target)
+        report_path = _database_release_diff_report_path(target["name"])
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        diff_fingerprint = _database_release_diff_fingerprint(delta["report"])
+        section = delta["schema"]
+        blockers = [{"type": "schema", **item} for item in section.get("blockers") or []]
+        blockers.extend(
+            {
+                "type": "schema",
+                "migration": migration_name,
+                "reason": "schema_migration_checksum_mismatch",
+            }
+            for migration_name in delta["report"].get("schema_migration_difference", {}).get("checksum_mismatch", [])
+        )
+        ledger_baseline = _schema_migration_ledger_baseline_sql(
+            get_local_app_db_target(), target, delta["report"],
+        )
+        blockers.extend({"type": "schema", **item} for item in ledger_baseline["blockers"])
+        generated = []
+        sql_text = "\n\n".join(part for part in (
+            str(section.get("sql") or "").strip(),
+            str(ledger_baseline.get("sql") or "").strip(),
+        ) if part)
+        if not blockers and sql_text:
+            generated.append(_write_generated_database_release_package(
+                "schema", _next_database_release_version(),
+                f"本地到 {target['name']} 表结构安全升级", sql_text, target["name"],
+            ))
+        review = _database_release_review_section("schema", section)
+        manifest = {
+            **delta["report"],
+            "release_mode": "schema_only",
+            "diff_fingerprint": diff_fingerprint,
+            "generated_packages": generated,
+            "schema_migration_ledger_baseline": ledger_baseline["rows"],
+        }
+        report_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {
+            "target": target["name"],
+            "mode": "schema_only",
+            "report_path": str(report_path.relative_to(ROOT)),
+            "diff_fingerprint": diff_fingerprint,
+            "generated_packages": generated,
+            "blockers": blockers,
+            "safe_release_delta": delta["report"]["safe_release_delta"],
+            "details": {"schema": [
+                *(section.get("actions") or []),
+                *[
+                    {"table": "schema_migrations", "migration": row["migration_name"], "action": "record_schema_migration"}
+                    for row in ledger_baseline["rows"]
+                ],
+            ]},
+            "schema_migration_ledger_baseline": ledger_baseline["rows"],
+            "review": {"sections": [review], "blockers": blockers, "requires_manual_review": bool(blockers)},
+        }
+
+
+def _migration_ledger_rows(connection):
+    """Read only the immutable migration identity needed for baseline repair."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT to_regclass('public.schema_migrations')")
+        if not cursor.fetchone()[0]:
+            raise ValueError("database_release_schema_migrations_missing")
+        cursor.execute(
+            """SELECT migration_name, migration_scope, checksum_sha256
+               FROM schema_migrations ORDER BY migration_name"""
+        )
+        return {
+            str(name): {"migration_name": str(name), "migration_scope": str(scope), "checksum_sha256": str(checksum)}
+            for name, scope, checksum in cursor.fetchall()
+        }
+
+
+def _build_migration_ledger_reconciliation(target_name):
+    """Build a reversible-in-practice, insert-only migration-ledger baseline plan."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    from tools.audit_database_release_diff import _connect, audit_schema_only
+    from src.domain.core_services import get_local_app_db_target
+
+    local_target = get_local_app_db_target()
+    report = audit_schema_only(local_target, target)
+    schema = report.get("schema") or {}
+    migrations = report.get("schema_migration_difference") or {}
+    structural_drift = (
+        list(schema.get("local_only_tables") or [])
+        + list(schema.get("target_only_tables") or [])
+        + list(schema.get("different_tables") or [])
+    )
+    blockers = []
+    if structural_drift:
+        blockers.append({"reason": "schema_not_equivalent", "tables": structural_drift})
+    if migrations.get("checksum_mismatch"):
+        blockers.append({"reason": "schema_migration_checksum_mismatch", "migrations": list(migrations["checksum_mismatch"])})
+
+    with closing(_connect(local_target)) as local_connection, closing(_connect(target)) as target_connection:
+        local_rows = _migration_ledger_rows(local_connection)
+        target_rows = _migration_ledger_rows(target_connection)
+    missing_on_target = [local_rows[name] for name in sorted(set(local_rows) - set(target_rows))]
+    missing_on_local = [target_rows[name] for name in sorted(set(target_rows) - set(local_rows))]
+    # Table equivalence proves that a schema migration's structural result is
+    # present. It cannot prove that a master-data migration's row changes ran,
+    # so those ledger entries must never be auto-baselined by this workflow.
+    target_insertions = [row for row in missing_on_target if row["migration_scope"] == "schema"]
+    local_insertions = [row for row in missing_on_local if row["migration_scope"] == "schema"]
+    manual_review_entries = [
+        {"side": "target", **row} for row in missing_on_target if row["migration_scope"] != "schema"
+    ] + [
+        {"side": "local", **row} for row in missing_on_local if row["migration_scope"] != "schema"
+    ]
+    if manual_review_entries:
+        blockers.append({
+            "reason": "non_schema_migration_ledger_requires_manual_verification",
+            "migrations": manual_review_entries,
+        })
+    plan = {
+        "target": target["name"],
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "mode": "migration_ledger_reconciliation",
+        "schema_summary": report.get("summary") or {},
+        "schema_migration_difference": migrations,
+        "target_insertions": target_insertions,
+        "local_insertions": local_insertions,
+        "manual_review_entries": manual_review_entries,
+        "blockers": blockers,
+        "safety_note": "仅向 schema_migrations 插入缺失账本记录；不删除、不更新表结构或业务数据。",
+    }
+    plan["fingerprint"] = _database_release_diff_fingerprint(plan)
+    return plan
+
+
+def generate_database_release_migration_ledger_reconciliation(target_name):
+    """Persist a reviewed, read-only plan before any migration-ledger mutation."""
+    with _delta_generation_lock:
+        plan = _build_migration_ledger_reconciliation(target_name)
+        report_path = _database_release_diff_report_path(f"{plan['target']}_migration_ledger")
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {**plan, "report_path": str(report_path.relative_to(ROOT))}
+
+
+def _insert_migration_ledger_baseline_rows(target, rows):
+    """Insert only verified missing entries and reject any concurrent checksum drift."""
+    if not rows:
+        return 0
+    with _managed_release_connection(
+        host=target.get("db_host") or target.get("host"),
+        port=target.get("db_port") or target.get("port"),
+        dbname=target.get("db_name") or target.get("dbname"),
+        user=target.get("db_user") or target.get("user"),
+        password=target.get("db_password") or target.get("password"), connect_timeout=8,
+        application_name="gangtise-migration-ledger-reconcile",
+    ) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_xact_lock(hashtext('gangtise_migration_ledger_reconciliation'))")
+            for row in rows:
+                cursor.execute(
+                    """INSERT INTO schema_migrations (migration_name, migration_scope, checksum_sha256, execution_ms)
+                       VALUES (%s, %s, %s, 0)
+                       ON CONFLICT (migration_name) DO NOTHING""",
+                    (row["migration_name"], row["migration_scope"], row["checksum_sha256"]),
+                )
+            cursor.execute(
+                "SELECT migration_name, checksum_sha256 FROM schema_migrations WHERE migration_name = ANY(%s)",
+                ([row["migration_name"] for row in rows],),
+            )
+            persisted = {str(name): str(checksum) for name, checksum in cursor.fetchall()}
+            conflicts = [row["migration_name"] for row in rows if persisted.get(row["migration_name"]) != row["checksum_sha256"]]
+            if conflicts:
+                raise ValueError(f"database_release_migration_ledger_concurrent_checksum_conflict:{','.join(conflicts)}")
+    return len(rows)
+
+
+def _apply_database_release_migration_ledger_reconciliation(
+    target_name, report_path, fingerprint, confirm_production=False,
+):
+    """Apply a reviewed insert-only baseline plan, then prove full equivalence."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    if target["name"] == "production" and confirm_production is not True:
+        raise ValueError("production_confirmation_required")
+    report_file = (ROOT / str(report_path or "").strip()).resolve()
+    deploy_root = (ROOT / ".deploy").resolve()
+    if deploy_root not in report_file.parents or not report_file.is_file():
+        raise ValueError("database_release_migration_ledger_report_invalid")
+    try:
+        saved_plan = json.loads(report_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError("database_release_migration_ledger_report_invalid") from exc
+    if saved_plan.get("mode") != "migration_ledger_reconciliation" or saved_plan.get("target") != target["name"]:
+        raise ValueError("database_release_migration_ledger_report_invalid")
+    if not compare_digest(str(saved_plan.get("fingerprint") or ""), str(fingerprint or "")):
+        raise ValueError("database_release_migration_ledger_fingerprint_invalid")
+    fresh_plan = _build_migration_ledger_reconciliation(target["name"])
+    if not compare_digest(str(fresh_plan.get("fingerprint") or ""), str(fingerprint or "")):
+        raise ValueError("database_release_migration_ledger_stale")
+    if fresh_plan.get("blockers"):
+        raise ValueError("database_release_migration_ledger_blocked")
+    from src.domain.core_services import get_local_app_db_target
+    local_target = get_local_app_db_target()
+    target_added = _insert_migration_ledger_baseline_rows(target, fresh_plan["target_insertions"])
+    local_added = _insert_migration_ledger_baseline_rows(local_target, fresh_plan["local_insertions"])
+    from tools.audit_database_release_diff import verify_schema_equivalence
+    verification = verify_schema_equivalence(local_target, target)
+    if not verification.get("ok"):
+        raise RuntimeError("database_release_migration_ledger_verification_failed")
+    return {
+        "target": target["name"],
+        "mode": "migration_ledger_reconciliation",
+        "target_inserted": target_added,
+        "local_inserted": local_added,
+        "verification": verification,
+        "note": "账本已对齐；未修改任何业务表或表结构。",
+    }
+
+
+def apply_database_release_migration_ledger_reconciliation(
+    target_name, report_path, fingerprint, confirm_production=False,
+):
+    """Serialize ledger baseline work against all other release operations."""
+    if not _migration_ledger_reconciliation_lock.acquire(blocking=False):
+        raise ValueError("database_release_migration_ledger_reconciliation_running")
+    try:
+        with _release_lock:
+            _load_persisted_release_job()
+            if _release_job.get("status") in {"queued", "running", "cancelling"}:
+                raise ValueError("database_release_job_running")
+        return _apply_database_release_migration_ledger_reconciliation(
+            target_name, report_path, fingerprint, confirm_production=confirm_production,
+        )
+    finally:
+        _migration_ledger_reconciliation_lock.release()
+
+
+def start_database_release_delta(target_name, report_path, diff_fingerprint, package_ids, confirm_production=False, schema_only=False):
     """Execute only a reviewed, freshly generated local-to-target diff.
 
     The saved report and a fresh audit must match before any package is
@@ -545,6 +1034,8 @@ def start_database_release_delta(target_name, report_path, diff_fingerprint, pac
         manifest = json.loads(report_file.read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError) as exc:
         raise ValueError("database_release_diff_report_invalid") from exc
+    if bool(schema_only) != (str(manifest.get("release_mode") or "") == "schema_only"):
+        raise ValueError("database_release_diff_mode_invalid")
     manifest_target = manifest.get("target") if isinstance(manifest, dict) else None
     if not isinstance(manifest_target, dict) or str(manifest_target.get("label") or "").strip().lower() != target["name"]:
         raise ValueError("database_release_diff_report_invalid")
@@ -552,7 +1043,29 @@ def start_database_release_delta(target_name, report_path, diff_fingerprint, pac
     if not saved_fingerprint or not compare_digest(saved_fingerprint, str(diff_fingerprint or "")):
         raise ValueError("database_release_diff_fingerprint_invalid")
     audit, _, get_local_app_db_target = _load_database_release_diff_tools()
-    fresh_report = audit(get_local_app_db_target(), target)
+    if schema_only:
+        # Rebuild the additive plan instead of only comparing a report hash.
+        # This prevents a reviewed schema package from starting when the
+        # current target now has an unsafe or no-longer-repairable drift.
+        from tools.audit_database_release_diff import build_schema_only_delta
+        fresh_delta = build_schema_only_delta(get_local_app_db_target(), target)
+        fresh_report = fresh_delta["report"]
+        fresh_schema_plan = fresh_delta["schema"]
+        if fresh_schema_plan.get("blockers"):
+            raise ValueError("database_release_schema_plan_blocked")
+        fresh_ledger_baseline = _schema_migration_ledger_baseline_sql(
+            get_local_app_db_target(), target, fresh_report,
+        )
+        if fresh_ledger_baseline.get("blockers"):
+            raise ValueError("database_release_schema_ledger_baseline_blocked")
+        fresh_sql_text = "\n\n".join(part for part in (
+            str(fresh_schema_plan.get("sql") or "").strip(),
+            str(fresh_ledger_baseline.get("sql") or "").strip(),
+        ) if part)
+        if not fresh_sql_text:
+            raise ValueError("database_release_schema_package_no_longer_required")
+    else:
+        fresh_report = audit(get_local_app_db_target(), target)
     if not compare_digest(saved_fingerprint, _database_release_diff_fingerprint(fresh_report)):
         raise ValueError("database_release_diff_stale")
     requested = []
@@ -563,6 +1076,26 @@ def start_database_release_delta(target_name, report_path, diff_fingerprint, pac
     generated_ids = {str(item.get("id") or "") for item in (manifest.get("generated_packages") or [])}
     if not requested or any(item not in generated_ids for item in requested):
         raise ValueError("database_release_diff_package_invalid")
+    if schema_only:
+        # A schema report can remain fingerprint-identical when only the
+        # generator changes. Bind the reviewed package to the current,
+        # freshly generated DDL as well, so a previously failed or edited
+        # package can never be retried through this endpoint.
+        if len(requested) != 1:
+            raise ValueError("database_release_schema_package_invalid")
+        package = next((item for item in list_database_release_packages() if item.get("id") == requested[0]), None)
+        package_path = ROOT / requested[0] / "schema.sql"
+        expected_payload = (
+            "-- Generated by the local-to-target delta scanner.\n"
+            "-- Additive only: target-only rows and destructive schema changes are excluded.\n\n"
+            + fresh_sql_text.rstrip() + "\n"
+        )
+        if not package or package.get("type") != "schema" or not package_path.is_file():
+            raise ValueError("database_release_schema_package_invalid")
+        actual_checksum = hashlib.sha256(package_path.read_bytes()).hexdigest()
+        expected_checksum = hashlib.sha256(expected_payload.encode("utf-8")).hexdigest()
+        if not compare_digest(actual_checksum, expected_checksum):
+            raise ValueError("database_release_schema_package_stale")
     return start_database_release_packages(target["name"], requested, confirm_production=confirm_production)
 
 
@@ -911,6 +1444,8 @@ def _update_release_progress_from_log(line):
 def _start_job(target, command, operation, package_plan=None, extra_env=None):
     with _release_lock:
         _load_persisted_release_job()
+        if _migration_ledger_reconciliation_lock.locked():
+            raise ValueError("database_release_migration_ledger_reconciliation_running")
         if _release_job.get("status") in {"queued", "running", "cancelling"}:
             raise ValueError("database_release_job_running")
         job_id = time.strftime("%Y%m%d_%H%M%S")
@@ -997,6 +1532,22 @@ def start_database_release(target_name, package_id="", confirm_production=False)
     if normalized_package not in {"", "__full__"}:
         raise ValueError("database_release_incremental_disabled")
     return _start_job(target, [str(PREPARE_SCRIPT)], "full_release", package_plan=[])
+
+
+def start_local_migration_ledger_repair():
+    """Run the canonical updater against the local source database only.
+
+    This repairs a historical gap where application bootstrap executed
+    idempotent migrations but did not populate ``schema_migrations``. It is
+    deliberately never pointed at Staging or Production; the updater verifies
+    immutable checksums before recording any newly applied local migration.
+    """
+    target = get_database_release_target("local")
+    if not target:
+        raise ValueError("database_release_local_target_invalid")
+    if not POSTGRES_UPDATES_SCRIPT.is_file():
+        raise ValueError("database_release_local_migration_updater_missing")
+    return _start_job(target, [str(POSTGRES_UPDATES_SCRIPT)], "local_migration_repair", package_plan=[])
 
 
 def start_database_clear(target_name, confirmation="", confirm_production=False):
@@ -1170,7 +1721,11 @@ def list_database_release_rollbacks(target_name):
     if not target or target["name"] not in {"staging", "production"}:
         raise ValueError("database_release_target_invalid")
     try:
-        with psycopg2.connect(host=target["db_host"], port=target["db_port"], dbname="postgres", user=target["db_user"], password=target["db_password"], connect_timeout=5) as connection:
+        with _managed_release_connection(
+            host=target["db_host"], port=target["db_port"], dbname="postgres",
+            user=target["db_user"], password=target["db_password"], connect_timeout=5,
+            application_name="gangtise-release-rollback-list",
+        ) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """SELECT datname, pg_size_pretty(pg_database_size(datname))
@@ -1275,7 +1830,14 @@ def get_database_release_log(limit=50000):
 
 
 def _simulation_connection(target):
-    return psycopg2.connect(host=target["db_host"], port=target["db_port"], dbname=target["db_name"], user=target["db_user"], password=target["db_password"], connect_timeout=5)
+    # A psycopg2 connection context commits or rolls back, but does not close
+    # the socket. Simulation callers use this as a context manager, so ensure
+    # every 5051 request closes its short-lived PostgreSQL session.
+    return _managed_release_connection(
+        host=target["db_host"], port=target["db_port"], dbname=target["db_name"],
+        user=target["db_user"], password=target["db_password"], connect_timeout=5,
+        application_name="gangtise-release-simulation",
+    )
 
 
 def _ensure_simulation_schema(cursor):

@@ -99,9 +99,10 @@ for file in "${FILES[@]}"; do
     0??)
       scope="schema"
       ;;
-    114|115|122|123|124|125|126|127|128|129|131|132)
-      # Tenant insight drafts and canonical user relations are application
-      # schema, even though their numbering is in the post-100 batch.
+    113|114|115|122|123|124|125|126|127|128|129|131|132)
+      # These post-100 migrations only establish application tables,
+      # columns, indexes, or constraints. They are schema migrations even
+      # though their historical file number is in the master-data range.
       scope="schema"
       ;;
     *)

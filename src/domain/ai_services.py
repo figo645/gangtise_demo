@@ -1,6 +1,7 @@
 import math
 import re
 from collections import Counter
+from contextlib import contextmanager
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -350,6 +351,75 @@ def call_openai_compatible_llm(
         metadata=metadata or {},
     )
     return content
+
+
+def parse_user_names_with_llm(raw_text, tenant_slug="", entry_point=""):
+    """Parse a human-entered name list into a confirmation-safe JSON list.
+
+    The model configuration is deliberately inherited from the existing
+    Hermes intent-router binding; this adds no second provider or fallback.
+    No account is created in this function.
+    """
+    source_text = str(raw_text or "").strip()
+    if not source_text:
+        raise ValueError("name_text_required")
+    if len(source_text) > 4000:
+        raise ValueError("name_text_too_long")
+    model_config = get_hermes_llm_config("hermes_intent_router")
+    system_prompt = (
+        "你是用户批量注册信息解析器。只负责从用户输入中提取要注册的新用户姓名和账户类别，"
+        "不创建账号、不补充手机号、不猜测身份。必须只返回合法 JSON，格式固定为 "
+        '{"users":[{"name":"姓名1","role":"investor"}]}。'
+        "role 只能是 investor（粉丝/投资者）、dav（大V）、admin（管理员）；"
+        "如果没有明确类别，默认 investor。姓名应保留原文，不要返回解释、Markdown、代码围栏或其他字段。"
+        "忽略‘请注册’‘新用户’‘批量导入’等操作说明，只提取人名。"
+    )
+    user_prompt = (
+        "请解析下面这段文字中的新用户姓名和账户类别。类别可能出现在姓名前后，例如‘张三大V’、‘管理员李四’。"
+        "姓名可能用逗号、顿号、分号、换行或空格分隔；去重并保持首次出现顺序。"
+        "若没有明确可识别的人名，返回空 users 数组。\n\n"
+        f"原始输入：\n{source_text}"
+    )
+    content = call_openai_compatible_llm(
+        model_config,
+        system_prompt,
+        user_prompt,
+        feature_code="user_batch_name_parser",
+        feature_label="批量用户姓名解析",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        metadata={"source_chars": len(source_text)},
+        request_timeout_seconds=45,
+        max_tokens=600,
+    )
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", str(content or "").strip(), flags=re.IGNORECASE).strip()
+    try:
+        payload = json.loads(cleaned)
+    except Exception as exc:
+        raise RuntimeError("invalid_user_name_parser_json") from exc
+    raw_items = payload.get("users") if isinstance(payload, dict) else None
+    if not isinstance(raw_items, list):
+        raw_items = [{"name": item, "role": "investor"} for item in (payload.get("names") or [])] if isinstance(payload, dict) and isinstance(payload.get("names"), list) else None
+    if not isinstance(raw_items, list):
+        raise RuntimeError("invalid_user_name_parser_shape")
+    normalized = []
+    seen = set()
+    role_aliases = {
+        "investor": "investor", "fan": "investor", "fans": "investor", "粉丝": "investor", "投资者": "investor", "普通用户": "investor",
+        "dav": "dav", "大v": "dav", "大V": "dav", "投顾": "dav",
+        "admin": "admin", "管理员": "admin", "平台管理员": "admin",
+    }
+    for raw_item in raw_items:
+        item = raw_item if isinstance(raw_item, dict) else {"name": raw_item}
+        name = re.sub(r"\s+", " ", str(item.get("name") or item.get("username") or "").strip())[:80]
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        role_raw = str(item.get("role") or item.get("category") or "investor").strip()
+        role = role_aliases.get(role_raw.lower(), role_aliases.get(role_raw, "investor"))
+        normalized.append({"name": name, "role": role})
+    normalized = normalized[:200]
+    return {"names": [item["name"] for item in normalized], "items": normalized, "model": model_config.get("model_name") or "", "source_chars": len(source_text)}
 
 
 def _is_truthy_flag(value):
@@ -1815,6 +1885,7 @@ def compose_review_structured_preview(
     return result
 
 
+@contextmanager
 def get_review_vector_db_connection():
     target = get_runtime_db_target().get("vector", {})
     connection = psycopg2.connect(
@@ -1824,8 +1895,15 @@ def get_review_vector_db_connection():
         user=target.get("user") or VECTOR_DB_USER,
         password=target.get("password") or VECTOR_DB_PASSWORD,
         connect_timeout=8,
+        application_name="gangtise-review-vector",
     )
-    return connection
+    # All callers use this helper as a context manager. Preserve psycopg2's
+    # commit/rollback behaviour and also close the socket on every exit.
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 def _safe_audio_filename(filename):

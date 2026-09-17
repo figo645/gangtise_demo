@@ -71,7 +71,7 @@ body{margin:0;min-height:100dvh;background:var(--surface-2);color:var(--text-mai
     {% if mode == 'register' %}<input class="login-input" type="text" name="display_name" autocomplete="nickname" placeholder="昵称" required>{% endif %}
     <input class="login-input" type="text" name="username" autocomplete="username" placeholder="用户名" autofocus required>
     <input class="login-input" type="password" name="password" autocomplete="{% if mode == 'register' %}new-password{% else %}current-password{% endif %}" placeholder="密码" required>
-    {% if mode == 'register' %}<input class="login-input" type="password" name="confirm_password" autocomplete="new-password" placeholder="确认密码" required>{% else %}<label class="login-check"><input type="checkbox" id="remember-login"><span>记住密码。勾选后，下次可直接选择这个账号进入。</span></label>{% endif %}
+    {% if mode == 'register' %}<input class="login-input" type="password" name="confirm_password" autocomplete="new-password" placeholder="确认密码" required><select class="login-input" name="h5_channel_label" required><option value="">请选择来源渠道</option>{% for channel in registration_channels or [] %}<option value="{{ channel }}">{{ channel }}</option>{% endfor %}</select>{% else %}<label class="login-check"><input type="checkbox" id="remember-login"><span>记住密码。勾选后，下次可直接选择这个账号进入。</span></label>{% endif %}
     <button class="login-btn" type="submit">{% if mode == 'register' %}注册并进入系统{% else %}账号登录{% endif %}</button>
   </form>
   <div class="login-switch">{% if mode == 'register' %}已经有账号？ <a href="/login?next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">去登录</a>{% else %}<a class="login-register-button" href="/login?mode=register&amp;next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">注册</a>{% endif %}</div>
@@ -109,6 +109,7 @@ async function submitUnifiedLogin(event){
     endpoint='/api/h5/register/password';
     const target=new URL(form.elements.next.value||'/',window.location.origin);
     payload.display_name=String(form.elements.display_name.value||'').trim();
+    payload.h5_channel_label=String(form.elements.h5_channel_label.value||'').trim();
     payload.tenant_slug=String(target.searchParams.get('tenant')||'').trim().toLowerCase();
     payload.confirm_password=String(form.elements.confirm_password.value||'');
     payload.invite_token=inviteToken;
@@ -129,7 +130,7 @@ async function submitUnifiedLogin(event){
     localStorage.setItem(historyKey,JSON.stringify(accounts.slice(0,8)));
     window.location.href=`/login/entry?next=${encodeURIComponent(form.elements.next.value||'/h5')}`;
   }catch(error){
-    const messages={username_password_required:'请输入用户名和密码。',display_name_required:'请输入昵称。',password_too_short:'密码至少需要 6 位。',username_exists:'该用户名已经注册，请切换到“登录”后输入密码。',password_mismatch:'两次输入的密码不一致。',password_login_disabled:'当前未开放账号注册。'};
+    const messages={username_password_required:'请输入用户名和密码。',display_name_required:'请输入昵称。',registration_channel_required:'请选择来源渠道。',password_too_short:'密码至少需要 6 位。',username_exists:'该用户名已经注册，请切换到“登录”后输入密码。',password_mismatch:'两次输入的密码不一致。',password_login_disabled:'当前未开放账号注册。'};
     if(status)status.textContent=messages[error.message]||'账号或密码不正确，或当前账号不可用。';
   }
 }

@@ -15,6 +15,7 @@ from functools import wraps
 from hmac import compare_digest
 from pathlib import Path
 
+import psycopg2
 from flask import Flask, jsonify, request, send_file, session
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,10 +25,12 @@ if str(ROOT) not in sys.path:
 from src.domain.database_release_services import (  # noqa: E402
     build_database_release_overview,
     cancel_database_release,
+    get_database_release_schema_summary,
+    verify_database_release_schema,
     get_database_release_log,
-    generate_database_release_delta,
-    review_database_release_delta,
-    scan_database_release_delta,
+    generate_database_release_schema,
+    get_database_table_inventory,
+    scan_database_release_schema,
     start_database_release_delta,
     start_production_to_staging_sync,
     start_staging_to_production_sync,
@@ -123,57 +126,67 @@ def overview():
     release_overview = build_database_release_overview()
     return jsonify({
         "ok": True,
-        "mode": "full_and_diff_migration",
+        "mode": "full_and_schema_safe_release",
         "release_targets": release_overview["targets"],
         "job": release_overview["job"],
     })
 
 
-@app.get("/api/diff/scan")
-def diff_scan():
+@app.get("/api/overview/schema-summary")
+def overview_schema_summary():
+    """Read-only local-to-target structural statistics for the overview."""
+    return jsonify({"ok": True, "summary": get_database_release_schema_summary()})
+
+
+@app.get("/api/schema-diff/scan")
+def schema_diff_scan():
+    """Fast metadata-only scan; it never hashes or reads business rows."""
     target = request.args.get("target") or "staging"
     try:
-        return jsonify({"ok": True, "scan": scan_database_release_delta(target)})
+        return jsonify({"ok": True, "scan": scan_database_release_schema(target)})
     except (ValueError, RuntimeError) as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 
 
-@app.post("/api/diff/review")
-@_require_csrf
-def diff_review():
-    payload = request.get_json(silent=True) or {}
+@app.get("/api/schema-inventory")
+def schema_inventory():
+    target = request.args.get("target") or "staging"
     try:
-        review = review_database_release_delta(
-            payload.get("target") or "staging",
-            include_schema=payload.get("include_schema", True) is True,
-            include_master_data=payload.get("include_master_data", True) is True,
-            include_runtime_data=payload.get("include_runtime_data", False) is True,
-        )
-        return jsonify({"ok": True, "review": review})
+        return jsonify({"ok": True, "inventory": get_database_table_inventory(target)})
     except (ValueError, RuntimeError) as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 
 
-@app.post("/api/diff/generate")
+@app.get("/api/schema-diff/verify")
+def schema_diff_verify():
+    """Final read-only schema and migration-ledger equivalence check."""
+    target = request.args.get("target") or "staging"
+    try:
+        return jsonify({"ok": True, "verification": verify_database_release_schema(target)})
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+
+@app.post("/api/schema-diff/generate")
 @_require_csrf
-def diff_generate():
+def schema_diff_generate():
     payload = request.get_json(silent=True) or {}
     try:
-        result = generate_database_release_delta(
-            payload.get("target") or "staging",
-            include_schema=payload.get("include_schema", True) is True,
-            include_master_data=payload.get("include_master_data", True) is True,
-            include_runtime_data=payload.get("include_runtime_data", False) is True,
-        )
+        result = generate_database_release_schema(payload.get("target") or "staging")
         return jsonify({"ok": True, "result": result}), 201
-    except (ValueError, RuntimeError) as exc:
+    except (ValueError, RuntimeError, psycopg2.Error) as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("Schema package generation failed")
+        return jsonify({"ok": False, "error": f"database_release_schema_generate_failed: {exc.__class__.__name__}"}), 500
 
 
-@app.post("/api/diff/release")
+@app.post("/api/schema-diff/release")
 @_require_csrf
-def diff_release():
+def schema_diff_release():
     payload = request.get_json(silent=True) or {}
+    if payload.get("review_confirmed") is not True:
+        return jsonify({"ok": False, "error": "database_release_schema_review_confirmation_required"}), 400
     try:
         job = start_database_release_delta(
             payload.get("target") or "staging",
@@ -181,6 +194,7 @@ def diff_release():
             payload.get("diff_fingerprint"),
             payload.get("package_ids") or [],
             confirm_production=payload.get("confirm_production") is True,
+            schema_only=True,
         )
         return jsonify({"ok": True, "job": job}), 202
     except ValueError as exc:
@@ -352,16 +366,23 @@ button.is-pressed:not(:disabled){transform:translateY(1px);box-shadow:inset 0 1p
 .section-title{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}.section-title h2{margin:0}.section-title p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.6}.eyebrow{color:var(--blue);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.primary-action{border-color:#0f5b96;background:#0f5b96;box-shadow:0 5px 12px rgba(23,105,170,.18)}.action-panel{border-top:3px solid var(--blue)}.source-panel{border-top:3px solid #b7791f;background:#fffdf8}.publish-panel{border-top:3px solid var(--red);background:#fffafa}.secondary-panel{border-top:3px solid #91a9bd}.cleanup-panel{border-top:3px solid var(--red);background:#fffafa}.cleanup-confirm{display:grid;gap:6px;max-width:460px;color:var(--muted);font-size:12px}.cleanup-confirm input{height:40px;border:1px solid #e5aaa4;border-radius:6px;padding:0 10px;font:inherit;color:var(--ink)}.monitor-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.4fr);gap:16px;margin-top:16px}.monitor-grid .panel{min-width:0}.panel-heading{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px}.panel-heading h2{margin:0}.panel-heading span{font-size:11px;color:var(--muted)}.rollback-panel{margin-top:16px}.release-note{margin-top:14px;padding:10px 12px;background:#f7fafc;border:1px solid #e6edf3;border-radius:6px;color:var(--muted);font-size:11px;line-height:1.7}@media(max-width:760px){.monitor-grid{grid-template-columns:1fr}.section-title{display:block}.section-title button{margin-top:12px;width:100%}}
 </style><style>
 .release-actions-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:18px;align-items:stretch}.release-actions-grid>.panel{margin-top:0!important;height:100%}@media(max-width:980px){.release-actions-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){.release-actions-grid{grid-template-columns:1fr}}
+</style><style>
+.shell{max-width:1480px;width:100%;min-height:100vh;display:grid;grid-template-columns:232px minmax(0,1fr);gap:28px;align-items:start;padding:24px 28px}.shell>.console-sidebar{grid-column:1;grid-row:1 / span 99}.shell> :not(.console-sidebar){grid-column:2}.console-sidebar{position:sticky;top:24px;background:#102b46;color:#e7f0f8;border-radius:12px;padding:18px 12px;box-shadow:0 10px 30px rgba(16,43,70,.12)}.console-brand{padding:4px 10px 18px;border-bottom:1px solid rgba(231,240,248,.16);margin-bottom:12px}.console-brand strong{display:block;font-size:16px;letter-spacing:.02em}.console-brand span{display:block;margin-top:5px;color:#9fb7ca;font-size:11px}.console-nav{display:grid;gap:4px}.console-nav-item{width:100%;display:flex;align-items:center;gap:10px;border:1px solid transparent;border-radius:8px;padding:11px 10px;background:transparent;color:#bad0e0;text-align:left;font-size:13px}.console-nav-item:hover{background:rgba(255,255,255,.07);color:#fff}.console-nav-item.active{background:#1b5d8f;border-color:#4489ba;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.12)}.console-nav-icon{width:22px;height:22px;display:grid;place-items:center;border-radius:6px;background:rgba(255,255,255,.09);font-size:11px;font-weight:800}.console-nav-caption{display:block;color:#7896ac;font-size:10px;margin:16px 10px 6px}.console-content-section.is-hidden{display:none!important}.overview-difference-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.overview-difference-card{border:1px solid var(--line);border-radius:8px;padding:14px;background:#f8fbfe}.overview-difference-card.unavailable{background:#fff8f7;border-color:#e5aaa4}.overview-difference-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.overview-difference-head h3{margin:0;font-size:14px}.overview-difference-status{font-size:11px;color:#218653;font-weight:700}.overview-difference-card.unavailable .overview-difference-status{color:var(--red)}.overview-difference-total{font-size:25px;font-weight:750;margin:12px 0 3px}.overview-difference-label{font-size:11px;color:var(--muted)}.overview-difference-breakdown{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.overview-difference-breakdown span{font-size:11px;color:var(--muted);padding:4px 6px;background:#fff;border:1px solid #e6edf3;border-radius:999px}.overview-difference-error{margin-top:10px;font-size:12px;color:var(--red);line-height:1.55}.inventory-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:end;flex-wrap:wrap}.inventory-summary{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.inventory-count{padding:9px 12px;border:1px solid var(--line);border-radius:7px;background:#f8fbfe;font-size:12px}.inventory-count strong{display:block;font-size:16px;margin-bottom:2px}.inventory-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px}.inventory-table{width:100%;min-width:980px;border-collapse:collapse;font-size:12px}.inventory-table th{background:#f7fafc;color:var(--muted);font-size:11px;text-align:left;white-space:nowrap}.inventory-table th,.inventory-table td{padding:11px 12px;border-bottom:1px solid #edf1f5;vertical-align:top}.inventory-table tr:last-child td{border-bottom:0}.inventory-table .table-name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);font-size:11px}.inventory-badge{display:inline-flex;padding:4px 7px;border-radius:999px;background:#eaf3fa;color:#1e5f8f;font-size:11px;white-space:nowrap}.inventory-status{white-space:nowrap}.inventory-status.mismatch{color:var(--red);font-weight:700}.inventory-filter{max-width:300px}@media(max-width:860px){.shell{display:block;padding:14px}.console-sidebar{position:static;margin-bottom:16px}.console-nav{display:flex;overflow-x:auto;padding-bottom:2px}.console-nav-item{min-width:132px;justify-content:flex-start}.console-nav-caption{display:none}.shell> :not(.console-sidebar){width:100%}.head{display:block}.head button{margin-top:14px}.stats{grid-template-columns:1fr 1fr}.overview-difference-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+</style><style>
+.schema-review{margin-top:14px;border:1px solid #b9d5e8;border-radius:9px;background:#f8fcff;padding:14px}.schema-review-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.schema-review-head h3{margin:0;font-size:14px}.schema-review-head p{margin:5px 0 0;font-size:12px;color:var(--muted);line-height:1.6}.schema-review-status{font-size:11px;font-weight:700;color:#1769aa;white-space:nowrap}.schema-review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.schema-review-stat{border:1px solid #dceaf3;border-radius:7px;padding:10px;background:#fff}.schema-review-stat strong{display:block;font-size:18px;margin-bottom:3px}.schema-review-stat span{font-size:11px;color:var(--muted)}.schema-review-block{margin-top:12px;border-top:1px solid #dceaf3;padding-top:12px}.schema-review-block h4{margin:0 0 7px;font-size:12px}.schema-review-list{display:flex;flex-wrap:wrap;gap:6px}.schema-review-list span{padding:4px 7px;border:1px solid #dceaf3;border-radius:999px;background:#fff;font-size:11px;color:var(--ink)}.schema-review-warning{padding:10px 11px;border-radius:7px;background:#fff8e8;border:1px solid #f0d58a;color:#7a5510;font-size:12px;line-height:1.6}.schema-review-danger{padding:10px 11px;border-radius:7px;background:#fff5f3;border:1px solid #e5aaa4;color:var(--red);font-size:12px;line-height:1.6}.schema-review-confirm{display:flex;gap:8px;align-items:flex-start;margin-top:14px;padding-top:12px;border-top:1px solid #dceaf3;font-size:12px;line-height:1.55;color:var(--ink);cursor:pointer}.schema-review-confirm input{margin-top:3px;accent-color:var(--blue)}.schema-review-raw{margin-top:12px;font-size:12px;color:var(--muted)}.schema-review-raw summary{cursor:pointer;color:var(--blue);font-weight:600}@media(max-width:760px){.schema-review-grid{grid-template-columns:1fr}}
 </style></head><body><main class="shell">
-<header class="head"><div><div class="eyebrow">DATABASE RELEASE CONTROL</div><h1>数据库迁移</h1><p>5051 数据迁移控制台。先确认目标环境，再选择全量替换或差异迁移；所有任务都保留日志和回滚点。</p></div><button id="refresh" type="button" onclick="refreshStatus(this)">刷新状态</button></header>
+<aside class="console-sidebar" aria-label="数据库迁移导航"><div class="console-brand"><strong>数据库发布控制台</strong><span>5051 · 安全升级与数据治理</span></div><span class="console-nav-caption">工作区</span><nav class="console-nav"><button class="console-nav-item active" type="button" data-console-section="overview"><span class="console-nav-icon">总</span><span>总览</span></button><button class="console-nav-item" type="button" data-console-section="full-release"><span class="console-nav-icon">全</span><span>全量发布</span></button><button class="console-nav-item" type="button" data-console-section="schema-release"><span class="console-nav-icon">构</span><span>结构安全升级</span></button><button class="console-nav-item" type="button" data-console-section="cleanup"><span class="console-nav-icon">清</span><span>数据清理</span></button><button class="console-nav-item" type="button" data-console-section="inventory"><span class="console-nav-icon">表</span><span>表结构与分层</span></button><button class="console-nav-item" type="button" data-console-section="operations"><span class="console-nav-icon">记</span><span>回滚记录</span></button></nav></aside>
+<header class="head"><div><div class="eyebrow">DATABASE RELEASE CONTROL</div><h1>数据库迁移</h1><p>5051 数据迁移控制台。日常升级仅执行零业务数据写入的结构安全升级；全量替换、同步、清理与回滚均保留独立保护流程。</p></div><button id="refresh" type="button" onclick="refreshStatus(this)">刷新状态</button></header>
 <section class="stats" id="stats"></section>
+<section id="overview-dashboard" class="panel"><div class="section-title"><div><h2>本地与目标环境结构差异</h2><p>仅比较表、字段、索引、约束与迁移账本元数据；不会读取、计算或修改业务数据。</p></div><span class="eyebrow">只读统计</span></div><div id="overview-difference-grid" class="overview-difference-grid"><div class="notice">正在读取 Staging 与 Production 的结构摘要...</div></div><div id="overview-difference-meta" class="notice"></div></section>
 <div class="release-actions-grid">
 <section class="panel action-panel" style="margin-top:18px"><div class="section-title"><div><h2>全量迁移</h2><p>以本地完整数据库为来源，先恢复到目标临时库校验，通过后才切换目标数据库。</p></div><span class="eyebrow">高影响操作</span></div><div class="row"><label class="field">目标环境<select id="releaseTarget"></select></label><button id="release" class="primary primary-action" type="button" onclick="startRelease(this)">开始全量迁移</button><button id="cancel" class="danger" type="button" onclick="cancelRelease(this)" hidden>停止任务</button></div><div class="warning" style="margin-top:14px">目标环境的用户及其关联业务数据会在切换前恢复；校验未通过时不会替换目标数据库，原数据库会保留为回滚点。</div></section>
-<section class="panel source-panel" style="margin-top:16px"><div class="section-title"><div><h2>生产 → Staging 全量同步</h2><p>将 Production 的完整数据库快照恢复到 Staging 临时库，校验通过后再切换；适合在 Staging 上验证差异迁移。</p></div><span class="eyebrow" style="color:#9a6700">高风险 · 仅 Staging</span></div><div class="row"><div class="field"><span>同步方向</span><strong>Production → Staging</strong></div><button id="productionToStaging" class="primary" style="background:#9a6700;border-color:#9a6700" type="button" onclick="startProductionToStaging(this)">从生产同步到 Staging</button></div><div class="warning" style="margin-top:14px">这会替换 Staging 当前数据库内容。Staging 原数据库会先重命名为备份，生产环境凭据不会直接覆盖 Staging 的受保护配置；确认前请确保没有正在进行的 staging 测试。</div></section>
+<section class="panel source-panel" style="margin-top:16px"><div class="section-title"><div><h2>生产 → Staging 全量同步</h2><p>将 Production 的完整数据库快照恢复到 Staging 临时库，校验通过后再切换；适合在 Staging 上验证全量发布或结构安全升级。</p></div><span class="eyebrow" style="color:#9a6700">高风险 · 仅 Staging</span></div><div class="row"><div class="field"><span>同步方向</span><strong>Production → Staging</strong></div><button id="productionToStaging" class="primary" style="background:#9a6700;border-color:#9a6700" type="button" onclick="startProductionToStaging(this)">从生产同步到 Staging</button></div><div class="warning" style="margin-top:14px">这会替换 Staging 当前数据库内容。Staging 原数据库会先重命名为备份，生产环境凭据不会直接覆盖 Staging 的受保护配置；确认前请确保没有正在进行的 staging 测试。</div></section>
 <section class="panel publish-panel" style="margin-top:16px"><div class="section-title"><div><h2>Staging → Production 全量发布</h2><p>将经过 Staging 验证的完整数据库快照发布到 Production；只有临时库校验通过后才切换生产数据库。</p></div><span class="eyebrow" style="color:var(--red)">高风险 · 需确认</span></div><div class="row"><div class="field"><span>发布方向</span><strong>Staging → Production</strong></div><button id="stagingToProduction" class="primary" style="background:var(--red);border-color:var(--red)" type="button" onclick="startStagingToProduction(this)">从 Staging 发布到 Production</button></div><div class="warning" style="margin-top:14px">Production 当前数据库会在切换前保留为回滚备份。此操作会覆盖 Production 的数据库内容，不会执行任何发布，直到你在确认框中再次确认。</div></section>
 </div>
 <section class="panel cleanup-panel" style="margin-top:16px"><div class="section-title"><div><h2>清除用户业务数据</h2><p>保留所有用户账户、密码、角色和租户归属；清除站内信、智能体会话、记忆、自选股、评论、标注、洞见草稿/发布内容、访问与用量记录、订阅订单等用户产生的数据。</p></div><span class="eyebrow" style="color:var(--red)">不可逆 · 先备份</span></div><div class="row"><label class="field">目标环境<select id="cleanupTarget"></select></label><button id="cleanupStart" class="danger" type="button" onclick="startUserDataCleanup(this)">清除全部用户业务数据</button></div><div class="warning" style="margin-top:14px">执行前会自动生成完整 PostgreSQL dump 和可恢复的 SQL 文件，并保留该目标环境最近 2 份清理前备份。指标、行情、行业、宏观主数据、租户配置、订阅产品和扫码邀请配置不受影响。</div><label class="cleanup-confirm" style="margin-top:14px">请输入确认文本 <strong>CLEAR ALL USER BUSINESS DATA</strong><input id="cleanupConfirmation" autocomplete="off" placeholder="CLEAR ALL USER BUSINESS DATA"></label><div id="cleanupStatus" class="notice">尚未执行用户业务数据清理。</div><div class="panel-heading" style="margin-top:16px"><h2>清理前备份</h2><span>最近 2 份 · 可下载 SQL</span></div><div id="userDataBackups" class="notice">正在读取...</div></section>
-<section class="panel secondary-panel" style="margin-top:16px"><div class="section-title"><div><h2>差异迁移</h2><p>扫描后系统会自动完成差异校验和执行计划准备，确认无阻断项后再执行。</p></div><span class="eyebrow">日常路径</span></div><div class="row"><label class="field">目标环境<select id="diffTarget"></select></label><label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)"><input id="diffSchema" type="checkbox" checked> 表结构</label><label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)"><input id="diffMaster" type="checkbox" checked> 主数据</label><label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)"><input id="diffRuntime" type="checkbox"> 业务数据</label><button id="diffScan" type="button" onclick="scanDiff()">扫描并准备差异</button><button id="diffRelease" class="primary" type="button" onclick="releaseDiff()" disabled>确认执行差异迁移</button></div><div id="diffStatus" class="notice">请先扫描并准备差异。系统会在后台完成预览和计划生成，业务数据默认不包含用户运行数据。</div><div id="diffWorkflow" class="workflow" aria-live="polite"></div><pre id="diffReport" style="max-height:260px;min-height:100px;margin-top:12px">暂无差异报告</pre></section>
+<section class="panel secondary-panel" style="margin-top:16px"><div class="section-title"><div><h2>生产结构安全升级</h2><p>只比较本地与目标库的表结构元数据，不读取、不覆盖业务数据。仅允许新增表、字段、索引和约束；危险差异会阻断执行。</p></div><span class="eyebrow">零业务数据写入</span></div><div class="row"><label class="field">目标环境<select id="schemaDiffTarget"></select></label><button id="schemaDiffScan" type="button" onclick="scanSchemaDiff()">比较并生成结构包</button><button id="schemaDiffRelease" class="primary" type="button" onclick="releaseSchemaDiff()" disabled>确认审核后应用</button></div><div id="schemaDiffStatus" class="notice">执行前会重新比较结构；Production 应用前自动创建完整回滚备份。</div><div id="schemaDiffWorkflow" class="workflow" aria-live="polite"></div><div id="schemaDiffReview" class="schema-review" aria-live="polite"><div class="notice">先比较并生成结构包，随后在这里完成差异审核。</div></div><details class="schema-review-raw"><summary>原始结构审计数据</summary><pre id="schemaDiffReport" style="max-height:260px;min-height:100px;margin-top:8px">暂无结构安全升级报告</pre></details></section>
 <section class="monitor-grid"><section class="panel"><div class="panel-heading"><h2>任务进度</h2><span>当前任务与执行流程</span></div><div id="progress" class="notice">正在读取...</div></section><section class="panel"><div class="panel-heading"><h2>迁移日志</h2><span>实时输出</span></div><pre id="log">正在读取...</pre></section></section>
 <section class="panel rollback-panel"><div class="panel-heading"><h2>回滚记录</h2><span>每个目标环境保留最近可用备份</span></div><div id="rollbacks" class="notice">正在读取...</div><div class="release-note">回滚只用于恢复已完成切换的目标数据库。执行前请核对目标环境、备份名称和应用连接配置。</div></section>
 </main><div id="toast" class="toast"></div><div id="modal" class="modal"><div class="panel"><h2 id="modalTitle">确认操作</h2><div id="modalBody"></div></div></div>
@@ -385,7 +406,7 @@ const csrf='__CSRF_TOKEN__';let overview={},submitting=false,poll=null;const $=i
 function refreshStatus(button){
   if(button&&button.disabled)return;
   if(button){button.disabled=true;button.classList.remove('is-success','is-failure');button.classList.add('is-loading');button.setAttribute('aria-busy','true');button.textContent='刷新中...'}
-  load().then(()=>{if(button){button.classList.remove('is-loading');button.classList.add('is-success');button.setAttribute('aria-busy','false');button.textContent='已刷新'}toast('状态已刷新')}).catch(e=>{if(button){button.classList.remove('is-loading');button.classList.add('is-failure');button.setAttribute('aria-busy','false');button.textContent='刷新失败'}toast('读取状态失败：'+e.message)}).finally(()=>setTimeout(()=>{if(button){button.disabled=false;button.classList.remove('is-success','is-failure');button.removeAttribute('aria-busy');button.textContent='刷新状态'}},1200));
+  Promise.all([load(),loadOverviewSchemaSummary()]).then(()=>{if(button){button.classList.remove('is-loading');button.classList.add('is-success');button.setAttribute('aria-busy','false');button.textContent='已刷新'}toast('状态已刷新')}).catch(e=>{if(button){button.classList.remove('is-loading');button.classList.add('is-failure');button.setAttribute('aria-busy','false');button.textContent='刷新失败'}toast('读取状态失败：'+e.message)}).finally(()=>setTimeout(()=>{if(button){button.disabled=false;button.classList.remove('is-success','is-failure');button.removeAttribute('aria-busy');button.textContent='刷新状态'}},1200));
 }
 function markButtonPressed(button){
   if(!button||button.disabled||button.classList.contains('is-loading'))return;
@@ -421,31 +442,159 @@ function renderJobWorkflow(){
   if(!host){host=document.createElement('div');host.id='workflowNodes';host.className='workflow';const progressHost=document.getElementById('progress');if(progressHost)progressHost.insertAdjacentElement('afterend',host)}
   const nodes=Array.isArray(progress.workflow)?progress.workflow:[];
   if(!nodes.length){host.innerHTML='<div class="workflow-title">任务流程</div><div class="workflow-detail">尚无正在执行的迁移任务</div>';return}
-  host.innerHTML='<div class="workflow-title">'+esc(job.operation==='release'?'差异迁移流程':'全量迁移流程')+' · 已完成 '+esc(progress.workflow_completed_steps||0)+' / '+esc(progress.workflow_total_steps||nodes.length)+' 步</div>'+nodes.map(n=>'<div class="workflow-node '+esc(n.status)+'"><div class="workflow-dot">'+esc(n.order)+'</div><div><div class="workflow-label">'+esc(n.label)+'</div><div class="workflow-detail">'+(n.status==='active'?'正在执行':n.status==='succeeded'?'已完成':n.status==='failed'?'失败':'等待执行')+'</div></div><div class="workflow-status">'+(n.status==='active'?'进行中':n.status==='succeeded'?'完成':n.status==='failed'?'失败':'未开始')+'</div></div>').join('');
+	  host.innerHTML='<div class="workflow-title">'+esc(job.operation==='release'?'结构安全升级流程':'全量迁移流程')+' · 已完成 '+esc(progress.workflow_completed_steps||0)+' / '+esc(progress.workflow_total_steps||nodes.length)+' 步</div>'+nodes.map(n=>'<div class="workflow-node '+esc(n.status)+'"><div class="workflow-dot">'+esc(n.order)+'</div><div><div class="workflow-label">'+esc(n.label)+'</div><div class="workflow-detail">'+(n.status==='active'?'正在执行':n.status==='succeeded'?'已完成':n.status==='failed'?'失败':'等待执行')+'</div></div><div class="workflow-status">'+(n.status==='active'?'进行中':n.status==='succeeded'?'完成':n.status==='failed'?'失败':'未开始')+'</div></div>').join('');
 }
 setInterval(renderJobWorkflow,500);renderJobWorkflow();
 </script>
 <script>
-let diffPlan=null;
-function diffPayload(){return {target:document.getElementById('diffTarget').value||'staging',include_schema:document.getElementById('diffSchema').checked,include_master_data:document.getElementById('diffMaster').checked,include_runtime_data:document.getElementById('diffRuntime').checked}}
 function diffText(value){return JSON.stringify(value,null,2)}
 async function diffRequest(path,body){return api(path,{method:'POST',body:JSON.stringify(body)})}
-function renderDiffTargets(){const source=document.getElementById('releaseTarget'),target=document.getElementById('diffTarget');if(!source||!target)return;target.innerHTML=source.innerHTML}
-async function scanDiff(){const button=document.getElementById('diffScan');if(button&&button.disabled)return false;try{if(button){button.disabled=true;button.classList.remove('is-success','is-failure');button.classList.add('is-loading');button.setAttribute('aria-busy','true');button.textContent='正在准备...'}renderDiffTargets();document.getElementById('diffReport').textContent='正在连接目标数据库并计算差异摘要，请稍候...';document.getElementById('diffStatus').textContent='正在扫描差异。扫描完成后系统会自动核对并准备执行计划。';const target=document.getElementById('diffTarget').value||'staging';const data=await api('/api/diff/scan?target='+encodeURIComponent(target));document.getElementById('diffReport').textContent=diffText(data.scan);document.getElementById('diffStatus').textContent='扫描完成，正在自动准备执行计划...';diffPlan=null;const planData=await diffRequest('/api/diff/generate',diffPayload());diffPlan=planData.result||{};const blockers=diffPlan.blockers||[];document.getElementById('diffReport').textContent=diffText(diffPlan);document.getElementById('diffStatus').textContent=blockers.length?'差异已准备，但存在阻断项，请查看报告。':'差异已准备完成，可以确认执行。';document.getElementById('diffRelease').disabled=!diffPlan.generated_packages||!diffPlan.generated_packages.length||blockers.length>0;if(button){button.classList.add('is-success')}return true}catch(e){document.getElementById('diffReport').textContent='差异准备未完成。请查看上方状态信息。';document.getElementById('diffStatus').textContent='差异准备失败：'+e.message;if(button){button.classList.add('is-failure')}return false}finally{if(button){button.disabled=false;button.classList.remove('is-loading');button.removeAttribute('aria-busy');button.textContent='扫描并准备差异';setTimeout(()=>button.classList.remove('is-success','is-failure'),2200)}}}
-async function releaseDiff(){const button=document.getElementById('diffRelease');if(!diffPlan||!diffPlan.generated_packages||!diffPlan.generated_packages.length||button&&button.disabled)return;const target=diffPlan.target;const production=target==='production';if(!window.confirm('确认执行 '+target+' 差异迁移？执行前会重新扫描并核验差异报告，目标用户数据不会被本地用户表覆盖。'))return;try{if(button){button.disabled=true;button.classList.add('is-loading');button.setAttribute('aria-busy','true');button.textContent='正在提交...'}document.getElementById('diffStatus').textContent='正在提交差异迁移任务，请稍候...';const data=await diffRequest('/api/diff/release',{target,report_path:diffPlan.report_path,diff_fingerprint:diffPlan.diff_fingerprint,package_ids:diffPlan.generated_packages.map(item=>item.id),confirm_production:production});document.getElementById('diffStatus').textContent='差异迁移任务已创建：'+(data.job||{}).id;if(button){button.classList.remove('is-loading');button.classList.add('is-success');button.setAttribute('aria-busy','false');button.textContent='已提交'}await load()}catch(e){document.getElementById('diffStatus').textContent='差异迁移未启动：'+e.message;if(button){button.classList.remove('is-loading');button.classList.add('is-failure');button.removeAttribute('aria-busy');button.disabled=false;button.textContent='确认执行差异迁移'}}}
-renderDiffTargets();
-let diffFlowStage=0;
-const diffFlowNodes=[['scan','扫描并准备差异'],['execute','执行差异迁移'],['completed','完成与记录']];
-function renderDiffWorkflow(){
-  const host=document.getElementById('diffWorkflow');if(!host)return;
-  host.innerHTML='<div class="workflow-title">差异迁移流程 · 已完成 '+Math.min(diffFlowStage,2)+' / 3 步</div>'+diffFlowNodes.map((n,i)=>{const status=i<diffFlowStage?'succeeded':i===diffFlowStage?'active':'pending';return '<div class="workflow-node '+status+'"><div class="workflow-dot">'+(i+1)+'</div><div><div class="workflow-label">'+n[1]+'</div><div class="workflow-detail">'+(status==='active'?'当前节点':status==='succeeded'?'已完成':'等待执行')+'</div></div><div class="workflow-status">'+(status==='active'?'进行中':status==='succeeded'?'完成':'未开始')+'</div></div>'}).join('');
-}
-const originalScanDiff=scanDiff,originalReleaseDiff=releaseDiff;
-scanDiff=async function(){diffFlowStage=0;renderDiffWorkflow();const succeeded=await originalScanDiff();if(succeeded){diffFlowStage=1}renderDiffWorkflow();return succeeded};
-releaseDiff=async function(){diffFlowStage=Math.max(diffFlowStage,1);renderDiffWorkflow();try{await originalReleaseDiff();diffFlowStage=2;renderDiffWorkflow()}catch(e){renderDiffWorkflow();throw e}};
-renderDiffWorkflow();
+function copyReleaseTargets(targetId){const source=document.getElementById('releaseTarget'),target=document.getElementById(targetId);if(!source||!target)return;const selected=target.value;target.innerHTML=source.innerHTML;if([...target.options].some(option=>option.value===selected))target.value=selected}
+function renderSchemaDiffTargets(){copyReleaseTargets('schemaDiffTarget')}
+renderSchemaDiffTargets();
 const baseRender=render;
-render=function(){baseRender();const j=overview.job||{},running=['queued','running','cancelling'].includes(j.status);if(document.getElementById('release'))document.getElementById('release').textContent=running&&j.operation==='full_release'?'全量迁移中...':'开始全量迁移';if(document.getElementById('productionToStaging'))document.getElementById('productionToStaging').textContent=running&&j.operation==='production_to_staging'?'同步中...':'从生产同步到 Staging';if(document.getElementById('stagingToProduction')){document.getElementById('stagingToProduction').disabled=busy();document.getElementById('stagingToProduction').textContent=running&&j.operation==='staging_to_production'?'Production 发布中...':'从 Staging 发布到 Production'}if(document.getElementById('cleanupStart'))document.getElementById('cleanupStart').textContent=running&&j.operation==='user_data_cleanup'?'清理中...':'清除全部用户业务数据';if(document.getElementById('cancel')){document.getElementById('cancel').disabled=j.status==='cancelling';document.getElementById('cancel').textContent=j.status==='cancelling'?'停止中...':'停止任务'}if(typeof diffPlan!=='undefined'&&document.getElementById('diffRelease')&&running)document.getElementById('diffRelease').disabled=true};
+render=function(){baseRender();if(typeof renderSchemaDiffTargets==='function')renderSchemaDiffTargets();const j=overview.job||{},running=['queued','running','cancelling'].includes(j.status);if(document.getElementById('release'))document.getElementById('release').textContent=running&&j.operation==='full_release'?'全量迁移中...':'开始全量迁移';if(document.getElementById('productionToStaging'))document.getElementById('productionToStaging').textContent=running&&j.operation==='production_to_staging'?'同步中...':'从生产同步到 Staging';if(document.getElementById('stagingToProduction')){document.getElementById('stagingToProduction').disabled=busy();document.getElementById('stagingToProduction').textContent=running&&j.operation==='staging_to_production'?'Production 发布中...':'从 Staging 发布到 Production'}if(document.getElementById('cleanupStart'))document.getElementById('cleanupStart').textContent=running&&j.operation==='user_data_cleanup'?'清理中...':'清除全部用户业务数据';if(document.getElementById('cancel')){document.getElementById('cancel').disabled=j.status==='cancelling';document.getElementById('cancel').textContent=j.status==='cancelling'?'停止中...':'停止任务'}};
+let schemaDiffPlan=null,schemaDiffScanResult=null,schemaDiffReviewInventory=null,schemaDiffReviewConfirmed=false,schemaLedgerPlan=null,schemaLedgerReviewConfirmed=false,schemaDiffFlowStage=0,schemaDiffFlowFailed=false,schemaDiffFinalVerificationTarget='',schemaDiffSubmittedJobId='',schemaDiffSubmittedTarget='';
+function schemaReviewChips(items,emptyText){const rows=Array.isArray(items)?items:[];return rows.length?'<div class="schema-review-list">'+rows.map(item=>'<span>'+esc(item)+'</span>').join('')+'</div>':'<div class="notice">'+esc(emptyText)+'</div>'}
+function hasPendingMigrationLedgerChanges(){const plan=schemaLedgerPlan||{};return !plan.blockers?.length&&Boolean((plan.target_insertions||[]).length||(plan.local_insertions||[]).length)}
+function hasBlockingMigrationLedgerDrift(){const migration=schemaDiffScanResult?.scan?.schema_migration_difference||{},strict=migration.strict_schema||migration;return Boolean((strict.local_only||[]).length||(strict.target_only||[]).length||(strict.checksum_mismatch||[]).length)}
+function resetSchemaDiffReleaseButton(){const button=document.getElementById('schemaDiffRelease');if(!button)return;button.classList.remove('is-loading','is-success','is-failure');button.removeAttribute('aria-busy');button.textContent='确认审核后应用'}
+function resetSchemaDiffSubmissionState(){schemaDiffSubmittedJobId='';schemaDiffSubmittedTarget='';resetSchemaDiffReleaseButton()}
+function updateSchemaDiffReleaseAvailability(){const button=document.getElementById('schemaDiffRelease'),blockers=schemaDiffPlan?.blockers||[],hasPackage=Boolean(schemaDiffPlan?.generated_packages?.length),hasSubmittedJob=Boolean(schemaDiffSubmittedJobId);if(button){button.disabled=hasSubmittedJob||!hasPackage||Boolean(blockers.length)||hasPendingMigrationLedgerChanges()||!schemaDiffReviewConfirmed;if(!hasSubmittedJob)resetSchemaDiffReleaseButton()}}
+function renderFinalSchemaVerification(verification){
+  const host=document.getElementById('schemaDiffReview');if(!host||!verification)return;
+  const status=verification.ok?'通过':'未通过',items=verification.differences||[],observed=verification.non_structural_migration_ledger_difference||{},observedItems=[...(observed.local_only||[]).map(name=>'本地历史主数据账本：'+name),...(observed.target_only||[]).map(name=>'目标历史主数据账本：'+name),...(observed.checksum_mismatch||[]).map(name=>'历史主数据账本 checksum 不一致：'+name)];
+  host.insertAdjacentHTML('beforeend','<div class="schema-review-block '+(verification.ok?'schema-review-warning':'schema-review-danger')+'"><h4>最终结构等价核验</h4><div><strong>'+esc(status)+'</strong> · '+esc(verification.note||'仅核对结构和迁移账本。')+'</div>'+(items.length?schemaReviewChips(items,''):'<div class="notice">结构和结构迁移 checksum 已一致。</div>')+(observedItems.length?'<div class="schema-review-block schema-review-warning"><h4>历史主数据迁移账本观察项</h4><div>这些记录不代表表结构漂移，且不会由结构安全升级自动补写；请在主数据发布或人工审计时处理。</div>'+schemaReviewChips(observedItems,'')+'</div>':'')+'</div>');
+}
+async function verifySchemaDiff(target,afterPlan){
+  try{const data=await api('/api/schema-diff/verify?target='+encodeURIComponent(target));renderFinalSchemaVerification(data.verification||{});return data.verification||{}}catch(error){renderFinalSchemaVerification({ok:false,differences:['核验失败：'+error.message]});return {ok:false}}
+}
+async function loadFinalSchemaVerification(target){
+  if(!target||schemaDiffFinalVerificationTarget===target)return;
+  schemaDiffFinalVerificationTarget=target;
+  await verifySchemaDiff(target);
+}
+function renderMigrationLedgerReview(){
+  const host=document.getElementById('schemaDiffReview');if(!host)return;host.querySelector('#schemaLedgerReview')?.remove();
+  if(!schemaLedgerPlan)return;
+  const plan=schemaLedgerPlan,blockers=plan.blockers||[],targetRows=plan.target_insertions||[],localRows=plan.local_insertions||[],manualRows=plan.manual_review_entries||[],hasChanges=Boolean(targetRows.length||localRows.length);
+  const targetLabels=targetRows.map(row=>'写入目标账本：'+row.migration_name+' · '+row.migration_scope);
+  const localLabels=localRows.map(row=>'写入本地账本：'+row.migration_name+' · '+row.migration_scope);
+  const manualLabels=manualRows.map(row=>(row.side==='target'?'目标缺失：':'本地缺失：')+row.migration_name+' · '+row.migration_scope);
+  const blockerLabels=blockers.map(item=>item.reason||'未说明原因');
+  const localOnlyManualRows=manualRows.filter(row=>row.side==='local');
+  const targetManualRows=manualRows.filter(row=>row.side==='target');
+  const localRepairAction=localOnlyManualRows.length&&!targetManualRows.length?'<div class="schema-review-block"><h4>本地源库修复</h4><div class="schema-review-warning">这些记录只在 Production 账本中存在。可先运行本地既有迁移更新器：它只连接本地开发库，先校验 SQL checksum，再执行本地缺失迁移并登记账本；不会连接、修改或复制 Production 的任何业务数据。</div><div class="row" style="margin-top:10px"><button id="localMigrationRepair" type="button" onclick="repairLocalMigrationLedger()">修复本地缺失迁移记录</button></div></div>':'';
+  const confirmation=hasChanges&&!blockers.length?'<label class="schema-review-confirm"><input id="schemaLedgerReviewConfirmed" type="checkbox" '+(schemaLedgerReviewConfirmed?'checked':'')+' onchange="confirmMigrationLedgerReview(this.checked)"><span>我已确认表结构已等价，仅对齐缺失的迁移账本记录；该操作不删除、不更新表结构或业务数据。</span></label><div class="row" style="margin-top:10px"><button id="schemaLedgerApply" class="primary" type="button" onclick="applyMigrationLedgerPlan()" '+(schemaLedgerReviewConfirmed?'':'disabled')+'>确认对齐迁移账本</button></div>':'<div class="schema-review-warning">'+esc(blockers.length?'账本对齐已被阻断。':hasChanges?'请先确认审核。':'两边迁移账本已一致，无需对齐。')+'</div>';
+  host.insertAdjacentHTML('beforeend','<div id="schemaLedgerReview" class="schema-review-block"><h4>迁移账本对齐计划</h4><div class="schema-review-warning">仅在当前表结构完全等价且没有 checksum 冲突时生成。计划会双向补齐缺失账本记录，随后重新执行等价核验。</div><div class="schema-review-grid"><div class="schema-review-stat"><strong>'+esc(targetRows.length)+'</strong><span>写入目标账本</span></div><div class="schema-review-stat"><strong>'+esc(localRows.length)+'</strong><span>写入本地账本</span></div><div class="schema-review-stat"><strong>'+esc(blockers.length)+'</strong><span>阻断项</span></div></div><div class="schema-review-block"><h4>计划写入目标</h4>'+schemaReviewChips(targetLabels,'目标账本无需补齐。')+'</div><div class="schema-review-block"><h4>计划写入本地</h4>'+schemaReviewChips(localLabels,'本地账本无需补齐。')+'</div>'+(manualRows.length?'<div class="schema-review-block schema-review-danger"><h4>需人工核验的非结构迁移</h4><div>主数据迁移可能写入业务或配置记录，表结构一致不足以证明已执行，因此不会自动补写账本。</div>'+schemaReviewChips(manualLabels,'')+'</div>':'')+localRepairAction+(blockers.length?'<div class="schema-review-danger">'+schemaReviewChips(blockerLabels,'')+'</div>':'')+confirmation+'</div>');
+}
+async function repairLocalMigrationLedger(){if(!window.confirm('确认仅修复本地开发库的缺失迁移记录？此操作不连接 Staging 或 Production。'))return;const button=document.getElementById('localMigrationRepair');try{if(button){button.disabled=true;button.classList.add('is-loading');button.textContent='正在修复本地...'}document.getElementById('schemaDiffStatus').textContent='正在运行本地迁移更新器并核验 checksum；不会连接 Production...';const data=await diffRequest('/api/local-migration-ledger/repair',{confirm:true});toast('本地迁移修复任务已创建：'+(data.job||{}).id);await load()}catch(error){document.getElementById('schemaDiffStatus').textContent='本地迁移修复未启动：'+error.message;if(button){button.disabled=false;button.classList.remove('is-loading');button.classList.add('is-failure');button.textContent='修复本地缺失迁移记录'}}}
+async function generateMigrationLedgerPlan(){const button=document.getElementById('schemaLedgerGenerate'),target=schemaDiffPlan?.target||document.getElementById('schemaDiffTarget')?.value||'staging';try{if(button){button.disabled=true;button.classList.add('is-loading');button.textContent='正在生成...'}document.getElementById('schemaDiffStatus').textContent='正在核验表结构与迁移 checksum，生成账本对齐计划...';const data=await diffRequest('/api/schema-migration-ledger/generate',{target});schemaLedgerPlan=data.plan||null;schemaLedgerReviewConfirmed=false;renderSchemaDiffReview();document.getElementById('schemaDiffReport').textContent=diffText({scan:schemaDiffScanResult?.scan,generated:schemaDiffPlan,inventory:schemaDiffReviewInventory,ledger_reconciliation:schemaLedgerPlan});document.getElementById('schemaDiffStatus').textContent=(schemaLedgerPlan?.blockers||[]).length?'账本对齐计划被阻断，请处理审核项。':'账本对齐计划已生成，请审核并确认。'}catch(error){document.getElementById('schemaDiffStatus').textContent='账本对齐计划生成失败：'+error.message}finally{if(button){button.disabled=false;button.classList.remove('is-loading');button.textContent='生成迁移账本对齐计划'}}}
+function confirmMigrationLedgerReview(confirmed){schemaLedgerReviewConfirmed=Boolean(confirmed);const button=document.getElementById('schemaLedgerApply');if(button)button.disabled=!schemaLedgerReviewConfirmed;document.getElementById('schemaDiffStatus').textContent=schemaLedgerReviewConfirmed?'账本对齐审核确认完成，可以执行对齐。':'请确认账本对齐审核后再执行。'}
+async function applyMigrationLedgerPlan(){if(!schemaLedgerPlan||!schemaLedgerReviewConfirmed)return;const target=schemaLedgerPlan.target,production=target==='production';if(!window.confirm('确认仅对齐 '+target+' 与本地的迁移账本？不会修改业务数据或表结构。'+(production?' Production 将执行最终等价核验。':'')))return;const button=document.getElementById('schemaLedgerApply');try{if(button){button.disabled=true;button.classList.add('is-loading');button.textContent='正在对齐...'}schemaDiffFlowStage=5;renderSchemaDiffWorkflow();document.getElementById('schemaDiffStatus').textContent='正在写入缺失账本并执行最终等价核验...';const data=await diffRequest('/api/schema-migration-ledger/apply',{target,report_path:schemaLedgerPlan.report_path,fingerprint:schemaLedgerPlan.fingerprint,review_confirmed:true,confirm_production:production});const verification=data.result?.verification||{};renderFinalSchemaVerification(verification);if(!verification.ok)throw new Error('最终等价核验未通过');toast('迁移账本已对齐：目标 '+(data.result?.target_inserted||0)+' 条，本地 '+(data.result?.local_inserted||0)+' 条');schemaLedgerPlan=null;schemaLedgerReviewConfirmed=false;await scanSchemaDiff()}catch(error){document.getElementById('schemaDiffStatus').textContent='账本对齐未执行：'+error.message;if(button){button.disabled=false;button.classList.remove('is-loading');button.classList.add('is-failure');button.textContent='确认对齐迁移账本'}}}
+function renderSchemaDiffReview(inventory){
+  const host=document.getElementById('schemaDiffReview');if(!host)return;
+  if(inventory!==undefined)schemaDiffReviewInventory=inventory;inventory=schemaDiffReviewInventory;
+  const scan=schemaDiffScanResult?.scan||{},schema=scan.schema||{},summary=scan.summary||{},migration=scan.schema_migration_difference||{};
+  const plan=schemaDiffPlan||{},actions=(plan.details||{}).schema||[],blockers=plan.blockers||[],packages=plan.generated_packages||[];
+  if(!schemaDiffPlan){host.innerHTML='<div class="notice">先比较并生成结构包，随后在这里完成差异审核。</div>';return}
+  const actionLabels=actions.map(action=>[action.action,action.table,action.column||action.index||action.constraint||action.migration].filter(Boolean).join(' · '));
+  const inventoryRows=(inventory?.rows||[]).filter(row=>row.status&&row.status!=='两边都有');
+  const inventoryLabels=inventoryRows.map(row=>row.table_name+' · '+row.category_label+' · '+row.status);
+  const inventorySection=inventory?.error?'<div class="schema-review-warning">表结构与数据分层交叉核对暂不可用：'+esc(inventory.error)+'</div>':'<div class="schema-review-warning">分层清单交叉核对：发现 '+esc(inventoryLabels.length)+' 个本地/目标表存在性差异。该清单仅核对表存在性；字段、索引与约束漂移以本次结构扫描为准。</div>'+schemaReviewChips(inventoryLabels,'表存在性与分层清单一致。');
+  const reviewState=blockers.length?'存在阻断项，不能应用。':packages.length?'请审阅所有项目并勾选确认后再应用。':'未生成结构包：无需写入结构，流程将继续执行最终等价核验。';
+  host.innerHTML='<div class="schema-review-head"><div><h3>差异审核</h3><p>以下内容来自本次扫描和生成的结构包，应用前将再次校验差异指纹。</p></div><span class="schema-review-status">'+esc(blockers.length?'已阻断':packages.length?'待审核':'无需应用')+'</span></div>'
+    +'<div class="schema-review-grid"><div class="schema-review-stat"><strong>'+esc(actions.length)+'</strong><span>拟执行新增操作</span></div><div class="schema-review-stat"><strong>'+esc(summary.schema_difference_tables||0)+'</strong><span>已有表定义差异</span></div><div class="schema-review-stat"><strong>'+esc(blockers.length)+'</strong><span>阻断项</span></div></div>'
+    +'<div class="schema-review-block"><h4>拟执行的结构操作</h4>'+schemaReviewChips(actionLabels,'没有新增操作；不会创建结构包。')+'</div>'
+    +'<div class="schema-review-block"><h4>表结构扫描差异</h4>'+schemaReviewChips((schema.local_only_tables||[]).map(name=>'仅本地：'+name),'没有仅本地表。')+schemaReviewChips((schema.target_only_tables||[]).map(name=>'仅目标：'+name),'没有仅目标表。')+schemaReviewChips((schema.different_tables||[]).map(name=>'定义不同：'+name),'没有已有表定义差异。')+'</div>'
+    +'<div class="schema-review-block"><h4>迁移账本差异</h4>'+schemaReviewChips((migration.local_only||[]).map(name=>'仅本地迁移：'+name),'没有仅本地迁移。')+schemaReviewChips((migration.target_only||[]).map(name=>'仅目标迁移：'+name),'没有仅目标迁移。')+schemaReviewChips((migration.checksum_mismatch||[]).map(name=>'校验和不一致：'+name),'没有迁移校验和不一致。')+'</div>'
+    +'<div class="schema-review-block"><h4>与表结构与数据分层的交叉核对</h4>'+inventorySection+'</div>'
+    +(blockers.length?'<div class="schema-review-block schema-review-danger">结构包已被阻断：'+schemaReviewChips(blockers.map(item=>item.table||item.reason||'未说明原因'),'')+'</div>':'')
+    +(packages.length&&!blockers.length?'<label class="schema-review-confirm"><input id="schemaDiffReviewConfirmed" type="checkbox" '+(schemaDiffReviewConfirmed?'checked':'')+' onchange="confirmSchemaDiffReview(this.checked)"><span>我已审阅本次差异、分层交叉核对和拟执行操作，确认只应用上述新增结构；我理解应用前系统会再次校验差异指纹。</span></label>':'<div class="schema-review-block schema-review-warning">'+esc(reviewState)+'</div>');
+  const hasBlockingLedgerDrift=hasBlockingMigrationLedgerDrift();
+  if(!packages.length&&!blockers.length&&hasBlockingLedgerDrift&&!schemaLedgerPlan)host.insertAdjacentHTML('beforeend','<div class="schema-review-block"><h4>迁移账本处理</h4><div class="schema-review-warning">表结构没有可应用的新增项，但存在需要处理的结构迁移账本差异。请先生成仅账本对齐计划；该计划会在执行前再次核验表结构和 checksum。</div><button id="schemaLedgerGenerate" type="button" onclick="generateMigrationLedgerPlan()">生成迁移账本对齐计划</button></div>');
+  renderMigrationLedgerReview();
+}
+function confirmSchemaDiffReview(confirmed){schemaDiffReviewConfirmed=Boolean(confirmed);schemaDiffFlowStage=confirmed?4:2;renderSchemaDiffWorkflow();updateSchemaDiffReleaseAvailability();document.getElementById('schemaDiffStatus').textContent=confirmed?'审核确认完成，可以提交结构包应用。':'请完成差异审核确认后再应用结构包。'}
+function schemaWorkflowDetail(key,status){if(status==='active')return '当前节点';if(status!=='succeeded')return '等待执行';const noSchemaPackage=!schemaDiffPlan?.generated_packages?.length;if(noSchemaPackage&&key==='confirm')return '无需用户确认';if(noSchemaPackage&&key==='execute')return '无需应用';if(key==='verify')return '已核验';if(key==='completed')return '流程闭环完成';return '已完成'}
+function renderSchemaDiffWorkflow(){const host=document.getElementById('schemaDiffWorkflow');if(!host)return;const nodes=[['compare','比较结构'],['generate','生成结构包'],['review','差异审核'],['confirm','用户确认'],['execute','应用结构包'],['verify','最终结构等价核验'],['completed','完成与记录']];host.innerHTML='<div class="workflow-title">结构安全升级流程 · 已完成 '+Math.min(schemaDiffFlowStage,7)+' / 7 步</div>'+nodes.map((n,i)=>{const status=schemaDiffFlowFailed&&i===schemaDiffFlowStage?'failed':i<schemaDiffFlowStage?'succeeded':i===schemaDiffFlowStage?'active':'pending',detail=schemaWorkflowDetail(n[0],status);return '<div class="workflow-node '+status+'"><div class="workflow-dot">'+(i+1)+'</div><div><div class="workflow-label">'+n[1]+'</div><div class="workflow-detail">'+detail+'</div></div><div class="workflow-status">'+(status==='active'?'进行中':status==='failed'?'失败':status==='succeeded'?(detail==='无需用户确认'||detail==='无需应用'?'自动通过':'完成'):'未开始')+'</div></div>'}).join('')}
+async function scanSchemaDiff(){const button=document.getElementById('schemaDiffScan');if(button&&button.disabled)return false;try{schemaDiffPlan=null;schemaDiffScanResult=null;schemaDiffReviewInventory=null;schemaDiffReviewConfirmed=false;schemaLedgerPlan=null;schemaLedgerReviewConfirmed=false;schemaDiffFlowStage=0;schemaDiffFlowFailed=false;schemaDiffFinalVerificationTarget='';resetSchemaDiffSubmissionState();renderSchemaDiffWorkflow();renderSchemaDiffReview();updateSchemaDiffReleaseAvailability();const select=document.getElementById('schemaDiffTarget');const target=select.value||'staging';const targetLabel=select.options[select.selectedIndex]?.textContent||target;if(button){button.disabled=true;button.classList.add('is-loading');button.setAttribute('aria-busy','true');button.textContent='正在比较...'}document.getElementById('schemaDiffStatus').textContent='正在读取 '+targetLabel+' 的结构元数据，不读取业务数据...';document.getElementById('schemaDiffReport').textContent='目标环境：'+targetLabel+'\n正在比较表、字段、索引和约束...';const scan=await api('/api/schema-diff/scan?target='+encodeURIComponent(target));schemaDiffScanResult=scan;schemaDiffFlowStage=1;renderSchemaDiffWorkflow();document.getElementById('schemaDiffStatus').textContent='结构比较完成，正在生成 '+targetLabel+' 的幂等结构包...';const generated=await diffRequest('/api/schema-diff/generate',{target});schemaDiffPlan=generated.result||{};let inventory=null;try{const inventoryResponse=await api('/api/schema-inventory?target='+encodeURIComponent(target));inventory=inventoryResponse.inventory||{}}catch(error){inventory={error:error.message}}schemaDiffFlowStage=2;renderSchemaDiffWorkflow();renderSchemaDiffReview(inventory);document.getElementById('schemaDiffReport').textContent=diffText({scan:scan.scan,generated:schemaDiffPlan,inventory});const blockers=schemaDiffPlan.blockers||[];const packages=schemaDiffPlan.generated_packages||[];const ledgerDrift=hasBlockingMigrationLedgerDrift();if(blockers.length){document.getElementById('schemaDiffStatus').textContent='结构升级被阻断，请处理审核区中的阻断项。'}else if(packages.length){document.getElementById('schemaDiffStatus').textContent='结构包已生成。预期新增表会在最终核验前显示为差异；请完成审核确认后应用，最终严格等价核验会在应用完成后执行。'}else if(ledgerDrift){document.getElementById('schemaDiffStatus').textContent='没有新增结构包，但存在需要处理的结构迁移账本差异；请生成并审核账本对齐计划。'}else{document.getElementById('schemaDiffStatus').textContent='没有新增结构包，正在执行最终结构等价核验...';const verification=await verifySchemaDiff(target);schemaDiffFinalVerificationTarget=target;if(verification.ok){schemaDiffFlowStage=7;document.getElementById('schemaDiffStatus').textContent='无需应用结构包，全部步骤已核验通过。'}else{document.getElementById('schemaDiffStatus').textContent='最终结构等价核验未通过，请根据审核结果处理差异。'}}renderSchemaDiffWorkflow();updateSchemaDiffReleaseAvailability();if(button){button.classList.add('is-success')}return true}catch(e){document.getElementById('schemaDiffStatus').textContent='结构升级准备失败：'+e.message;document.getElementById('schemaDiffReport').textContent='结构升级准备未完成。';if(button)button.classList.add('is-failure');return false}finally{if(button){button.disabled=false;button.classList.remove('is-loading');button.removeAttribute('aria-busy');button.textContent='比较并生成结构包';setTimeout(()=>button.classList.remove('is-success','is-failure'),2200)}}}
+async function releaseSchemaDiff(){const button=document.getElementById('schemaDiffRelease');if(!schemaDiffPlan||!schemaDiffReviewConfirmed||!schemaDiffPlan.generated_packages||!schemaDiffPlan.generated_packages.length||button&&button.disabled)return;const target=schemaDiffPlan.target;const production=target==='production';if(!window.confirm('确认将已审核的结构包应用到 '+target+'？只执行审核区列出的新增结构，不写入业务数据。'+(production?' Production 执行前会创建完整回滚备份。':'')))return;try{button.disabled=true;button.classList.add('is-loading');button.setAttribute('aria-busy','true');button.textContent='正在应用...';schemaDiffFlowStage=4;renderSchemaDiffWorkflow();document.getElementById('schemaDiffStatus').textContent='正在重新校验结构指纹并提交应用任务...';const data=await diffRequest('/api/schema-diff/release',{target,report_path:schemaDiffPlan.report_path,diff_fingerprint:schemaDiffPlan.diff_fingerprint,package_ids:schemaDiffPlan.generated_packages.map(item=>item.id),review_confirmed:true,confirm_production:production});const job=data.job||{};if(!job.id)throw new Error('database_release_job_id_missing');schemaDiffSubmittedJobId=job.id;schemaDiffSubmittedTarget=target;document.getElementById('schemaDiffStatus').textContent='结构安全升级任务已创建：'+job.id;button.classList.remove('is-loading');button.classList.add('is-success');button.setAttribute('aria-busy','false');button.textContent='已提交';await load()}catch(e){document.getElementById('schemaDiffStatus').textContent='结构包未应用：'+e.message;button.classList.remove('is-loading');button.classList.add('is-failure');button.removeAttribute('aria-busy');button.disabled=false;button.textContent='确认审核后应用'}}
+renderSchemaDiffWorkflow();
+function syncSchemaDiffWorkflowFromJob(){const job=overview.job||{},packages=job.package_plan||[];const isSchemaRelease=job.operation==='release'&&packages.some(item=>item&&item.type==='schema');const isCurrentSubmission=Boolean(schemaDiffPlan&&schemaDiffSubmittedJobId&&job.id===schemaDiffSubmittedJobId&&job.target===schemaDiffSubmittedTarget&&job.target===schemaDiffPlan.target);if(!isSchemaRelease||!isCurrentSubmission)return;const events=job.events||[],failure=[...events].reverse().find(item=>item&&item.status==='failed'&&item.stage==='error')||[...events].reverse().find(item=>item&&item.status==='failed');const finalVerificationStarted=events.some(item=>/Final schema equivalence verification/.test(String((item||{}).title||'')+' '+String((item||{}).detail||'')));const transactionCommitted=events.some(item=>/Schema package SQL transaction committed|Package workflow committed/.test(String((item||{}).title||'')+' '+String((item||{}).detail||'')));const status=document.getElementById('schemaDiffStatus'),release=document.getElementById('schemaDiffRelease');if(job.status==='failed'){schemaDiffFlowStage=finalVerificationStarted?5:4;schemaDiffFlowFailed=true;renderSchemaDiffWorkflow();if(status)status.textContent='结构安全升级失败：'+String((failure||{}).detail||job.progress?.message||'请查看迁移日志。')+(transactionCommitted?' 结构包 SQL 已提交，但最终严格核验未通过；请根据审核结果处理剩余差异。':' 本次 SQL 事务已回滚，未部分写入。');if(finalVerificationStarted)loadFinalSchemaVerification(job.target);if(release)release.disabled=true;return}if(job.status==='succeeded'){schemaDiffFlowStage=7;schemaDiffFlowFailed=false;renderSchemaDiffWorkflow();if(status)status.textContent='结构安全升级完成，最终结构等价核验已通过。';loadFinalSchemaVerification(job.target);if(release)release.disabled=true;return}if(['queued','running','cancelling'].includes(job.status)){schemaDiffFlowStage=finalVerificationStarted?5:4;schemaDiffFlowFailed=false;renderSchemaDiffWorkflow();if(status)status.textContent=finalVerificationStarted?'正在进行最终结构等价核验...':'结构包正在应用，尚未进入最终核验。';if(release)release.disabled=true}}
+const schemaDiffBaseRender=render;
+render=function(){schemaDiffBaseRender();syncSchemaDiffWorkflowFromJob()};
+document.getElementById('schemaDiffTarget').addEventListener('change',()=>{schemaDiffPlan=null;schemaDiffScanResult=null;schemaDiffReviewInventory=null;schemaDiffReviewConfirmed=false;schemaLedgerPlan=null;schemaLedgerReviewConfirmed=false;schemaDiffFlowStage=0;schemaDiffFlowFailed=false;schemaDiffFinalVerificationTarget='';resetSchemaDiffSubmissionState();renderSchemaDiffWorkflow();renderSchemaDiffReview();updateSchemaDiffReleaseAvailability();document.getElementById('schemaDiffStatus').textContent='目标环境已变更，请重新比较并生成结构包。'});
+const consolePages={};
+function setupConsoleWorkspace(){
+  const secondary=[...document.querySelectorAll('.secondary-panel')];
+  const inventory=document.createElement('section');
+  inventory.id='page-inventory';inventory.className='panel console-content-section is-hidden';inventory.dataset.consolePage='inventory';
+  inventory.innerHTML='<div class="section-title"><div><h2>表结构与数据分层</h2><p>以数据库表为单位展示所有权、数据性质和发布策略。这里是治理清单，不读取业务表行内容。</p></div><span class="eyebrow">Schema governance</span></div><div class="inventory-toolbar"><label class="field" style="max-width:300px">目标环境<select id="inventoryTarget"></select></label><label class="field inventory-filter">筛选表名或分类<input id="inventoryFilter" type="search" placeholder="例如：用户、主数据、comments"></label><button id="inventoryRefresh" type="button" onclick="loadTableInventory(this)">刷新清单</button></div><div id="inventorySummary" class="inventory-summary"><div class="notice">正在读取表结构清单...</div></div><div id="inventoryRows" class="inventory-table-wrap"><div class="notice" style="padding:14px">尚未加载。</div></div>';
+  const monitor=document.querySelector('.monitor-grid');if(monitor)monitor.parentNode.insertBefore(inventory,monitor);
+  consolePages.overview=[document.getElementById('stats'),document.getElementById('overview-dashboard')];
+  consolePages['full-release']=[document.querySelector('.release-actions-grid'),monitor];
+  consolePages['schema-release']=[secondary[0]];
+  consolePages.cleanup=[document.querySelector('.cleanup-panel')];
+  consolePages.inventory=[inventory];
+  consolePages.operations=[document.querySelector('.rollback-panel')];
+  Object.values(consolePages).flat().filter(Boolean).forEach(node=>node.classList.add('console-content-section'));
+  const target=document.getElementById('inventoryTarget');
+  target.innerHTML=(overview.release_targets||[]).map(item=>'<option value="'+esc(item.name)+'">'+esc(item.label)+' ('+esc(item.host)+'/'+esc(item.database)+')</option>').join('')||'<option value="staging">Staging</option><option value="production">Production</option>';
+  document.getElementById('inventoryFilter').addEventListener('input',()=>filterTableInventory());
+  document.querySelectorAll('[data-console-section]').forEach(button=>button.addEventListener('click',()=>setConsoleSection(button.dataset.consoleSection)));
+  setConsoleSection('overview');
+}
+function setConsoleSection(name){
+  const visible=new Set(consolePages[name]||[]);
+  Object.values(consolePages).flat().filter(Boolean).forEach(node=>node.classList.toggle('is-hidden',!visible.has(node)));
+  document.querySelectorAll('[data-console-section]').forEach(button=>button.classList.toggle('active',button.dataset.consoleSection===name));
+  if(name==='inventory')loadTableInventory();
+}
+function renderTableInventory(data){
+  const rows=data.rows||[],summary=data.counts||{},targetWarning=data.target_error?'<div class="notice" style="grid-column:1/-1;color:var(--orange,#b7791f)">'+esc(data.target_error)+'</div>':'';document.getElementById('inventorySummary').innerHTML=targetWarning+Object.entries(summary).map(([label,count])=>'<div class="inventory-count"><strong>'+esc(count)+'</strong>'+esc(label)+'</div>').join('');
+  document.getElementById('inventoryRows').innerHTML='<table class="inventory-table"><thead><tr><th>表名</th><th>数据分类</th><th>归属模块</th><th>本地 / 目标</th><th>说明</th><th>发布策略</th></tr></thead><tbody>'+rows.map(row=>'<tr data-inventory-text="'+esc([row.table_name,row.category_label,row.owner,row.description,row.policy].join(' '))+'"><td class="table-name">'+esc(row.table_name)+'</td><td><span class="inventory-badge">'+esc(row.category_label)+'</span></td><td>'+esc(row.owner)+'</td><td class="inventory-status '+(row.status==='两边都有'?'':'mismatch')+'">'+esc(row.status)+'</td><td>'+esc(row.description)+'</td><td>'+esc(row.policy)+'</td></tr>').join('')+'</tbody></table>';filterTableInventory();
+}
+function filterTableInventory(){const query=(document.getElementById('inventoryFilter')?.value||'').trim().toLowerCase();document.querySelectorAll('#inventoryRows tbody tr').forEach(row=>{row.hidden=Boolean(query&&!String(row.dataset.inventoryText||'').toLowerCase().includes(query))})}
+async function loadTableInventory(button){const target=document.getElementById('inventoryTarget')?.value||'staging';try{if(button){button.disabled=true;button.classList.add('is-loading');button.textContent='读取中...'}const data=await api('/api/schema-inventory?target='+encodeURIComponent(target));renderTableInventory(data.inventory||{});if(button){button.classList.add('is-success')}}catch(error){document.getElementById('inventoryRows').innerHTML='<div class="notice" style="padding:14px;color:var(--red)">表结构清单读取失败：'+esc(error.message)+'</div>'}finally{if(button){button.disabled=false;button.classList.remove('is-loading');button.textContent='刷新清单';setTimeout(()=>button.classList.remove('is-success'),1200)}}}
+let overviewSchemaSummary=null;
+function renderOverviewStatistics(){
+  const summary=overviewSchemaSummary||{},targets=summary.targets||[];
+  const byName=Object.fromEntries(targets.map(item=>[item.target,item]));
+  const localCount=(byName.staging?.summary||byName.production?.summary||{}).local_table_count;
+  const statItems=[
+    ['本地结构表',localCount==null?'--':localCount,summary.source?.database||'等待只读扫描'],
+    ['Staging 结构差异',byName.staging?.available?(byName.staging.summary.structural_difference_count||0):'不可用',byName.staging?.available?'与本地开发库比较':(byName.staging?.error||'等待扫描')],
+    ['Production 结构差异',byName.production?.available?(byName.production.summary.structural_difference_count||0):'不可用',byName.production?.available?'与本地开发库比较':(byName.production?.error||'等待扫描')],
+    ['统计口径','只读','不读取、不修改业务数据'],
+  ];
+  const stats=document.getElementById('stats');
+  if(stats)stats.innerHTML=statItems.map(item=>'<div class="stat"><span>'+esc(item[0])+'</span><b>'+esc(item[1])+'</b><span>'+esc(item[2])+'</span></div>').join('');
+  const host=document.getElementById('overview-difference-grid');
+  const meta=document.getElementById('overview-difference-meta');
+  if(!host)return;
+  if(!targets.length){host.innerHTML='<div class="notice">正在读取 Staging 与 Production 的结构摘要...</div>';if(meta)meta.textContent='';return}
+  host.innerHTML=targets.map(item=>{
+    if(!item.available)return '<article class="overview-difference-card unavailable"><div class="overview-difference-head"><h3>'+esc(item.label)+'</h3><span class="overview-difference-status">暂不可用</span></div><div class="overview-difference-error">'+esc(item.error||'未能读取结构摘要。')+'</div></article>';
+    const value=item.summary||{};
+    const parts=[
+      ['仅本地表',value.local_only_tables],['仅目标表',value.target_only_tables],['表定义不同',value.schema_difference_tables],
+      ['本地迁移',value.migration_local_only],['目标迁移',value.migration_target_only],['校验和不一致',value.migration_checksum_mismatch],
+    ];
+    return '<article class="overview-difference-card"><div class="overview-difference-head"><h3>'+esc(item.label)+'</h3><span class="overview-difference-status">可用</span></div><div class="overview-difference-total">'+esc(value.structural_difference_count||0)+'</div><div class="overview-difference-label">项结构或迁移账本差异</div><div class="overview-difference-breakdown">'+parts.map(part=>'<span>'+esc(part[0])+' '+esc(part[1]||0)+'</span>').join('')+'</div></article>';
+  }).join('');
+  if(meta)meta.textContent='来源：'+esc(summary.source?.label||'本地开发库')+' · '+esc(summary.source?.host||'--')+'/'+esc(summary.source?.database||'--')+' · 统计时间：'+esc(summary.generated_at||'--');
+}
+async function loadOverviewSchemaSummary(){
+  try{const data=await api('/api/overview/schema-summary');overviewSchemaSummary=data.summary||{};renderOverviewStatistics()}catch(error){
+    overviewSchemaSummary={targets:[{target:'staging',label:'Staging',available:false,error:'结构摘要读取失败：'+error.message,summary:{}},{target:'production',label:'Production',available:false,error:'结构摘要读取失败：'+error.message,summary:{}}]};
+    renderOverviewStatistics();
+  }
+}
+setupConsoleWorkspace();
+const overviewWorkspaceRender=render;
+render=function(){overviewWorkspaceRender();renderOverviewStatistics()};
+loadOverviewSchemaSummary();
 </script></body></html>'''
 
 

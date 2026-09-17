@@ -1532,12 +1532,15 @@ def api_h5_register_password():
     display_name = str(body.get("display_name") or "").strip()
     requested_tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
     invite_token = str(body.get("invite_token") or "").strip()
+    h5_channel_label = str(body.get("h5_channel_label") or "").strip()
     if not username or not password:
         return jsonify({"ok": False, "error": "username_password_required"}), 400
     if not display_name:
         return jsonify({"ok": False, "error": "display_name_required"}), 400
     if len(password) < 6:
         return jsonify({"ok": False, "error": "password_too_short"}), 400
+    if h5_channel_label not in CHANNELS:
+        return jsonify({"ok": False, "error": "registration_channel_required"}), 400
     try:
         site_config = get_site_config()
         auth_settings = get_auth_settings(site_config)
@@ -1557,7 +1560,8 @@ def api_h5_register_password():
             "tenant_slug": tenant.get("slug") or get_default_tenant_slug(site_config),
             "advisor_name": tenant.get("advisor") or "",
             "status": "pending_approval",
-            "source_label": f"扫码注册：{invite.get('source_label')}" if invite else "自主注册",
+            "source_label": h5_channel_label,
+            "h5_channel_label": h5_channel_label,
         }
         user = create_user(payload)
         if invite:
@@ -1850,6 +1854,67 @@ def api_update_admin_user_status():
     return jsonify({"ok": True, "user": user, "users": list_users()})
 
 
+@app.route("/api/users/account", methods=["POST"])
+def api_update_user_account():
+    """Shared account editor for Admin and the current tenant's DAv."""
+    body = request.get_json(silent=True) or {}
+    current_user = get_current_authenticated_user() or {}
+    current_role = str(current_user.get("role") or "").strip().lower()
+    target_id = body.get("user_id")
+    target = get_user_by_id(target_id)
+    if not target:
+        return jsonify({"ok": False, "error": "user_not_found"}), 400
+    is_admin = current_role == "admin"
+    is_dav = has_role_capability(current_role, "dav") and current_role != "admin"
+    if not is_admin and not is_dav:
+        return jsonify({"ok": False, "error": "account_edit_forbidden"}), 403
+    requested_tenant = str(body.get("tenant_slug") or "").strip().lower()
+    if is_dav:
+        requested_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+        if str(target.get("tenant_slug") or "").strip().lower() != requested_tenant or str(target.get("role") or "").strip().lower() != "investor":
+            return jsonify({"ok": False, "error": "tenant_user_not_found"}), 400
+    requested_role = str(body.get("role") or target.get("role") or "").strip().lower()
+    if not requested_role:
+        return jsonify({"ok": False, "error": "invalid_user_role"}), 400
+    if not is_admin and not requested_tenant:
+        return jsonify({"ok": False, "error": "tenant_required"}), 400
+    if is_admin and requested_role != "admin" and not requested_tenant:
+        return jsonify({"ok": False, "error": "tenant_required"}), 400
+    if is_admin and requested_role == "admin":
+        requested_tenant = ""
+    try:
+        user = update_user_account(
+            target_id,
+            body.get("username"),
+            body.get("password"),
+            tenant_slug=requested_tenant,
+            role=("investor" if is_dav else requested_role),
+            advisor_name=body.get("advisor_name"),
+            scope_tenant_slug=requested_tenant if is_dav else None,
+        )
+        if is_admin:
+            users = list_users()
+            summary = None
+        else:
+            summary = build_user_import_summary(scope="kol", tenant_slug=requested_tenant)
+            users = summary["users"]
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    payload = {"ok": True, "user": user, "users": users}
+    if summary is not None:
+        payload["summary"] = summary
+    return jsonify(payload)
+
+
+@app.route("/api/admin/users/account", methods=["POST"])
+def api_update_admin_user_account():
+    return api_update_user_account()
+
+
 @app.route("/api/admin/users", methods=["POST"])
 def api_create_admin_user():
     body = request.get_json(silent=True) or {}
@@ -1866,6 +1931,35 @@ def api_import_admin_users():
     body = request.get_json(silent=True) or {}
     users = body.get("users", [])
     created, skipped = bulk_create_users(users if isinstance(users, list) else [], context=build_user_import_context(scope="admin"))
+    return jsonify({"ok": True, "created": created, "skipped": skipped, "users": list_users()})
+
+
+@app.route("/api/admin/users/parse-names", methods=["POST"])
+def api_parse_admin_user_names():
+    body = request.get_json(silent=True) or {}
+    try:
+        result = parse_user_names_with_llm(body.get("text"), entry_point="admin.user_batch_import")
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("Admin user name parsing failed")
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    items = annotate_user_name_candidates(result.get("items") or result.get("names") or [])
+    return jsonify({"ok": True, **result, "items": items, "password": "Abc123456"})
+
+
+@app.route("/api/admin/users/import-names", methods=["POST"])
+def api_import_admin_user_names():
+    body = request.get_json(silent=True) or {}
+    names = body.get("names") if isinstance(body.get("names"), list) else []
+    try:
+        created, skipped = bulk_create_name_batch_users(
+            names,
+            context=build_user_import_context(scope="admin"),
+            source_label="AI批量导入",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
     return jsonify({"ok": True, "created": created, "skipped": skipped, "users": list_users()})
 
 
@@ -1939,6 +2033,11 @@ def api_create_kol_user():
     return jsonify({"ok": True, "user": user, "users": summary["users"], "summary": summary})
 
 
+@app.route("/api/kol/users/account", methods=["POST"])
+def api_update_kol_user_account():
+    return api_update_user_account()
+
+
 @app.route("/api/kol/users/labels", methods=["POST"])
 def api_update_kol_user_labels():
     tenant = get_active_tenant_from_request()
@@ -2007,6 +2106,49 @@ def api_import_kol_users():
         context=build_user_import_context(scope="kol", tenant_slug=tenant["slug"]),
     )
     summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    return jsonify({"ok": True, "created": created, "skipped": skipped, "users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users/parse-names", methods=["POST"])
+def api_parse_kol_user_names():
+    tenant = get_active_tenant_from_request()
+    try:
+        result = parse_user_names_with_llm(
+            (request.get_json(silent=True) or {}).get("text"),
+            tenant_slug=tenant["slug"],
+            entry_point="kol.user_batch_import",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("KOL user name parsing failed")
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    items = annotate_user_name_candidates(result.get("items") or result.get("names") or [])
+    return jsonify({"ok": True, **result, "items": items, "password": "Abc123456"})
+
+
+@app.route("/api/kol/users/import-names", methods=["POST"])
+def api_import_kol_user_names():
+    tenant = get_active_tenant_from_request()
+    names = (request.get_json(silent=True) or {}).get("names")
+    current_user = get_current_authenticated_user() or {}
+    current_role = str(current_user.get("role") or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if not has_role_capability(current_role, "dav"):
+        return jsonify({"ok": False, "error": "kol_access_required"}), 403
+    if current_role != "admin" and current_tenant != str(tenant["slug"] or "").strip().lower():
+        return jsonify({"ok": False, "error": "tenant_access_denied"}), 403
+    try:
+        confirmed_names = names if isinstance(names, list) else []
+        allowed_names = [item for item in confirmed_names if not isinstance(item, dict) or str(item.get("role") or "investor").strip().lower() == "investor"]
+        created, skipped = bulk_create_name_batch_users(
+            allowed_names,
+            context=build_user_import_context(scope="kol", tenant_slug=tenant["slug"]),
+            source_label="AI批量导入",
+        )
+        summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
     return jsonify({"ok": True, "created": created, "skipped": skipped, "users": summary["users"], "summary": summary})
 
 

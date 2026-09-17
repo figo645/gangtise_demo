@@ -89,7 +89,7 @@ cleanup_runtime() {
 trap cleanup_runtime EXIT INT TERM
 
 echo "Starting the Gunicorn Web service in the foreground on port $APP_PORT."
-env PORT="$APP_PORT" DEBUG=0 APP_SERVER=gunicorn PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" "$PYTHON_BIN" "$SCRIPT_DIR/app.py" &
+env PORT="$APP_PORT" DEBUG=0 APP_SERVER=gunicorn PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" GANGTISE_RUNTIME_ROLE=web "$PYTHON_BIN" "$SCRIPT_DIR/app.py" &
 APP_PID=$!
 echo "$APP_PID" >"$PID_FILE"
 

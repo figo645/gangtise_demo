@@ -22,6 +22,7 @@ TARGET_USER="${REMOTE_DB_USER:-postgres}"
 TARGET_PASSWORD="${REMOTE_DB_PASSWORD:-}"
 TARGET_MAINTENANCE_DB="${REMOTE_MAINTENANCE_DB:-postgres}"
 CONNECT_TIMEOUT_SECONDS="${DATABASE_RELEASE_CONNECT_TIMEOUT_SECONDS:-8}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 PROTECTED_APP_SETTING_KEYS="'gangtise_openapi_credentials:v1','gangtise_openapi_token:v1','llm_api_credentials:v1','auth_credentials:wechat:v1'"
 
 [[ "${CONFIRM_PRODUCTION_TO_STAGING_SYNC:-}" == "YES" ]] || { echo "Production-to-Staging confirmation is required." >&2; exit 2; }
@@ -97,6 +98,12 @@ echo "==> Temporary database created: ${TEMP_DB}"
 PGPASSWORD="$TARGET_PASSWORD" pg_restore -w -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TEMP_DB" --format=custom --no-owner --no-acl --exit-on-error "$DUMP_FILE"
 echo "==> Restore completed: ${TEMP_DB}"
 preserve_target_environment_credentials
+
+echo "==> Final Production and temporary Staging schema equivalence verification"
+VERIFY_SOURCE_HOST="$SOURCE_HOST" VERIFY_SOURCE_PORT="$SOURCE_PORT" VERIFY_SOURCE_DB="$SOURCE_DB" VERIFY_SOURCE_USER="$SOURCE_USER" VERIFY_SOURCE_PASSWORD="$SOURCE_PASSWORD" \
+  VERIFY_TARGET_HOST="$TARGET_HOST" VERIFY_TARGET_PORT="$TARGET_PORT" VERIFY_TARGET_DB="$TEMP_DB" VERIFY_TARGET_USER="$TARGET_USER" VERIFY_TARGET_PASSWORD="$TARGET_PASSWORD" \
+  "$PYTHON_BIN" "$ROOT_DIR/tools/verify_database_schema.py"
+echo "==> Final schema equivalence verification passed"
 
 echo "==> Validating Production and Staging temporary database equivalence"
 TARGET_QUERY=(psql -w -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TEMP_DB" -Atqc)

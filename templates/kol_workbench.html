@@ -3773,7 +3773,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="downloadKwFanTemplate()">下载 CSV 模板</button>
             <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="triggerKwFanCsvImport()">上传 CSV 导入</button>
             <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="openKwFanBulkEditor()">批量手工录入</button>
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="openKwFanCreator()">新增单个粉丝</button>
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="openKwFanCreator()">新增粉丝</button>
           </div>
           <input id="kw-fan-csv-input" type="file" accept=".csv,text/csv" style="display:none">
         </div>
@@ -6509,6 +6509,7 @@ let kwFans = Array.isArray((window.WORKBENCH_DATA && window.WORKBENCH_DATA.fan_m
       status: fan.status === '已禁用' ? 'disabled' : 'active',
     }))
   : [];
+let kwAiNameRows = [];
 let kwSelectedFanIds = new Set();
 const KW_FAN_IMPORT_COLUMNS = ['username', 'password', 'phone', 'status', 'is_paid_sample', 'source_label', 'paid_sample_note'];
 
@@ -9353,7 +9354,13 @@ function kwGetSelectedWatchlist() {
 function kwGetReviewDraftContentText() {
   if (kwReviewDraft.sourceMode === 'voice') return String(kwReviewDraft.voiceTranscript || '').trim();
   if (kwReviewDraft.sourceMode === 'file') return String(kwReviewDraft.fileText || '').trim();
-  if (kwReviewDraft.sourceMode === 'url') return String(kwReviewDraft.urlText || '').trim();
+  if (kwReviewDraft.sourceMode === 'url') {
+    const body = String(kwReviewDraft.urlText || '').trim();
+    if (!body) return '';
+    const sourceTitle = String(kwReviewDraft.urlTitle || '').trim();
+    const sourceUrl = String(kwReviewDraft.urlValue || '').trim();
+    return [`网页标题：${sourceTitle || '未提供'}`, `网页地址：${sourceUrl || '未提供'}`, '', body].join('\n').trim();
+  }
   const temp = document.createElement('div');
   temp.innerHTML = kwReviewDraft.manualHtml || '';
   return String(temp.textContent || '').trim();
@@ -10073,11 +10080,13 @@ function kwSyncReviewTextInputs() {
   const accessModeInput = document.getElementById('kw-review-access-mode');
   const urlInput = document.getElementById('kw-review-url-input');
   const urlTitleInput = document.getElementById('kw-review-url-title');
+  const urlTextInput = document.getElementById('kw-review-url-text');
   const finalEditor = document.getElementById('kw-review-final-editor');
   if (titleInput) kwReviewDraft.reviewTitle = String(titleInput.value || '').trim();
   if (accessModeInput) kwReviewDraft.accessMode = accessModeInput.dataset.accessMode === 'subscriber' ? 'subscriber' : 'public';
   if (urlInput) kwReviewDraft.urlValue = String(urlInput.value || '').trim();
   if (urlTitleInput) kwReviewDraft.urlTitle = String(urlTitleInput.value || '').trim();
+  if (urlTextInput) kwReviewDraft.urlText = String(urlTextInput.value || '').trim();
   if (finalEditor) {
     kwReviewDraft.finalDraftHtml = kwSafeReviewHtml(finalEditor.innerHTML || '');
     kwReviewDraft.finalDraftText = kwKnowledgeHtmlToPlainText(kwReviewDraft.finalDraftHtml);
@@ -10154,8 +10163,7 @@ async function kwPreviewReviewUrl() {
     if (!extractedText) throw new Error('网页未提取到可用文本，请确认链接内容');
     kwReviewDraft.urlTitle = kwReviewDraft.urlTitle || String(preview.title || '');
     kwReviewDraft.urlText = extractedText;
-    kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml(kwReviewDraft.manualHtml || '', extractedText);
-    kwReviewDraft.sourceMode = 'manual';
+    kwReviewDraft.sourceMode = 'url';
     kwReviewDraft.previewReady = false;
     kwReviewDraft.generatedPreviewText = '';
     kwReviewDraft.draftReviewText = '';
@@ -10741,7 +10749,8 @@ function kwRenderReviewInputPanel() {
         </div>
         <div class="kw-review-intake-result">
           <div class="kw-review-intake-result-title">网页提炼结果</div>
-          <div class="kw-review-intake-result-text">${escapeHtml(kwReviewDraft.urlText || '抓取网页后，这里会展示正文摘要，可作为洞见素材。')}</div>
+          <textarea id="kw-review-url-text" class="kw-review-final-editor" style="margin-top:8px;min-height:180px" placeholder="抓取网页后，这里会展示正文；你可以先修改，再提交大模型优化。">${escapeHtml(kwReviewDraft.urlText || '')}</textarea>
+          <div class="kw-review-runtime-desc" style="margin-top:6px">网页内容会作为原始素材提交给大模型，生成结果进入 Draft 审核，不会直接发布。</div>
         </div>
       </div>
     `;
@@ -12958,7 +12967,7 @@ function renderKwFans() {
       <td>${escapeHtml(fan.paid_sample_note || fan.phone_masked || '--')}</td>
       <td><span class="tag ${fan.status === 'pending_approval' ? 'tag-blue' : 'tag-gold'}">${escapeHtml(fan.status === 'disabled' ? '已禁用' : (fan.status === 'pending_approval' ? '待审批' : '活跃'))}</span></td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">${labels.length ? labels.map((label) => `<span class="tag ${label === '付费用户' ? 'tag-gold' : 'tag-blue'}">${escapeHtml(label)}</span>`).join('') : '<span style="color:#8899aa">--</span>'}</div></td>
-      <td><button class="btn-outline" type="button" style="padding:4px 9px;font-size:11px;color:${fan.status === 'disabled' ? '#9DE0BE' : '#F2B8B5'};border-color:${fan.status === 'disabled' ? 'rgba(22,112,74,0.28)' : 'rgba(180,35,24,0.28)'}" onclick="requestKwFanStatusChange(${userId})">${fan.status === 'disabled' ? '启用' : (fan.status === 'pending_approval' ? '审批通过' : '停用')}</button></td>
+      <td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn-outline" type="button" style="padding:4px 9px;font-size:11px" onclick="openKwFanEdit(${userId})">编辑账号</button><button class="btn-outline" type="button" style="padding:4px 9px;font-size:11px;color:${fan.status === 'disabled' ? '#9DE0BE' : '#F2B8B5'};border-color:${fan.status === 'disabled' ? 'rgba(22,112,74,0.28)' : 'rgba(180,35,24,0.28)'}" onclick="requestKwFanStatusChange(${userId})">${fan.status === 'disabled' ? '启用' : (fan.status === 'pending_approval' ? '审批通过' : '停用')}</button></div></td>
     </tr>
   `;
   }).join('') : '<tr><td colspan="9" style="text-align:center;color:#8899aa;padding:20px 0">暂无粉丝用户</td></tr>';
@@ -12977,6 +12986,38 @@ function renderKwFans() {
 function closeKwFanStatusModal() {
   const modal = document.getElementById('kw-fan-status-modal');
   if (modal) modal.classList.remove('show');
+}
+
+function openKwFanEdit(userId) {
+  const fan = kwFans.find((item) => Number(item.id || 0) === Number(userId || 0));
+  const modal = document.getElementById('kw-fan-status-modal');
+  const host = document.getElementById('kw-fan-status-modal-content');
+  if (!fan || !modal || !host) return;
+  const activeTenant = window.ACTIVE_TENANT || {};
+  host.innerHTML = `<div class="kw-review-modal-head"><div><div class="kw-review-modal-title">粉丝账号详情与编辑</div><div class="kw-review-modal-subtitle">所属大V / 租户已固定为当前工作台，不允许跨租户修改。用户名可修改；新密码留空表示保持不变。</div></div></div><div class="kw-card" style="margin-top:12px;border-color:rgba(47,116,192,.28)"><div class="kw-card-title">账号归属</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px"><div><div class="kw-card-desc">所属大V / 租户</div><strong>${escapeHtml(activeTenant.name || activeTenant.slug || '--')}</strong></div><div><div class="kw-card-desc">账户类别</div><strong>粉丝 / 投资者</strong></div><div><div class="kw-card-desc">账号状态</div><strong>${escapeHtml(fan.status === 'pending_approval' ? '待审批' : (fan.status === 'disabled' ? '已停用' : '正常'))}</strong></div><div><div class="kw-card-desc">来源</div><strong>${escapeHtml(fan.source || '--')}</strong></div></div></div><form style="display:grid;gap:12px;margin-top:14px" onsubmit="submitKwFanEdit(event, ${Number(fan.id || 0)})"><label style="display:grid;gap:6px;font-size:12px;color:var(--text-sub)">用户名<input id="kw-fan-edit-username" class="login-input" style="color:var(--text-main)" value="${escapeAttr(fan.username || '')}" required maxlength="80"></label><label style="display:grid;gap:6px;font-size:12px;color:var(--text-sub)">新密码 <span style="font-weight:400">（留空表示不修改）</span><input id="kw-fan-edit-password" class="login-input" style="color:var(--text-main)" type="password" minlength="6" autocomplete="new-password" placeholder="至少 6 位"></label><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn-outline" type="button" onclick="closeKwFanStatusModal()">取消</button><button class="btn-gold" type="submit">保存账号编辑</button></div><div id="kw-fan-edit-status" style="min-height:18px;font-size:12px;color:var(--text-sub)"></div></form>`;
+  modal.classList.add('show');
+}
+
+async function submitKwFanEdit(event, userId) {
+  event.preventDefault();
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  const status = document.getElementById('kw-fan-edit-status');
+  const username = String(document.getElementById('kw-fan-edit-username')?.value || '').trim();
+  const password = String(document.getElementById('kw-fan-edit-password')?.value || '');
+  if (status) status.textContent = '正在保存...';
+  try {
+    const response = await fetch('/api/users/account', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, username, password, role: 'investor', tenant_slug: tenantSlug}) });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'account_update_failed');
+    kwFans = Array.isArray(payload.users) ? payload.users.map(normalizeKwFan) : kwFans;
+    renderKwFans();
+    closeKwFanStatusModal();
+    await refreshKwBusinessAnalytics();
+    showToast('粉丝账号已更新');
+  } catch (error) {
+    const messages = {username_required: '请输入用户名。', username_exists: '用户名已存在。', password_too_short: '新密码至少需要 6 位。', tenant_user_not_found: '未找到当前租户下的粉丝账号。', tenant_required: '当前大V未绑定租户，无法编辑粉丝账号。', tenant_not_found: '当前租户不存在。'};
+    if (status) status.textContent = messages[error.message] || error.message || '账号更新失败';
+  }
 }
 
 function requestKwFanStatusChange(userId) {
@@ -13387,6 +13428,7 @@ function openKwFanImportModal(mode = 'bulk') {
       </div>
       <div class="kw-toolbar" style="margin-top:12px">
         <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="addKwFanImportRow()">新增一行</button>
+        <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="openKwAiNameImportModal()">AI按姓名批量导入</button>
         <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="submitKwFanImportRows()">${isSingle ? '保存粉丝' : '批量创建粉丝'}</button>
       </div>
     </div>
@@ -13394,6 +13436,64 @@ function openKwFanImportModal(mode = 'bulk') {
   modal.classList.add('show');
   addKwFanImportRow({status: 'active', is_paid_sample: '0', source_label: '用户导入'});
   if (!isSingle) addKwFanImportRow({status: 'active', is_paid_sample: '0', source_label: '用户导入'});
+}
+
+function openKwAiNameImportModal() {
+  const content = document.getElementById('kw-fan-import-modal-content');
+  if (!content) return;
+  content.innerHTML = `<div class="kw-review-modal-head"><div><div class="kw-review-modal-title">AI 按姓名批量导入粉丝</div><div class="kw-review-modal-subtitle">输入姓名或姓名串，AI 只负责解析；确认表格后才会创建当前租户粉丝。</div></div><button class="kw-review-modal-close-pill" type="button" onclick="closeKwFanImportModal()">关闭</button></div><div class="kw-card"><div class="kw-card-desc" style="margin-bottom:10px">默认统一密码：<strong>Abc123456</strong> · 新账号角色：粉丝用户 · 解析上限 200 人</div><textarea id="kw-ai-name-text" class="config-field" style="width:100%;min-height:110px;box-sizing:border-box" placeholder="例如：张三、李四，王五；请注册为新用户"></textarea><div class="kw-toolbar" style="margin-top:12px"><button class="btn-gold" type="button" onclick="parseKwAiNames()">解析并预览</button><button class="btn-outline" type="button" onclick="openKwFanImportModal('bulk')">返回普通导入</button></div><div id="kw-ai-name-preview" style="margin-top:14px"></div></div>`;
+  document.getElementById('kw-fan-import-modal')?.classList.add('show');
+}
+
+function renderKwAiNamePreview() {
+  const host = document.getElementById('kw-ai-name-preview');
+  if (!host) return;
+  if (!kwAiNameRows.length) { host.innerHTML = '<div class="kw-card-desc">没有解析到可导入的姓名，请检查输入。</div>'; return; }
+  host.innerHTML = `<div style="overflow:auto"><table><thead><tr><th>用户名（可修改）</th><th>初始密码</th><th>账户类别</th><th>状态</th><th>操作</th></tr></thead><tbody>${kwAiNameRows.map((item, index) => `<tr><td><input data-kw-ai-name="${index}" value="${escapeAttr(item.name)}" style="min-width:160px"></td><td><code>Abc123456</code></td><td>${item.role === 'investor' ? '粉丝 / 投资者' : escapeHtml(item.role === 'dav' ? '大V' : '管理员')}</td><td>${item.exists ? '<span class="tag tag-red">已存在，不导入</span>' : (item.role === 'investor' ? '<span class="tag tag-green">可创建</span>' : '<span class="tag tag-red">当前入口不可导入</span>')}</td><td><button class="btn-outline" type="button" onclick="removeKwAiName(${index})">删除</button></td></tr>`).join('')}</tbody></table></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn-gold" type="button" onclick="confirmKwAiNames()">确认并批量创建 ${kwAiNameRows.filter((item) => !item.exists && item.role === 'investor').length} 位粉丝</button></div>`;
+}
+
+function syncKwAiNameRows() {
+  kwAiNameRows = Array.from(document.querySelectorAll('[data-kw-ai-name]')).map((node, index) => ({name: String(node.value || '').trim(), role: kwAiNameRows[index]?.role || 'investor', exists: Boolean(kwAiNameRows[index]?.exists)})).filter((item) => item.name);
+}
+
+function removeKwAiName(index) {
+  syncKwAiNameRows();
+  kwAiNameRows.splice(index, 1);
+  renderKwAiNamePreview();
+}
+
+async function parseKwAiNames() {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  const text = String(document.getElementById('kw-ai-name-text')?.value || '').trim();
+  const preview = document.getElementById('kw-ai-name-preview');
+  if (!tenantSlug) { showToast('tenant_missing'); return; }
+  if (!text) { showToast('请输入姓名或姓名串'); return; }
+  if (preview) preview.innerHTML = '<div class="kw-card-desc">正在调用模型解析，请稍候...</div>';
+  try {
+    const response = await fetch(`/api/kol/users/parse-names?tenant=${encodeURIComponent(tenantSlug)}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'parse_user_names_failed');
+    kwAiNameRows = Array.isArray(data.items) ? data.items : (Array.isArray(data.names) ? data.names.map((name) => ({name, exists: false})) : []);
+    renderKwAiNamePreview();
+  } catch (error) { if (preview) preview.innerHTML = `<div class="login-error">${escapeHtml(error.message || '姓名解析失败，未创建用户')}</div>`; }
+}
+
+async function confirmKwAiNames() {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  syncKwAiNameRows();
+  if (!tenantSlug) { showToast('tenant_missing'); return; }
+  const namesToImport = kwAiNameRows.filter((item) => !item.exists && item.role === 'investor').map((item) => ({name: item.name, role: item.role}));
+  if (!namesToImport.length) { showToast('没有新的用户名可导入'); return; }
+  try {
+    const response = await fetch(`/api/kol/users/import-names?tenant=${encodeURIComponent(tenantSlug)}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({names:namesToImport})});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'import_user_names_failed');
+    kwFans = Array.isArray(data.users) ? data.users.map(normalizeKwFan) : kwFans;
+    renderKwFans();
+    closeKwFanImportModal();
+    await refreshKwBusinessAnalytics();
+    showToast(`已创建 ${Array.isArray(data.created) ? data.created.length : 0} 位粉丝`);
+  } catch (error) { showToast(error.message || '批量导入失败'); }
 }
 
 function openKwFanBulkEditor() {

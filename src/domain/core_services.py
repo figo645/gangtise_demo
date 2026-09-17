@@ -1,6 +1,8 @@
 from src.runtime import *
+import atexit
 import base64
 import hashlib
+import os
 import re
 from zoneinfo import ZoneInfo
 
@@ -5643,6 +5645,67 @@ def update_user_status(user_id, status, actor_user_id=None):
     return get_user_by_id(target_id)
 
 
+def update_user_account(user_id, username, password="", tenant_slug=None, role=None, advisor_name=None, scope_tenant_slug=None):
+    """Update account credentials while keeping the existing role and tenant.
+
+    The caller is responsible for authorization; ``tenant_slug`` is an
+    optional server-side scope check used by the KOL endpoint.
+    """
+    try:
+        target_id = int(user_id)
+    except (TypeError, ValueError):
+        raise ValueError("user_not_found")
+    target = get_user_by_id(target_id)
+    if not target:
+        raise ValueError("user_not_found")
+    normalized_username = str(username or "").strip()
+    if not normalized_username:
+        raise ValueError("username_required")
+    if len(normalized_username) > 80:
+        raise ValueError("username_too_long")
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    normalized_scope_tenant = str(scope_tenant_slug or "").strip().lower()
+    if normalized_scope_tenant and str(target.get("tenant_slug") or "").strip().lower() != normalized_scope_tenant:
+        raise ValueError("tenant_user_not_found")
+    if normalized_tenant:
+        tenant = get_tenant_by_slug(normalized_tenant)
+        if not tenant:
+            raise ValueError("tenant_not_found")
+    normalized_role = str(role or target.get("role") or "investor").strip().lower()
+    configured_roles = normalize_role_capabilities(get_site_config().get("role_capabilities"))
+    if normalized_role not in configured_roles:
+        raise ValueError("invalid_user_role")
+    if normalized_scope_tenant and normalized_role != "investor":
+        raise ValueError("tenant_user_not_found")
+    # Platform administrators are not owned by a tenant. For investor/DAV
+    # accounts, callers must pass the selected tenant explicitly; preserving
+    # an old tenant here would make an account role change ambiguous.
+    resolved_tenant = "" if normalized_role == "admin" else (normalized_tenant or str(target.get("tenant_slug") or "").strip().lower())
+    resolved_advisor = str(advisor_name if advisor_name is not None else target.get("advisor_name") or "").strip()[:120]
+    if resolved_tenant and normalized_role != "admin":
+        resolved_advisor = str(get_tenant_by_slug(resolved_tenant).get("advisor") or resolved_advisor).strip()[:120]
+    existing = get_user_by_username(normalized_username)
+    if existing and int(existing.get("id") or 0) != target_id:
+        raise ValueError("username_exists")
+    normalized_password = str(password or "").strip()
+    if normalized_password and len(normalized_password) < 6:
+        raise ValueError("password_too_short")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db = get_db()
+    if normalized_password:
+        db.execute(
+            "UPDATE users SET username = ?, password = ?, role = ?, tenant_slug = ?, advisor_name = ?, updated_at = ? WHERE id = ?",
+            (normalized_username, normalized_password, normalized_role, resolved_tenant, resolved_advisor, now, target_id),
+        )
+    else:
+        db.execute(
+            "UPDATE users SET username = ?, role = ?, tenant_slug = ?, advisor_name = ?, updated_at = ? WHERE id = ?",
+            (normalized_username, normalized_role, resolved_tenant, resolved_advisor, now, target_id),
+        )
+    db.commit()
+    return get_user_by_id(target_id)
+
+
 def get_user_by_username(username):
     db = get_db()
     row = db.execute(
@@ -6201,6 +6264,62 @@ def bulk_create_users(items, context=None):
                 "reason": str(exc),
             })
     return created, skipped
+
+
+def build_name_batch_user_rows(names, source_label="AI批量导入"):
+    """Build the fixed, reviewable investor rows used by name batch import."""
+    rows = []
+    seen = set()
+    seed = str(time.time_ns())
+    role_aliases = {"investor": "investor", "粉丝": "investor", "投资者": "investor", "普通用户": "investor", "dav": "dav", "大v": "dav", "大V": "dav", "投顾": "dav", "admin": "admin", "管理员": "admin"}
+    for index, raw_item in enumerate(names if isinstance(names, list) else []):
+        item = raw_item if isinstance(raw_item, dict) else {"name": raw_item}
+        username = re.sub(r"\s+", " ", str(item.get("name") or item.get("username") or "").strip())[:80]
+        if not username or username in seen:
+            continue
+        seen.add(username)
+        role_raw = str(item.get("role") or "investor").strip()
+        role = role_aliases.get(role_raw.lower(), role_aliases.get(role_raw, "investor"))
+        phone_seed = hashlib.sha1(f"{seed}:{index}:{username}".encode("utf-8")).hexdigest()[:8]
+        rows.append({
+            "username": username,
+            "password": "Abc123456",
+            "phone": f"139{phone_seed}",
+            "role": role,
+            "tenant_slug": str(item.get("tenant_slug") or "").strip().lower(),
+            "status": "active",
+            "is_paid_sample": False,
+            "source_label": str(source_label or "AI批量导入").strip()[:80] or "AI批量导入",
+            "paid_sample_note": "",
+        })
+    return rows[:200]
+
+
+def bulk_create_name_batch_users(names, context=None, source_label="AI批量导入"):
+    """Create only confirmed names, always using the product batch password."""
+    rows = build_name_batch_user_rows(names, source_label=source_label)
+    # Keep the normal importer as the sole persistence path, but force the
+    # fixed password server-side so the browser cannot change the policy.
+    return bulk_create_users(rows, context=context)
+
+
+def annotate_user_name_candidates(names):
+    """Annotate parsed names before confirmation without exposing passwords."""
+    items = []
+    for raw_item in names if isinstance(names, list) else []:
+        item = raw_item if isinstance(raw_item, dict) else {"name": raw_item}
+        name = str(item.get("name") or item.get("username") or "").strip()
+        if not name:
+            continue
+        existing = get_user_by_username(name)
+        items.append({
+            "name": name,
+            "role": str(item.get("role") or "investor").strip().lower() or "investor",
+            "exists": bool(existing),
+            "existing_user_id": int(existing.get("id") or 0) if existing else None,
+            "existing_status": str(existing.get("status") or "") if existing else "",
+        })
+    return items
 
 
 def build_user_import_summary(scope="admin", tenant_slug=""):
@@ -7387,6 +7506,21 @@ _app_db_pool = None
 _app_db_pool_signature = None
 
 
+def _database_application_name(role=None):
+    """Label PostgreSQL sessions so operators can map them to a runtime PID."""
+    environment = re.sub(r"[^a-zA-Z0-9_.-]+", "-", str(os.environ.get("GANGTISE_RUNTIME_ENV", "local") or "local"))
+    runtime_role = role or os.environ.get("GANGTISE_RUNTIME_ROLE") or "web"
+    runtime_role = re.sub(r"[^a-zA-Z0-9_.-]+", "-", str(runtime_role or "web"))
+    return f"gangtise-{environment}-{runtime_role}-{os.getpid()}"[:63]
+
+
+def _database_session_options():
+    timeout_ms = max(0, int(DATABASE_IDLE_IN_TRANSACTION_TIMEOUT_MS or 0))
+    if not timeout_ms:
+        return None
+    return f"-c idle_in_transaction_session_timeout={timeout_ms}"
+
+
 class _PooledRawConnection:
     """Return a psycopg2 connection to the process-local pool on close."""
 
@@ -7417,13 +7551,18 @@ class _PooledRawConnection:
 
 def _app_db_pool_config():
     target = get_runtime_db_target().get("app", {})
-    return {
+    config = {
         "host": target.get("host") or APP_DB_HOST,
         "port": int(target.get("port") or APP_DB_PORT),
         "dbname": target.get("dbname") or APP_DB_NAME,
         "user": target.get("user") or APP_DB_USER,
         "password": target.get("password") or APP_DB_PASSWORD,
+        "application_name": _database_application_name(),
     }
+    session_options = _database_session_options()
+    if session_options:
+        config["options"] = session_options
+    return config
 
 
 def _release_app_db_connection(connection):
@@ -7475,6 +7614,11 @@ def close_app_db_pool():
         _app_db_pool_signature = None
 
 
+# Gunicorn runs this module independently in every worker. Registering here
+# ensures a graceful worker or sidecar exit returns all process-local sockets.
+atexit.register(close_app_db_pool)
+
+
 def get_app_db_connection():
     pool = _get_app_db_pool()
     connection = pool.getconn()
@@ -7490,6 +7634,7 @@ def get_db_connection_for_target(target):
         user=db_target.get("user") or APP_DB_USER,
         password=db_target.get("password") or APP_DB_PASSWORD,
         connect_timeout=8,
+        application_name=_database_application_name("target-client"),
     )
 
 

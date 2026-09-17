@@ -133,7 +133,7 @@ start_runtime_sidecar() {
   if [[ -n "${PYTHONPATH:-}" ]]; then
     python_path="$root_dir:$PYTHONPATH"
   fi
-  nohup env PYTHONPATH="$python_path" PYTHONUNBUFFERED=1 DEBUG=0 GANGTISE_RUNTIME_ENV="$environment" "$python_bin" "$entry" \
+  nohup env PYTHONPATH="$python_path" PYTHONUNBUFFERED=1 DEBUG=0 GANGTISE_RUNTIME_ENV="$environment" GANGTISE_RUNTIME_ROLE="$mode" "$python_bin" "$entry" \
     >"$log_file" 2>&1 < /dev/null &
   local child_pid=$!
   echo "$child_pid" > "$pid_file"

@@ -13,6 +13,12 @@ REMOTE_DB_NAME="${REMOTE_DB_NAME:-sprint_dashboard}"
 REMOTE_DB_USER="${REMOTE_DB_USER:-postgres}"
 REMOTE_DB_PASSWORD="${REMOTE_DB_PASSWORD:-${REMOTE_POSTGRES_PASSWORD:-your_password}}"
 CONNECT_TIMEOUT_SECONDS="${DATABASE_RELEASE_CONNECT_TIMEOUT_SECONDS:-8}"
+LOCAL_HOST="${LOCAL_PGHOST:-${LOCAL_POSTGRES_HOST:-127.0.0.1}}"
+LOCAL_PORT="${LOCAL_PGPORT:-${LOCAL_POSTGRES_PORT:-5432}}"
+LOCAL_DB="${LOCAL_PGDATABASE:-${LOCAL_POSTGRES_DB:-sprint_dashboard}}"
+LOCAL_USER="${LOCAL_PGUSER:-${LOCAL_POSTGRES_USER:-postgres}}"
+LOCAL_PASSWORD="${LOCAL_PGPASSWORD:-${LOCAL_POSTGRES_PASSWORD:-your_password}}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 [[ -n "$PACKAGE_DIR" ]] || { echo "Usage: $0 database_release_packages/YYYY-MM-DD/vX.Y.Z" >&2; exit 2; }
 [[ "$PACKAGE_DIR" = /* ]] || PACKAGE_DIR="$ROOT_DIR/$PACKAGE_DIR"
@@ -30,6 +36,15 @@ fi
 export PGPASSWORD="$REMOTE_DB_PASSWORD"
 export PGCONNECT_TIMEOUT="$CONNECT_TIMEOUT_SECONDS"
 PSQL=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$REMOTE_DB_NAME" -v ON_ERROR_STOP=1)
+if [[ "$PACKAGE_TYPE" == "schema" ]]; then
+  # Schema packages are additive-only. Keep this guard at the final execution
+  # boundary so a manually edited package cannot turn into a data/destructive
+  # migration after it passed the 5051 review screen.
+  if grep -Eiq '(^|[^[:alnum:]_])(DROP[[:space:]]+(TABLE|COLUMN|SCHEMA)|TRUNCATE([[:space:];]|$)|DELETE[[:space:]]+FROM|UPDATE[[:space:]]+|ALTER[[:space:]]+TABLE[[:space:]].*[[:space:]]ALTER[[:space:]]+COLUMN[[:space:]]+.*[[:space:]]TYPE)([^[:alnum:]_]|$)' "$SQL_FILE"; then
+    echo "Refusing non-additive SQL in schema release package." >&2
+    exit 2
+  fi
+fi
 echo "==> [preflight] Checking ${TARGET} database connection for ${RELEASE_VERSION} (timeout ${CONNECT_TIMEOUT_SECONDS}s)"
 "${PSQL[@]}" -Atqc "SELECT 1" >/dev/null
 echo "==> [preflight] ${TARGET} database connection is available"
@@ -62,13 +77,25 @@ trap 'rm -f "$wrapper"' EXIT
   echo 'BEGIN;'
   echo "SET LOCAL lock_timeout = '10s';"
   echo "SET LOCAL statement_timeout = '120s';"
+  echo "SELECT pg_advisory_xact_lock(hashtextextended('database_release:' || current_database(), 0));"
   printf "\\i '%s'\n" "$SQL_FILE"
-  printf "INSERT INTO database_release_packages (release_version,target_environment,package_type,title,checksum_sha256,status) VALUES ('%s','%s','%s','%s','%s','succeeded');\n" "$version_sql" "$target_sql" "$PACKAGE_TYPE" "$title_sql" "$checksum"
+  if [[ "$PACKAGE_TYPE" != "schema" ]]; then
+    printf "INSERT INTO database_release_packages (release_version,target_environment,package_type,title,checksum_sha256,status) VALUES ('%s','%s','%s','%s','%s','succeeded');\n" "$version_sql" "$target_sql" "$PACKAGE_TYPE" "$title_sql" "$checksum"
+  fi
   echo 'COMMIT;'
 } > "$wrapper"
 echo "==> Starting transactional SQL execution: ${RELEASE_VERSION} (${PACKAGE_TYPE})"
 "${PSQL[@]}" -f "$wrapper"
-echo "==> Transaction committed: ${RELEASE_VERSION}"
+if [[ "$PACKAGE_TYPE" == "schema" ]]; then
+  echo "==> Schema package SQL transaction committed; beginning final equivalence verification"
+  echo "==> Final schema equivalence verification (source local -> target ${TARGET})"
+  VERIFY_SOURCE_HOST="$LOCAL_HOST" VERIFY_SOURCE_PORT="$LOCAL_PORT" VERIFY_SOURCE_DB="$LOCAL_DB" VERIFY_SOURCE_USER="$LOCAL_USER" VERIFY_SOURCE_PASSWORD="$LOCAL_PASSWORD" \
+    VERIFY_TARGET_HOST="$REMOTE_DB_HOST" VERIFY_TARGET_PORT="$REMOTE_DB_PORT" VERIFY_TARGET_DB="$REMOTE_DB_NAME" VERIFY_TARGET_USER="$REMOTE_DB_USER" VERIFY_TARGET_PASSWORD="$REMOTE_DB_PASSWORD" \
+    "$PYTHON_BIN" "$ROOT_DIR/tools/verify_database_schema.py"
+  "${PSQL[@]}" -c "INSERT INTO database_release_packages (release_version,target_environment,package_type,title,checksum_sha256,status) VALUES ('${version_sql}','${target_sql}','schema','${title_sql}','${checksum}','succeeded') ON CONFLICT (release_version,target_environment) DO UPDATE SET checksum_sha256=EXCLUDED.checksum_sha256,status='succeeded',applied_at=CURRENT_TIMESTAMP;" >/dev/null
+  echo "==> Final schema equivalence verification passed"
+fi
+echo "==> Package workflow committed: ${RELEASE_VERSION}"
 elapsed=$(( $(date +%s) - started ))
 "${PSQL[@]}" -c "UPDATE database_release_packages SET execution_ms=${elapsed}*1000 WHERE release_version='${version_sql}' AND target_environment='${target_sql}';" >/dev/null
 echo "==> Release ledger updated: ${elapsed} seconds"

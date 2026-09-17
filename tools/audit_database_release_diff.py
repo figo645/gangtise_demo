@@ -243,8 +243,54 @@ def _migration_ledger(connection):
         cursor.execute("SELECT to_regclass('public.schema_migrations')")
         if not cursor.fetchone()[0]:
             return {}
-        cursor.execute("SELECT migration_name, checksum_sha256 FROM schema_migrations ORDER BY migration_name")
-        return {str(name): str(checksum) for name, checksum in cursor.fetchall()}
+        cursor.execute(
+            "SELECT migration_name, migration_scope, checksum_sha256 "
+            "FROM schema_migrations ORDER BY migration_name"
+        )
+        return {
+            str(name): {"scope": str(scope), "checksum": str(checksum)}
+            for name, scope, checksum in cursor.fetchall()
+        }
+
+
+def _migration_differences(local_migrations, target_migrations):
+    """Separate release-blocking schema history from non-structural history.
+
+    A schema-only release flows from local to target. Target-only migrations
+    are historical facts about the target, not proof of structural drift: the
+    table/column/index comparison is authoritative for that. Master-data
+    migration ledgers are deliberately never auto-repaired by this workflow.
+    """
+    local_names, target_names = set(local_migrations), set(target_migrations)
+    local_only = sorted(local_names - target_names)
+    target_only = sorted(target_names - local_names)
+    checksum_mismatch = sorted(
+        name for name in local_names & target_names
+        if local_migrations[name]["checksum"] != target_migrations[name]["checksum"]
+    )
+    strict = {
+        "local_only": [name for name in local_only if local_migrations[name]["scope"] == "schema"],
+        # A target-only structural migration is reported for governance, but
+        # cannot block an additive local-to-target release when metadata is equal.
+        "target_only": [],
+        "checksum_mismatch": [
+            name for name in checksum_mismatch
+            if local_migrations[name]["scope"] == "schema" or target_migrations[name]["scope"] == "schema"
+        ],
+    }
+    strict_names = set(strict["local_only"]) | set(strict["checksum_mismatch"])
+    observed = {
+        "local_only": [name for name in local_only if name not in strict_names],
+        "target_only": target_only,
+        "checksum_mismatch": [name for name in checksum_mismatch if name not in strict_names],
+    }
+    return {
+        "local_only": local_only,
+        "target_only": target_only,
+        "checksum_mismatch": checksum_mismatch,
+        "strict_schema": strict,
+        "non_structural": observed,
+    }
 
 
 def _digest(value):
@@ -260,7 +306,8 @@ def _column_specs(connection, table_name):
     with connection.cursor() as cursor:
         cursor.execute(
             f"""SELECT a.attname, pg_catalog.format_type(a.atttypid, a.atttypmod), a.attnotnull,
-                       pg_get_expr(d.adbin, d.adrelid), a.attidentity
+                       pg_get_expr(d.adbin, d.adrelid), a.attidentity,
+                       pg_get_serial_sequence(format('%%I.%%I', n.nspname, c.relname), a.attname)
                 FROM pg_attribute a
                 JOIN pg_class c ON c.oid = a.attrelid
                 JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -271,7 +318,11 @@ def _column_specs(connection, table_name):
             (table_name,),
         )
         return [
-            {"name": row[0], "type": row[1], "not_null": bool(row[2]), "default": row[3] or "", "identity": row[4] or ""}
+            {
+                "name": row[0], "type": row[1], "not_null": bool(row[2]),
+                "default": row[3] or "", "identity": row[4] or "",
+                "serial_sequence": row[5] or "",
+            }
             for row in cursor.fetchall()
         ]
 
@@ -285,6 +336,40 @@ def _column_definition(spec, allow_not_null=True):
     if allow_not_null and spec.get("not_null"):
         parts.append("NOT NULL")
     return " ".join(parts)
+
+
+def _serial_sequence_identifier(spec):
+    """Return a safely qualified public serial sequence name, if applicable."""
+    raw_name = str(spec.get("serial_sequence") or "").strip()
+    if not raw_name:
+        return ""
+    normalized = raw_name.replace('"', "")
+    parts = normalized.split(".")
+    if len(parts) != 2 or parts[0] != "public" or not parts[1]:
+        return ""
+    return "public." + _quote_identifier(parts[1])
+
+
+def _append_serial_sequence_statements(statements, actions, table_name, specs):
+    """Create sequences before a table or column references ``nextval``."""
+    bindings = []
+    for spec in specs:
+        sequence_identifier = _serial_sequence_identifier(spec)
+        if not sequence_identifier:
+            continue
+        statements.append("CREATE SEQUENCE IF NOT EXISTS " + sequence_identifier + ";")
+        actions.append({"table": table_name, "column": spec["name"], "sequence": sequence_identifier, "action": "create_sequence"})
+        bindings.append((sequence_identifier, spec["name"]))
+    return bindings
+
+
+def _append_serial_sequence_ownership(statements, actions, table_name, bindings):
+    for sequence_identifier, column_name in bindings:
+        statements.append(
+            "ALTER SEQUENCE " + sequence_identifier + " OWNED BY "
+            + _quote_identifier(table_name) + "." + _quote_identifier(column_name) + ";"
+        )
+        actions.append({"table": table_name, "column": column_name, "sequence": sequence_identifier, "action": "own_sequence"})
 
 
 def _primary_key_columns(connection, table_name):
@@ -328,44 +413,89 @@ def _table_indexes(connection, table_name):
         return {str(name): str(definition) for name, definition in cursor.fetchall()}
 
 
-def _schema_incremental_sql(local_connection, target_connection, report):
+def _constraint_release_phase(definition):
+    """Return the DDL phase required for an additive table constraint."""
+    normalized = str(definition or "").lstrip().upper()
+    if normalized.startswith("PRIMARY KEY") or normalized.startswith("UNIQUE"):
+        return "key"
+    if normalized.startswith("FOREIGN KEY"):
+        return "foreign_key"
+    return "other"
+
+
+def _schema_incremental_sql(local_connection, target_connection, report, schema_only=False):
     """Build only additive, idempotent DDL and report unsafe schema changes."""
     local_tables = [name for name in _public_tables(local_connection) if name not in EXCLUDED_SCHEMA_TABLES]
     target_tables = [name for name in _public_tables(target_connection) if name not in EXCLUDED_SCHEMA_TABLES]
     local_set, target_set = set(local_tables), set(target_tables)
-    statements, blockers, actions = [], [], []
+    # A foreign key may point at another table that is also new in this
+    # release. Emit all tables before any constraint, then indexes last.
+    # Alphabetical table iteration alone is not a dependency order.
+    foundation_statements, key_constraint_statements = [], []
+    foreign_key_statements, other_constraint_statements, index_statements = [], [], []
+    blockers, actions = [], []
+
+    def append_constraint(table_name, name, definition):
+        statement = (
+            "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = "
+            + "'" + name.replace("'", "''") + "' AND conrelid = 'public."
+            + table_name.replace('"', '""').replace("'", "''") + "'::regclass) THEN ALTER TABLE " + _quote_identifier(table_name)
+            + " ADD CONSTRAINT " + _quote_identifier(name) + " " + definition + "; END IF; END $$;"
+        )
+        phase = _constraint_release_phase(definition)
+        if phase == "key":
+            key_constraint_statements.append(statement)
+        elif phase == "foreign_key":
+            foreign_key_statements.append(statement)
+        else:
+            other_constraint_statements.append(statement)
+        actions.append({"table": table_name, "constraint": name, "action": "add_constraint"})
+
     for table_name in sorted(local_set - target_set):
         specs = _column_specs(local_connection, table_name)
         if not specs:
             blockers.append({"table": table_name, "reason": "source_table_has_no_columns"})
             continue
-        statements.append(
+        unmanaged_sequences = [
+            spec["name"] for spec in specs
+            if "nextval(" in str(spec.get("default") or "") and not _serial_sequence_identifier(spec)
+        ]
+        if unmanaged_sequences:
+            blockers.append({"table": table_name, "columns": unmanaged_sequences, "reason": "unmanaged_sequence_default"})
+            continue
+        sequence_bindings = _append_serial_sequence_statements(foundation_statements, actions, table_name, specs)
+        foundation_statements.append(
             "CREATE TABLE IF NOT EXISTS " + _quote_identifier(table_name) + " (\n    "
             + ",\n    ".join(_column_definition(spec) for spec in specs) + "\n);"
         )
         actions.append({"table": table_name, "action": "create_table"})
+        _append_serial_sequence_ownership(foundation_statements, actions, table_name, sequence_bindings)
         for name, definition in _table_constraints(local_connection, table_name).items():
-            statements.append(
-                "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = "
-                + "'" + name.replace("'", "''") + "') THEN ALTER TABLE " + _quote_identifier(table_name)
-                + " ADD CONSTRAINT " + _quote_identifier(name) + " " + definition + "; END IF; END $$;"
-            )
-            actions.append({"table": table_name, "constraint": name, "action": "add_constraint"})
+            append_constraint(table_name, name, definition)
         for name, definition in _table_indexes(local_connection, table_name).items():
             index_sql = re.sub(r"^CREATE( UNIQUE)? INDEX ", r"CREATE\1 INDEX IF NOT EXISTS ", definition, count=1)
-            statements.append(index_sql.rstrip(";") + ";")
+            index_statements.append(index_sql.rstrip(";") + ";")
             actions.append({"table": table_name, "index": name, "action": "add_index"})
     changed_tables = set(report["schema"].get("different_tables") or [])
     for table_name in sorted((local_set & target_set) & changed_tables):
         local_specs = {item["name"]: item for item in _column_specs(local_connection, table_name)}
         target_specs = {item["name"]: item for item in _column_specs(target_connection, table_name)}
-        target_rows = _table_data_digest(target_connection, table_name).get("row_count", 0)
+        # A schema-only release must never inspect business rows. Be
+        # conservative for a new NOT NULL column without a default: the
+        # target may contain rows, and a data backfill is outside this path.
+        target_rows = 0 if schema_only else _table_data_digest(target_connection, table_name).get("row_count", 0)
         for name in sorted(set(local_specs) - set(target_specs)):
             spec = local_specs[name]
-            if spec["not_null"] and not spec["default"] and not spec["identity"] and target_rows:
+            if "nextval(" in str(spec.get("default") or ""):
+                # Adding a serial default to an existing table may invoke
+                # nextval for existing rows. That is a data rewrite and is
+                # intentionally outside the zero-business-data-write path.
+                blockers.append({"table": table_name, "column": name, "reason": "sequence_default_on_existing_table"})
+                continue
+            if spec["not_null"] and not spec["default"] and not spec["identity"] and (schema_only or target_rows):
                 blockers.append({"table": table_name, "column": name, "reason": "non_null_column_without_default"})
                 continue
-            statements.append(
+            foundation_statements.append(
                 "ALTER TABLE " + _quote_identifier(table_name) + " ADD COLUMN IF NOT EXISTS "
                 + _column_definition(spec) + ";"
             )
@@ -377,21 +507,140 @@ def _schema_incremental_sql(local_connection, target_connection, report):
         local_constraints = _table_constraints(local_connection, table_name)
         target_constraints = _table_constraints(target_connection, table_name)
         for name in sorted(set(local_constraints) - set(target_constraints)):
-            statements.append(
-                "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = "
-                + "'" + name.replace("'", "''") + "') THEN ALTER TABLE " + _quote_identifier(table_name)
-                + " ADD CONSTRAINT " + _quote_identifier(name) + " " + local_constraints[name] + "; END IF; END $$;"
-            )
-            actions.append({"table": table_name, "constraint": name, "action": "add_constraint"})
+            append_constraint(table_name, name, local_constraints[name])
+        for name in sorted(set(local_constraints) & set(target_constraints)):
+            if local_constraints[name] != target_constraints[name]:
+                blockers.append({"table": table_name, "constraint": name, "reason": "existing_constraint_definition_differs"})
         local_indexes = _table_indexes(local_connection, table_name)
         target_indexes = _table_indexes(target_connection, table_name)
         for name in sorted(set(local_indexes) - set(target_indexes)):
             index_sql = re.sub(r"^CREATE( UNIQUE)? INDEX ", r"CREATE\1 INDEX IF NOT EXISTS ", local_indexes[name], count=1)
-            statements.append(index_sql.rstrip(";") + ";")
+            index_statements.append(index_sql.rstrip(";") + ";")
             actions.append({"table": table_name, "index": name, "action": "add_index"})
+        for name in sorted(set(local_indexes) & set(target_indexes)):
+            if local_indexes[name] != target_indexes[name]:
+                blockers.append({"table": table_name, "index": name, "reason": "existing_index_definition_differs"})
     for table_name in sorted(target_set - local_set):
         blockers.append({"table": table_name, "reason": "target_only_table_not_deleted"})
+    statements = (
+        foundation_statements
+        + key_constraint_statements
+        + foreign_key_statements
+        + other_constraint_statements
+        + index_statements
+    )
     return {"sql": "\n\n".join(statements), "actions": actions, "blockers": blockers}
+
+
+def audit_schema_only(local_target, remote_target):
+    """Compare only PostgreSQL schema metadata, never business table rows."""
+    with _connect(local_target) as local_connection, _connect(remote_target) as remote_connection:
+        local_tables = _public_tables(local_connection)
+        remote_tables = _public_tables(remote_connection)
+        local_set, remote_set = set(local_tables), set(remote_tables)
+        common_tables = sorted(local_set & remote_set)
+        schema_differences = []
+        table_details = {}
+        for table_name in common_tables:
+            local_schema = _table_schema(local_connection, table_name)
+            remote_schema = _table_schema(remote_connection, table_name)
+            schema_same = table_name in EXCLUDED_SCHEMA_TABLES or local_schema["hash"] == remote_schema["hash"]
+            if not schema_same:
+                schema_differences.append(table_name)
+            table_details[table_name] = {
+                "schema_same": schema_same,
+                "local": {"hash": local_schema["hash"]},
+                "target": {"hash": remote_schema["hash"]},
+            }
+        schema_local_set = local_set - EXCLUDED_SCHEMA_TABLES
+        schema_remote_set = remote_set - EXCLUDED_SCHEMA_TABLES
+        local_only = sorted(schema_local_set - schema_remote_set)
+        target_only = sorted(schema_remote_set - schema_local_set)
+        local_migrations = _migration_ledger(local_connection)
+        target_migrations = _migration_ledger(remote_connection)
+        migration_difference = _migration_differences(local_migrations, target_migrations)
+        difference_count = len(local_only) + len(target_only) + len(schema_differences)
+        return {
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "mode": "read_only_schema_only",
+            "local": _safe_target(local_target),
+            "target": _safe_target(remote_target),
+            "summary": {
+                "local_table_count": len(local_tables),
+                "target_table_count": len(remote_tables),
+                "local_only_tables": len(local_only),
+                "target_only_tables": len(target_only),
+                "schema_difference_tables": len(schema_differences),
+                "data_difference_tables": 0,
+                "hash_skipped_tables": 0,
+                "release_master_data_difference_tables": 0,
+                "raw_master_data_difference_tables": 0,
+                "runtime_data_difference_tables": 0,
+                "manual_business_data_difference_tables": 0,
+                "migration_local_only": len(migration_difference["local_only"]),
+                "migration_target_only": len(migration_difference["target_only"]),
+                "migration_checksum_mismatch": len(migration_difference["checksum_mismatch"]),
+            },
+            "schema": {"local_only_tables": local_only, "target_only_tables": target_only, "different_tables": schema_differences},
+            "data": {
+                "different_tables": [],
+                "hash_skipped_tables": [],
+                "release_master_data_candidates": [],
+                "raw_master_data_difference_tables": [],
+                "master_data_stable_differences": {},
+                "runtime_data_difference_tables": [],
+                "manual_business_data_candidates": [],
+            },
+            "tables": table_details,
+            "schema_migration_difference": migration_difference,
+            "safe_release_delta": {
+                "schema": schema_differences,
+                "master_data": [],
+                "business_data": [],
+                "total": difference_count,
+                "note": "Schema-only mode does not read or write business data. Target-only objects are retained.",
+            },
+            "local_release_ledger": _ledger(local_connection, "local"),
+            "target_release_ledger": _ledger(remote_connection, remote_target.get("name") or ""),
+        }
+
+
+def build_schema_only_delta(local_target, target):
+    """Generate an additive schema delta without reading any business rows."""
+    report = audit_schema_only(local_target, target)
+    with _connect(local_target) as local_connection, _connect(target) as target_connection:
+        schema = _schema_incremental_sql(local_connection, target_connection, report, schema_only=True)
+    return {"report": report, "schema": schema}
+
+
+def verify_schema_equivalence(local_target, remote_target):
+    """Return a final schema verdict without reading any business rows."""
+    report = audit_schema_only(local_target, remote_target)
+    schema = report.get("schema") or {}
+    migrations = report.get("schema_migration_difference") or {}
+    strict_migrations = migrations.get("strict_schema") or migrations
+    non_structural_migrations = migrations.get("non_structural") or {}
+    differences = (
+        list(schema.get("local_only_tables") or [])
+        + list(schema.get("target_only_tables") or [])
+        + list(schema.get("different_tables") or [])
+        + list(strict_migrations.get("local_only") or [])
+        + list(strict_migrations.get("target_only") or [])
+        + list(strict_migrations.get("checksum_mismatch") or [])
+    )
+    return {
+        "ok": not differences,
+        "mode": "final_schema_equivalence",
+        "checked_at": report.get("generated_at"),
+        "source": report.get("local"),
+        "target": report.get("target"),
+        "summary": report.get("summary"),
+        "schema": schema,
+        "schema_migration_difference": migrations,
+        "non_structural_migration_ledger_difference": non_structural_migrations,
+        "differences": differences,
+        "note": "只阻断表、字段、索引、约束与结构迁移 checksum；历史主数据账本仅提示，不读取业务表行内容。",
+    }
 
 
 def _data_rows(connection, table_name, columns, key_columns, include_values=False):
@@ -587,17 +836,21 @@ def audit(local_target, remote_target):
 def main():
     parser = argparse.ArgumentParser(description="Read-only local-to-target database release audit")
     parser.add_argument("--target", choices=("staging", "production"), default="staging")
+    parser.add_argument("--schema-only", action="store_true", help="Compare PostgreSQL metadata only; never read business table rows")
+    parser.add_argument("--fail-on-diff", action="store_true", help="Exit with status 1 when schema or migration metadata differs")
     parser.add_argument("--output", default="")
     args = parser.parse_args()
     local_target = get_local_app_db_target()
     target = get_database_release_target(args.target)
     if not target:
         raise SystemExit(f"Target unavailable: {args.target}")
-    report = audit(local_target, target)
+    report = verify_schema_equivalence(local_target, target) if args.fail_on_diff else (audit_schema_only(local_target, target) if args.schema_only else audit(local_target, target))
     output = Path(args.output) if args.output else ROOT / ".deploy" / f"database_diff_local_to_{args.target}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"output": str(output), "summary": report["summary"]}, ensure_ascii=False))
+    if args.fail_on_diff and not report["ok"]:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

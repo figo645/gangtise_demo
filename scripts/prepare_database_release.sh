@@ -24,6 +24,7 @@ REMOTE_DB_USER="${REMOTE_DB_USER:-postgres}"
 REMOTE_DB_PASSWORD="${REMOTE_DB_PASSWORD:-${REMOTE_POSTGRES_PASSWORD:-your_password}}"
 REMOTE_MAINTENANCE_DB="${REMOTE_MAINTENANCE_DB:-postgres}"
 CONNECT_TIMEOUT_SECONDS="${DATABASE_RELEASE_CONNECT_TIMEOUT_SECONDS:-8}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 PROTECTED_APP_SETTING_KEYS="'gangtise_openapi_credentials:v1','gangtise_openapi_token:v1','llm_api_credentials:v1','auth_credentials:wechat:v1'"
 USER_DATA_DUMP="${WORK_DIR}/target_user_data_${STAMP}.sql"
 USER_DATA_TABLE_LIST="${WORK_DIR}/target_user_data_${STAMP}.tables"
@@ -159,6 +160,12 @@ preserve_target_environment_credentials
 echo "==> Applying schema updates to temporary database"
 PGHOST="$REMOTE_DB_HOST" PGPORT="$REMOTE_DB_PORT" PGDATABASE="$TEMP_DB" PGUSER="$REMOTE_DB_USER" PGPASSWORD="$REMOTE_DB_PASSWORD" "$ROOT_DIR/scripts/apply_postgres_updates.sh"
 echo "==> Schema updates completed"
+
+echo "==> Final local and temporary-target schema equivalence verification"
+VERIFY_SOURCE_HOST="$LOCAL_HOST" VERIFY_SOURCE_PORT="$LOCAL_PORT" VERIFY_SOURCE_DB="$LOCAL_DB" VERIFY_SOURCE_USER="$LOCAL_USER" VERIFY_SOURCE_PASSWORD="$LOCAL_PASSWORD" \
+  VERIFY_TARGET_HOST="$REMOTE_DB_HOST" VERIFY_TARGET_PORT="$REMOTE_DB_PORT" VERIFY_TARGET_DB="$TEMP_DB" VERIFY_TARGET_USER="$REMOTE_DB_USER" VERIFY_TARGET_PASSWORD="$REMOTE_DB_PASSWORD" \
+  "$PYTHON_BIN" "$ROOT_DIR/tools/verify_database_schema.py"
+echo "==> Final schema equivalence verification passed"
 
 echo "==> Validating temporary database structure and market master data"
 VALIDATE=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$TEMP_DB" -Atqc)

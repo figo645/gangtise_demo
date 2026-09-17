@@ -696,9 +696,10 @@ def api_preview_kol_knowledge_file():
 
 @app.route("/api/kol/knowledge/url-preview", methods=["POST"])
 def api_preview_kol_knowledge_url():
-    blocked = _knowledge_feature_disabled_response()
-    if blocked:
-        return blocked
+    # Review URL intake is independently governed from the knowledge browser.
+    # A disabled knowledge page must not disable the review authoring flow.
+    if not is_feature_enabled("knowledge") and not is_feature_enabled("review_url_input"):
+        return jsonify({"ok": False, "error": "review_url_input_disabled"}), 404
     body = request.get_json(silent=True) or {}
     try:
         preview = fetch_url_preview(body.get("url"))

@@ -56,19 +56,20 @@ def login():
     if request.method == "GET":
         site_config = get_site_config()
         registration_allowed = True
-        return render_template("login.html", next_target=next_target, mode=mode, error=None, site_config=site_config, registration_allowed=registration_allowed)
+        return render_template("login.html", next_target=next_target, mode=mode, error=None, site_config=site_config, registration_allowed=registration_allowed, registration_channels=get_h5_supported_channels())
     username = str(request.form.get("username") or "").strip()
     password = str(request.form.get("password") or "").strip()
     site_config = get_site_config()
     if mode == "register":
         display_name = str(request.form.get("display_name") or "").strip()
+        h5_channel_label = str(request.form.get("h5_channel_label") or "").strip()
         confirm_password = str(request.form.get("confirm_password") or "").strip()
-        if not display_name or not username or not password or not confirm_password:
-            return render_template("login.html", next_target=next_target, mode=mode, error="请完整填写注册信息", site_config=site_config, registration_allowed=True)
+        if not display_name or not username or not password or not confirm_password or h5_channel_label not in get_h5_supported_channels():
+            return render_template("login.html", next_target=next_target, mode=mode, error="请完整填写注册信息并选择来源渠道", site_config=site_config, registration_allowed=True, registration_channels=get_h5_supported_channels())
         if password != confirm_password:
-            return render_template("login.html", next_target=next_target, mode=mode, error="两次输入的密码不一致", site_config=site_config, registration_allowed=True)
+            return render_template("login.html", next_target=next_target, mode=mode, error="两次输入的密码不一致", site_config=site_config, registration_allowed=True, registration_channels=get_h5_supported_channels())
         if len(password) < 6:
-            return render_template("login.html", next_target=next_target, mode=mode, error="密码至少需要 6 位", site_config=site_config, registration_allowed=True)
+            return render_template("login.html", next_target=next_target, mode=mode, error="密码至少需要 6 位", site_config=site_config, registration_allowed=True, registration_channels=get_h5_supported_channels())
         try:
             invite_token = str(request.args.get("invite") or request.form.get("invite") or "").strip()
             invite = get_tenant_fan_qr_invite(invite_token) if invite_token and is_feature_enabled("fan_qr_import", site_config) else None
@@ -83,18 +84,19 @@ def login():
                 "tenant_slug": tenant.get("slug") or get_default_tenant_slug(site_config),
                 "advisor_name": tenant.get("advisor") or "",
                 "status": "pending_approval",
-                "source_label": f"扫码注册：{invite.get('source_label')}" if invite else "自主注册",
+                "source_label": h5_channel_label,
+                "h5_channel_label": h5_channel_label,
             })
             if invite:
                 claim_tenant_fan_qr_invite(invite_token, user)
             save_h5_profile_settings(user, {"display_name": display_name})
-            return render_template("login.html", next_target=next_target, mode=mode, error="注册申请已提交，请等待大V审批后再登录。", site_config=site_config, registration_allowed=True)
+            return render_template("login.html", next_target=next_target, mode=mode, error="注册申请已提交，请等待大V审批后再登录。", site_config=site_config, registration_allowed=True, registration_channels=get_h5_supported_channels())
         except ValueError as exc:
             messages = {"username_exists": "用户名已存在，请更换一个", "invalid_user_payload": "注册信息无效，请检查填写内容", "fan_qr_invite_unavailable": "二维码已失效，请联系大V获取新的二维码"}
-            return render_template("login.html", next_target=next_target, mode=mode, error=messages.get(str(exc), "注册失败，请稍后重试"), site_config=site_config, registration_allowed=True)
+            return render_template("login.html", next_target=next_target, mode=mode, error=messages.get(str(exc), "注册失败，请稍后重试"), site_config=site_config, registration_allowed=True, registration_channels=get_h5_supported_channels())
         except Exception as exc:
             if is_db_unavailable_error(exc):
-                return render_template("login.html", next_target=next_target, mode=mode, error="账户服务暂不可用，请稍后重试", site_config=site_config, registration_allowed=True)
+                return render_template("login.html", next_target=next_target, mode=mode, error="账户服务暂不可用，请稍后重试", site_config=site_config, registration_allowed=True, registration_channels=get_h5_supported_channels())
             raise
     if not username or not password:
         return render_template("login.html", next_target=next_target, mode=mode, error="请输入用户名和密码", site_config=site_config)

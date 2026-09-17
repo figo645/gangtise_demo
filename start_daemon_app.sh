@@ -70,17 +70,17 @@ fi
 
 # Database releases are managed by the Admin database-release module. Application
 # startup only verifies that PostgreSQL is reachable (and may start a local service).
-
-if [ -f "$PID_FILE" ]; then
-  OLD_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
-  if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null && runtime_pid_matches "$OLD_PID" "gunicorn"; then
-    echo "Existing daemon Web process found (PID: $OLD_PID). Restarting it."
-    "$SCRIPT_DIR/stop_daemon_app.sh"
-    sleep 1
-  else
-    rm -f "$PID_FILE"
-  fi
+#
+# PID files can be lost after a crash or a manual deployment. Do not start a
+# second set of workers in that state: they each maintain their own PostgreSQL
+# pool and can exhaust Staging before the port collision becomes apparent.
+EXISTING_RUNTIME_PIDS="$(runtime_project_pids "$SCRIPT_DIR" || true)"
+if [ -n "$(printf '%s' "$EXISTING_RUNTIME_PIDS" | tr -d '[:space:]')" ]; then
+  echo "Existing Gangtise runtime processes found. Stopping them before restart: $EXISTING_RUNTIME_PIDS"
+  "$SCRIPT_DIR/stop_daemon_app.sh"
+  sleep 1
 fi
+rm -f "$PID_FILE"
 
 if lsof -nP -iTCP:"$APP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "Port $APP_PORT is already in use. Stop the existing process before starting the daemon." >&2
@@ -93,7 +93,7 @@ fi
 start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" worker "$WORKER_PID_FILE" "$WORKER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
 start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" scheduler "$SCHEDULER_PID_FILE" "$SCHEDULER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
 
-nohup env PORT="$APP_PORT" DEBUG=0 APP_SERVER=gunicorn PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" "$PYTHON_BIN" "$SCRIPT_DIR/app.py" \
+nohup env PORT="$APP_PORT" DEBUG=0 APP_SERVER=gunicorn PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" GANGTISE_RUNTIME_ROLE=web "$PYTHON_BIN" "$SCRIPT_DIR/app.py" \
   >"$LOG_FILE" 2>&1 < /dev/null &
 APP_PID=$!
 echo "$APP_PID" >"$PID_FILE"

@@ -9275,6 +9275,7 @@ async function openAdminIndicatorHistory(indicatorId) {
 }
 
 let adminUsers = [];
+let adminAiNameRows = [];
 const ADMIN_USER_IMPORT_COLUMNS = ['username', 'password', 'phone', 'role', 'tenant_slug', 'advisor_name', 'status', 'is_paid_sample', 'source_label', 'paid_sample_note'];
 let agentWorkflowCenter = {summary: {}, workflows: []};
 let selectedAgentWorkflowId = '';
@@ -9315,7 +9316,7 @@ function renderAdminUsersTable() {
       <td>${escapeHtml(user.tenant?.name || '--')}</td>
       <td><span class="tag ${user.status === 'active' ? 'tag-green' : 'tag-red'}">${escapeHtml(user.status === 'active' ? '正常' : '已禁用')}</span></td>
       <td>${escapeHtml(user.created_at || '--')}</td>
-      <td style="white-space:nowrap"><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminUserDetail(${Number(user.id || 0)})">详情</button><button class="btn-outline" style="padding:3px 9px;font-size:11px;color:${user.status === 'active' ? '#F2B8B5' : '#9DE0BE'};border-color:${user.status === 'active' ? 'rgba(180,35,24,0.28)' : 'rgba(22,112,74,0.28)'}" onclick="openAdminUserDetail(${Number(user.id || 0)});requestAdminUserStatusChange(${Number(user.id || 0)})">${user.status === 'active' ? '停用' : '启用'}</button></td>
+      <td style="white-space:nowrap"><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminUserDetail(${Number(user.id || 0)})">详情 / 编辑</button><button class="btn-outline" style="padding:3px 9px;font-size:11px;color:${user.status === 'active' ? '#F2B8B5' : '#9DE0BE'};border-color:${user.status === 'active' ? 'rgba(180,35,24,0.28)' : 'rgba(22,112,74,0.28)'}" onclick="openAdminUserDetail(${Number(user.id || 0)});requestAdminUserStatusChange(${Number(user.id || 0)})">${user.status === 'active' ? '停用' : '启用'}</button></td>
     </tr>
   `).join('') || '<tr><td colspan="10" style="text-align:center;color:#8899aa;padding:20px 0">暂无用户</td></tr>';
   const activeCount = filtered.filter((user) => user.status === 'active').length;
@@ -9345,6 +9346,7 @@ function openAdminUserDetail(userId) {
   if (!modal || !content) return;
   const roleLabel = user.roleLabel || (user.role === 'admin' ? '管理员' : (user.role === 'dav' ? '大V投顾' : '粉丝用户'));
   const statusLabel = user.status === 'active' ? '正常' : '已禁用';
+  const tenantOptions = (Array.isArray(adminSiteConfig.tenants) ? adminSiteConfig.tenants : []).map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}" ${String(tenant.slug || '') === String(user.tenant_slug || '') ? 'selected' : ''}>${escapeHtml(tenant.name || tenant.slug || '')} · ${escapeHtml(tenant.advisor || '--')}</option>`).join('');
   content.innerHTML = `
     <div class="admin-modal-head">
       <div>
@@ -9352,6 +9354,17 @@ function openAdminUserDetail(userId) {
         <div class="admin-modal-subtitle">${escapeHtml(roleLabel)} · ${escapeHtml(user.tenant?.name || user.tenant_slug || '--')} · 创建于 ${escapeHtml(user.created_at || '--')}</div>
       </div>
       <button class="admin-modal-close" type="button" onclick="closeAdminUserDetailModal()">×</button>
+    </div>
+    <div class="admin-modal-card" style="margin-bottom:16px;border-color:rgba(47,116,192,.28)">
+      <div class="admin-modal-card-title">账号编辑</div>
+      <div class="admin-modal-copy" style="margin-bottom:10px">先确认所属大V / 租户，再保存用户名、密码和账户类别。密码留空表示不修改；管理员账号不需要归属大V。</div>
+      <form id="admin-user-edit-form" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px" onsubmit="submitAdminUserEdit(event, ${Number(user.id || 0)})">
+        <label style="display:grid;gap:5px;font-size:12px;color:#8899aa;grid-column:1/-1"><strong style="color:var(--text-main)">所属大V / 租户（请先选择）</strong><select id="admin-user-edit-tenant" class="login-input" style="color:var(--text-main);border-color:rgba(200,169,110,.55)" onchange="syncAdminUserTenantRequirement()"><option value="">${user.role === 'admin' ? '管理员无需归属大V' : '请选择所属大V / 租户'}</option>${tenantOptions}</select><span id="admin-user-edit-tenant-hint" style="font-size:11px;color:#8899aa">${user.role === 'admin' ? '当前为管理员账号，不归属任何大V。' : '粉丝和大V账号必须明确归属一个大V。'}</span></label>
+        <label style="display:grid;gap:5px;font-size:12px;color:#8899aa">用户名<input id="admin-user-edit-username" class="login-input" style="color:var(--text-main)" value="${escapeAttr(user.username || '')}" required maxlength="80"></label>
+        <label style="display:grid;gap:5px;font-size:12px;color:#8899aa">新密码<input id="admin-user-edit-password" class="login-input" style="color:var(--text-main)" type="password" minlength="6" autocomplete="new-password" placeholder="留空表示不修改"></label>
+        <label style="display:grid;gap:5px;font-size:12px;color:#8899aa">账户类别<select id="admin-user-edit-role" class="login-input" style="color:var(--text-main)" onchange="syncAdminUserTenantRequirement()"><option value="investor" ${user.role === 'investor' ? 'selected' : ''}>粉丝 / 投资者</option><option value="dav" ${user.role === 'dav' ? 'selected' : ''}>大V</option><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>管理员</option></select></label>
+        <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center"><span id="admin-user-edit-status" style="margin-right:auto;font-size:12px;color:#8899aa"></span><button class="btn-gold" type="submit">保存账号编辑</button></div>
+      </form>
     </div>
     <div class="admin-modal-grid">
       <div class="admin-modal-card">
@@ -9458,7 +9471,50 @@ function openAdminUserDetail(userId) {
     </div>
     <div id="admin-user-status-confirm" style="display:none;margin-top:12px;padding:12px;border:1px solid rgba(200,169,110,0.22);border-radius:10px;background:rgba(200,169,110,0.06)"></div>
   `;
+  syncAdminUserTenantRequirement();
   modal.classList.add('show');
+}
+
+function syncAdminUserTenantRequirement() {
+  const role = String(document.getElementById('admin-user-edit-role')?.value || 'investor');
+  const tenant = document.getElementById('admin-user-edit-tenant');
+  const hint = document.getElementById('admin-user-edit-tenant-hint');
+  if (!tenant) return;
+  const required = role !== 'admin';
+  tenant.required = required;
+  if (required && !tenant.value) tenant.firstElementChild.textContent = '请选择所属大V / 租户';
+  if (!required) tenant.value = '';
+  if (hint) hint.textContent = required ? '粉丝和大V账号必须明确归属一个大V。' : '当前为管理员账号，不归属任何大V。';
+}
+
+function openAdminUserEdit(userId) {
+  openAdminUserDetail(userId);
+}
+
+async function submitAdminUserEdit(event, userId) {
+  event.preventDefault();
+  const status = document.getElementById('admin-user-edit-status');
+  const username = String(document.getElementById('admin-user-edit-username')?.value || '').trim();
+  const password = String(document.getElementById('admin-user-edit-password')?.value || '');
+  const role = String(document.getElementById('admin-user-edit-role')?.value || 'investor');
+  const tenantSlug = String(document.getElementById('admin-user-edit-tenant')?.value || '').trim();
+  if (role !== 'admin' && !tenantSlug) {
+    if (status) status.textContent = '请先选择所属大V / 租户。';
+    return;
+  }
+  if (status) status.textContent = '正在保存...';
+  try {
+    const response = await fetch('/api/users/account', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, username, password, role, tenant_slug: tenantSlug}) });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'account_update_failed');
+    adminUsers = Array.isArray(payload.users) ? payload.users : adminUsers;
+    renderAdminUsersTable();
+    closeAdminUserDetailModal();
+    showToast('账号信息已更新');
+  } catch (error) {
+    const messages = {username_required: '请输入用户名。', username_exists: '用户名已存在。', password_too_short: '新密码至少需要 6 位。', user_not_found: '未找到该用户。', tenant_required: '粉丝和大V账号必须选择所属大V / 租户。', tenant_not_found: '所选大V / 租户不存在。', invalid_user_role: '账户类别无效。'};
+    if (status) status.textContent = messages[error.message] || error.message || '账号更新失败';
+  }
 }
 
 function requestAdminUserStatusChange(userId) {
@@ -9617,6 +9673,7 @@ function openAdminUserImportModal(mode = 'bulk') {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
         <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="addAdminUserImportRow()">新增一行</button>
+        <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="openAdminAiNameImportModal()">AI按姓名批量导入</button>
         <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="submitAdminUserImportRows()">${isSingle ? '保存用户' : '批量创建用户'}</button>
       </div>
     </div>
@@ -9624,6 +9681,65 @@ function openAdminUserImportModal(mode = 'bulk') {
   modal.classList.add('show');
   addAdminUserImportRow(isSingle ? {role: 'investor', status: 'active', is_paid_sample: '0', source_label: '管理录入'} : {role: 'investor', status: 'active', is_paid_sample: '0', source_label: '管理录入'});
   if (!isSingle) addAdminUserImportRow({role: 'investor', status: 'active', is_paid_sample: '0', source_label: '管理录入'});
+}
+
+function openAdminAiNameImportModal() {
+  const content = document.getElementById('admin-user-import-modal-content');
+  if (!content) return;
+  content.innerHTML = `<div class="admin-modal-head"><div><div class="admin-modal-title">AI 按姓名批量导入用户</div><div class="admin-modal-subtitle">输入姓名或姓名串，AI 只负责解析；确认表格后才会创建账号。</div></div><button class="admin-modal-close" type="button" onclick="closeAdminUserImportModal()">×</button></div><div class="admin-modal-card"><div class="feature-note" style="margin-bottom:10px">默认统一密码：<strong>Abc123456</strong> · 新账号角色：investor · 解析上限 200 人</div><textarea id="admin-ai-name-text" class="config-field" style="width:100%;min-height:110px;box-sizing:border-box" placeholder="例如：张三、李四，王五；请注册为新用户"></textarea><div style="display:flex;gap:8px;margin-top:12px"><button class="btn-gold" type="button" onclick="parseAdminAiNames()">解析并预览</button><button class="btn-outline" type="button" onclick="openAdminUserImportModal('bulk')">返回普通导入</button></div><div id="admin-ai-name-preview" style="margin-top:14px"></div></div>`;
+  document.getElementById('admin-user-import-modal')?.classList.add('show');
+}
+
+function renderAdminAiNamePreview() {
+  const host = document.getElementById('admin-ai-name-preview');
+  if (!host) return;
+  if (!adminAiNameRows.length) {
+    host.innerHTML = '<div class="feature-note">没有解析到可导入的姓名，请检查输入。</div>';
+    return;
+  }
+  const tenantOptions = (Array.isArray(adminSiteConfig.tenants) ? adminSiteConfig.tenants : []).map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}" ${String(tenant.slug || '') === String(item.tenant_slug || '') ? 'selected' : ''}>${escapeHtml(tenant.name || tenant.slug || '')} · ${escapeHtml(tenant.advisor || '--')}</option>`).join('');
+  host.innerHTML = `<div style="overflow:auto"><table><thead><tr><th>用户名（可修改）</th><th>初始密码</th><th>账户类别</th><th>所属大V / 租户</th><th>状态</th><th>操作</th></tr></thead><tbody>${adminAiNameRows.map((item, index) => `<tr><td><input data-admin-ai-name="${index}" value="${escapeAttr(item.name)}" style="min-width:160px"></td><td><code>Abc123456</code></td><td><select data-admin-ai-role="${index}"><option value="investor" ${item.role === 'investor' ? 'selected' : ''}>粉丝 / 投资者</option><option value="dav" ${item.role === 'dav' ? 'selected' : ''}>大V</option><option value="admin" ${item.role === 'admin' ? 'selected' : ''}>管理员</option></select></td><td><select data-admin-ai-tenant="${index}"><option value="">请选择</option>${tenantOptions}</select></td><td>${item.exists ? '<span class="tag tag-red">已存在，不导入</span>' : '<span class="tag tag-green">可创建</span>'}</td><td><button class="btn-outline" type="button" onclick="removeAdminAiName(${index})">删除</button></td></tr>`).join('')}</tbody></table></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn-gold" type="button" onclick="confirmAdminAiNames()">确认并批量创建 ${adminAiNameRows.filter((item) => !item.exists).length} 个用户</button></div>`;
+}
+
+function syncAdminAiNameRows() {
+  adminAiNameRows = Array.from(document.querySelectorAll('[data-admin-ai-name]')).map((node, index) => ({name: String(node.value || '').trim(), role: String(document.querySelector(`[data-admin-ai-role="${index}"]`)?.value || adminAiNameRows[index]?.role || 'investor'), tenant_slug: String(document.querySelector(`[data-admin-ai-tenant="${index}"]`)?.value || adminAiNameRows[index]?.tenant_slug || adminSiteConfig.default_tenant_slug || '').trim(), exists: Boolean(adminAiNameRows[index]?.exists)})).filter((item) => item.name);
+}
+
+function removeAdminAiName(index) {
+  syncAdminAiNameRows();
+  adminAiNameRows.splice(index, 1);
+  renderAdminAiNamePreview();
+}
+
+async function parseAdminAiNames() {
+  const text = String(document.getElementById('admin-ai-name-text')?.value || '').trim();
+  const preview = document.getElementById('admin-ai-name-preview');
+  if (!text) { showToast('请输入姓名或姓名串'); return; }
+  if (preview) preview.innerHTML = '<div class="feature-note">正在调用模型解析，请稍候...</div>';
+  try {
+    const response = await fetch('/api/admin/users/parse-names', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'parse_user_names_failed');
+    adminAiNameRows = Array.isArray(data.items) ? data.items : (Array.isArray(data.names) ? data.names.map((name) => ({name, exists: false})) : []);
+    renderAdminAiNamePreview();
+  } catch (error) {
+    if (preview) preview.innerHTML = `<div class="login-error">${escapeHtml(error.message || '姓名解析失败，未创建用户')}</div>`;
+  }
+}
+
+async function confirmAdminAiNames() {
+  syncAdminAiNameRows();
+  const namesToImport = adminAiNameRows.filter((item) => !item.exists).map((item) => ({name: item.name, role: item.role || 'investor', tenant_slug: item.tenant_slug || adminSiteConfig.default_tenant_slug || ''}));
+  if (!namesToImport.length) { showToast('没有新的用户名可导入'); return; }
+  try {
+    const response = await fetch('/api/admin/users/import-names', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({names:namesToImport})});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'import_user_names_failed');
+    adminUsers = Array.isArray(data.users) ? data.users : adminUsers;
+    renderAdminUsersTable();
+    closeAdminUserImportModal();
+    showToast(`已创建 ${Array.isArray(data.created) ? data.created.length : 0} 个用户`);
+  } catch (error) { showToast(error.message || '批量导入失败'); }
 }
 
 async function submitAdminUserImportRows() {
