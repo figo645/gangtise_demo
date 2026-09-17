@@ -5248,19 +5248,26 @@ def _market_display_catalog():
     # uses, rather than maintaining a second, drifting list in the web layer.
     from src.domain.market_services import (
         GANGTISE_MARKET_OVERVIEW_SPECS,
+        GANGTISE_INDICATOR_REGISTRY,
+        MACRO_ECONOMIC_VISIBLE_CODES,
         MARKET_OVERVIEW_INDEX_CODES,
         SHENWAN_LEVEL1_INDUSTRIES,
     )
 
     market_names = {item[0]: item[1] for item in GANGTISE_MARKET_OVERVIEW_SPECS}
-    return tuple(MARKET_OVERVIEW_INDEX_CODES), market_names, tuple(SHENWAN_LEVEL1_INDUSTRIES)
+    macro_names = {
+        code: str((GANGTISE_INDICATOR_REGISTRY.get(code) or {}).get("indicator_name") or code)
+        for code in MACRO_ECONOMIC_VISIBLE_CODES
+    }
+    return tuple(MARKET_OVERVIEW_INDEX_CODES), market_names, tuple(SHENWAN_LEVEL1_INDUSTRIES), tuple(MACRO_ECONOMIC_VISIBLE_CODES), macro_names
 
 
 def _normalize_tenant_market_display_settings(payload=None):
     source = payload if isinstance(payload, dict) else {}
-    market_codes, _market_names, sector_names = _market_display_catalog()
+    market_codes, _market_names, sector_names, macro_codes, _macro_names = _market_display_catalog()
     allowed_market = set(market_codes)
     allowed_sectors = set(sector_names)
+    allowed_macro = set(macro_codes)
 
     def unique_allowed(values, allowed, limit):
         result = []
@@ -5277,6 +5284,13 @@ def _normalize_tenant_market_display_settings(payload=None):
         "configured": bool(source.get("configured", False)),
         "market_overview_codes": unique_allowed(source.get("market_overview_codes"), allowed_market, 4),
         "sector_names": unique_allowed(source.get("sector_names"), allowed_sectors, 10),
+        # Existing published market layouts predate the macro picker. Preserve
+        # their established macro display until the DaV explicitly saves it.
+        "macro_economic_codes": unique_allowed(
+            source.get("macro_economic_codes") if "macro_economic_codes" in source else (list(macro_codes) if source.get("configured") else []),
+            allowed_macro,
+            6,
+        ),
         "updated_at": str(source.get("updated_at") or "").strip(),
         "updated_by": str(source.get("updated_by") or "").strip(),
     }
@@ -5299,18 +5313,24 @@ def save_tenant_market_display_settings(tenant_slug, payload=None, updated_by=""
     source = payload if isinstance(payload, dict) else {}
     raw_market = source.get("market_overview_codes")
     raw_sectors = source.get("sector_names")
-    if not isinstance(raw_market, list) or not isinstance(raw_sectors, list):
+    raw_macro = source.get("macro_economic_codes", [])
+    if not isinstance(raw_market, list) or not isinstance(raw_sectors, list) or not isinstance(raw_macro, list):
         raise ValueError("market_display_selection_required")
     if len(raw_market) > 4:
         raise ValueError("market_overview_limit_exceeded")
     if len(raw_sectors) > 10:
         raise ValueError("hot_industry_limit_exceeded")
+    if len(raw_macro) > 6:
+        raise ValueError("macro_economic_limit_exceeded")
     clean_market = [str(item or "").strip() for item in raw_market if str(item or "").strip()]
     clean_sectors = [str(item or "").strip() for item in raw_sectors if str(item or "").strip()]
+    clean_macro = [str(item or "").strip() for item in raw_macro if str(item or "").strip()]
     if len(clean_market) != len(set(clean_market)):
         raise ValueError("market_overview_indicator_duplicated")
     if len(clean_sectors) != len(set(clean_sectors)):
         raise ValueError("hot_industry_indicator_duplicated")
+    if len(clean_macro) != len(set(clean_macro)):
+        raise ValueError("macro_economic_indicator_duplicated")
     normalized = _normalize_tenant_market_display_settings(source)
     # Reject unknown values explicitly. Silent deletion would make a DaV think
     # an item was published while followers cannot see it.
@@ -5318,6 +5338,8 @@ def save_tenant_market_display_settings(tenant_slug, payload=None, updated_by=""
         raise ValueError("market_overview_indicator_invalid")
     if len(normalized["sector_names"]) != len(clean_sectors):
         raise ValueError("hot_industry_indicator_invalid")
+    if len(normalized["macro_economic_codes"]) != len(clean_macro):
+        raise ValueError("macro_economic_indicator_invalid")
     normalized["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     normalized["updated_by"] = str(updated_by or "").strip()
     normalized["configured"] = True

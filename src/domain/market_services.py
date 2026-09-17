@@ -6980,7 +6980,7 @@ def _build_macro_snapshot_item(indicator_code, series_result):
     }
 
 
-def build_macro_economic_payload():
+def build_macro_economic_payload(tenant_slug=""):
     """Read the persisted macro snapshot; the H5 request never calls AKShare."""
     cache_key = "china_macro"
     visible_codes = set(MACRO_ECONOMIC_VISIBLE_CODES)
@@ -6995,16 +6995,32 @@ def build_macro_economic_payload():
         ]
         return result
 
+    def _apply_tenant_selection(payload):
+        result = _visible_payload(payload)
+        if not tenant_slug or not isinstance(result, dict):
+            return result
+        from src.domain.core_services import load_tenant_market_display_settings
+
+        settings = load_tenant_market_display_settings(tenant_slug)
+        items = result.get("items") if isinstance(result.get("items"), list) else []
+        if settings.get("configured"):
+            selected = settings.get("macro_economic_codes") or []
+            by_code = {str(item.get("indicator_code") or ""): item for item in items if isinstance(item, dict)}
+            result["items"] = [by_code[code] for code in selected if code in by_code]
+        result["tenant_display_config"] = settings
+        result["display_limit"] = len(MACRO_ECONOMIC_VISIBLE_CODES)
+        return result
+
     cached = _load_market_snapshot_payload("macro_economic", cache_key, MACRO_SNAPSHOT_REFRESH_TTL_SECONDS)
     if isinstance(cached, dict) and isinstance(cached.get("items"), list) and cached.get("snapshot_version") == 1:
-        return _visible_payload(cached)
+        return _apply_tenant_selection(cached)
     stale = _load_market_snapshot_payload("macro_economic", cache_key, 0)
     if isinstance(stale, dict) and isinstance(stale.get("items"), list) and stale.get("snapshot_version") == 1:
-        preserved = _visible_payload(stale)
+        preserved = _apply_tenant_selection(stale)
         preserved["stale"] = True
         preserved["message"] = "宏观数据正在同步，当前展示最近一次真实快照"
         return preserved
-    return {"ok": True, "snapshot_version": 1, "items": [], "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 宏观数据"}
+    return _apply_tenant_selection({"ok": True, "snapshot_version": 1, "items": [], "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 宏观数据"})
 
 
 _market_snapshot_refresh_lock = threading.Lock()

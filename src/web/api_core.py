@@ -449,7 +449,7 @@ def api_market_overview():
 @app.route("/api/macro-overview")
 def api_macro_overview():
     try:
-        return jsonify(build_macro_economic_payload())
+        return jsonify(build_macro_economic_payload(tenant_slug=_resolve_market_snapshot_tenant()))
     except Exception as exc:
         if is_db_unavailable_error(exc):
             return jsonify({"ok": False, "error": "database_unavailable"}), 503
@@ -601,7 +601,14 @@ def api_watchlist_detail(stock_code):
         viewer_role = actor["user_role"]
         viewer_profile_id = actor["user_profile_id"]
     allow_fan_to_fan = is_feature_enabled("watchlist_fan_comment_interaction", site_config)
-    payload = get_watchlist_detail_by_code(stock_code=stock_code, stock_name=stock_code, details_map=details) or {
+    payload = get_watchlist_detail_by_code(
+        stock_code=stock_code,
+        stock_name=stock_code,
+        details_map=details,
+        # A focused detail view is the intentional on-demand provider path.
+        # List composition remains cache-only and never enables this flag.
+        allow_provider_fetch=True,
+    ) or {
         "code": stock_code,
         "name": stock_code,
         "market": "CN",

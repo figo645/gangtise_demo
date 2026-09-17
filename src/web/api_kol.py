@@ -178,7 +178,7 @@ def api_tenant_market_display_config(tenant_slug):
         return denied
     normalized_tenant = str(tenant_slug or "").strip().lower()
     try:
-        market_codes, market_names, sector_names = _market_display_catalog()
+        market_codes, market_names, sector_names, macro_codes, macro_names = _market_display_catalog()
         if request.method == "POST":
             current_user = get_current_authenticated_user() or {}
             previous = load_tenant_market_display_settings(normalized_tenant)
@@ -203,7 +203,8 @@ def api_tenant_market_display_config(tenant_slug):
             "catalog": {
                 "market_overview": [{"code": code, "name": market_names.get(code) or code} for code in market_codes],
                 "hot_industries": list(sector_names),
-                "limits": {"market_overview": 4, "hot_industries": 10},
+                "macro_economic": [{"code": code, "name": macro_names.get(code) or code} for code in macro_codes],
+                "limits": {"market_overview": 4, "hot_industries": 10, "macro_economic": 6},
             },
         })
     except ValueError as exc:

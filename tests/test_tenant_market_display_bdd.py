@@ -57,6 +57,28 @@ def test_given_dav_clears_all_choices_when_published_then_the_snapshot_projectio
     assert selected["items"] == []
 
 
+def test_given_dav_publishes_macro_choices_when_follower_reads_macro_snapshot_then_only_that_tenant_selection_is_visible():
+    from src.domain import market_services
+
+    snapshot = {
+        "ok": True,
+        "snapshot_version": 1,
+        "source": "AKShare",
+        "items": [
+            {"indicator_code": "source_cpi", "name": "CPI", "available": True},
+            {"indicator_code": "source_ppi", "name": "PPI", "available": True},
+        ],
+    }
+    with patch.object(market_services, "_load_market_snapshot_payload", return_value=snapshot), patch(
+        "src.domain.core_services.load_tenant_market_display_settings",
+        return_value={"configured": True, "macro_economic_codes": ["source_ppi"]},
+    ):
+        payload = market_services.build_macro_economic_payload(tenant_slug="laowang")
+
+    assert [item["indicator_code"] for item in payload["items"]] == ["source_ppi"]
+    assert payload["display_limit"] == len(market_services.MACRO_ECONOMIC_VISIBLE_CODES)
+
+
 def test_given_unconfigured_tenant_when_reading_shared_snapshot_then_platform_recommendation_is_limited_but_not_persisted():
     from src.domain import market_services
 
@@ -159,8 +181,12 @@ def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfac
     assert "feed-overview-chart" in fundamental_panel
     assert "renderFeedMarketEconomy(sectors.items" in fundamental_panel
     assert "feed-watchlist-chart" in h5
+    assert 'data-h5-market-picker="macro"' in h5
+    assert "toggleH5MarketDisplaySummary" in h5
     assert 'id="kw-market-layout-modal"' in web
     assert 'data-kw-market-picker=' in web
     assert 'data-kw-market-picker-tile=' in web
+    assert 'data-kw-market-picker="macro"' in web
+    assert "toggleKwMarketDisplaySummary" in web
     assert "配置粉丝端行情版面" in web
     assert "已发布给本租户粉丝" in web

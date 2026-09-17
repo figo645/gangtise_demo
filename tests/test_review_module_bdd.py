@@ -2666,6 +2666,7 @@ class ReviewModuleBddTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(detail_lookup.call_args.kwargs["details_map"], {})
+        self.assertTrue(detail_lookup.call_args.kwargs["allow_provider_fetch"])
 
     def test_given_empty_shared_quote_cache_when_loading_detail_then_gangtise_fetch_is_retried(self):
         candidate = {"code": "601939", "name": "建设银行", "market": "SH", "security_code": "601939.SH"}

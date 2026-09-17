@@ -2,6 +2,7 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 
+import app as app_entry
 from src.domain import market_services
 
 
@@ -21,6 +22,44 @@ def test_stock_daily_uses_sina_backed_akshare_for_a_share():
     assert result["provider"] == "Sina"
     assert result["points"][-1]["close"] == 11.5
     ak.stock_zh_a_daily.assert_called_once()
+
+
+def test_on_demand_unseeded_a_share_detail_fetches_its_canonical_sina_series():
+    """A direct watchlist view must fetch a normal A-share absent from demo seeds."""
+    candidate = {
+        "code": "601818",
+        "name": "光大银行",
+        "market": "SH",
+        "security_code": "601818.SH",
+        "industry": "银行",
+    }
+    daily_result = {
+        "ok": True,
+        "provider": "Sina",
+        "points": [
+            {"date": "2026-09-16", "open": 3.1, "high": 3.2, "low": 3.0, "close": 3.12},
+            {"date": "2026-09-17", "open": 3.12, "high": 3.25, "low": 3.1, "close": 3.2},
+        ],
+    }
+    with app_entry.app.app_context():
+        with patch.object(market_services, "_resolve_watchlist_candidate", return_value=candidate), patch.object(
+            market_services, "fetch_akshare_stock_kline_series", return_value=daily_result
+        ) as fetch_daily, patch.object(market_services, "attach_watchlist_intraday", side_effect=lambda detail: detail), patch.object(
+            market_services, "_save_watchlist_cache"
+        ):
+            detail = market_services.get_watchlist_detail_by_code(
+                stock_code="601818",
+                stock_name="光大银行",
+                details_map={},
+                allow_provider_fetch=True,
+            )
+
+    assert detail["code"] == "601818"
+    assert detail["name"] == "光大银行"
+    assert detail["market"] == "SH"
+    assert detail["data_unavailable"] is False
+    assert len(detail["kline"]) == 2
+    assert fetch_daily.call_args.kwargs["security_code"] == "601818.SH"
 
 
 def test_stock_minute_uses_sina_backed_akshare_for_a_share():

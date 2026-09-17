@@ -67,6 +67,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 .feed-market-bar.down { background:var(--green); }
 .feed-market-bar-label { width:100%; min-width:0; align-self:end; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; font-size:8px; line-height:1.4; color:var(--gray-400); }
 .market-layout-summary { border:1px solid #DCE8F5; border-radius:10px; background:#F7FBFF; padding:12px; }
+.market-layout-summary.is-collapsed .market-layout-summary-grid { display:none; }
 .market-layout-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
 .market-layout-summary-card { min-width:0; padding:10px; border:1px solid #DCE8F5; border-radius:8px; background:#FFFFFF; }
 .market-layout-summary-title { color:#183A62; font-size:12px; font-weight:700; }
@@ -8177,8 +8178,9 @@ function marketSnapshotTenantQuery() {
 
 let h5MarketDisplayConfigLoading = false;
 let h5MarketDisplayConfig = { settings: {}, catalog: {} };
-let h5MarketDisplayDraft = { market_overview_codes: [], sector_names: [] };
+let h5MarketDisplayDraft = { market_overview_codes: [], sector_names: [], macro_economic_codes: [] };
 let h5MarketPickerTab = 'sectors';
+let h5MarketDisplaySummaryExpanded = false;
 
 function h5MarketDisplayTenantSlug() {
   return String((currentDemoUser && currentDemoUser.tenant && currentDemoUser.tenant.slug) || '').trim().toLowerCase();
@@ -8192,17 +8194,23 @@ function renderH5MarketDisplayConfig(payload) {
   const settings = h5MarketDisplayConfig.settings || {};
   const catalog = h5MarketDisplayConfig.catalog || {};
   const marketRows = Array.isArray(catalog.market_overview) ? catalog.market_overview : [];
+  const macroRows = Array.isArray(catalog.macro_economic) ? catalog.macro_economic : [];
+  const limits = catalog.limits || { market_overview: 4, hot_industries: 10, macro_economic: 6 };
   const chips = (values, labelOf, emptyText) => values.length
     ? values.map((value) => `<span class="market-layout-chip">${escapeHtml(labelOf(value))}</span>`).join('')
     : `<span style="font-size:11px;color:#7A8C9F">${emptyText}</span>`;
   const marketName = (code) => ((marketRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
-  const summary = `<div class="market-layout-summary-grid"><div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">热门行业</strong><span class="market-layout-count">${(settings.sector_names || []).length}/10</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(settings.sector_names || [], (value) => value, '尚未配置')}</div></div><div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">市场一览</strong><span class="market-layout-count">${(settings.market_overview_codes || []).length}/4</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(settings.market_overview_codes || [], marketName, '尚未配置')}</div></div></div>`;
-  host.innerHTML = `<section class="market-layout-summary"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="font-size:12px;font-weight:750;color:#183A62">粉丝端行情版面</div><div style="font-size:11px;color:#62758A;margin-top:3px">${settings.configured ? `已发布 · ${escapeHtml(settings.updated_at || '--')}` : '尚未发布，可按需选择，不必填满'}</div></div><button type="button" class="btn btn-outline-primary btn-sm" onclick="openH5MarketDisplayModal()">调整版面</button></div>${summary}</section>`;
+  const macroName = (code) => ((macroRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
+  const summaryCard = (title, values, limit, labelOf) => `<div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">${title}</strong><span class="market-layout-count">${values.length}/${limit}</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(values, labelOf, '尚未配置')}</div></div>`;
+  const summary = `<div class="market-layout-summary-grid">${summaryCard('热门行业', settings.sector_names || [], Number(limits.hot_industries || 10), (value) => value)}${summaryCard('市场一览', settings.market_overview_codes || [], Number(limits.market_overview || 4), marketName)}${summaryCard('宏观经济', settings.macro_economic_codes || [], Number(limits.macro_economic || 6), macroName)}</div>`;
+  host.innerHTML = `<section class="market-layout-summary ${h5MarketDisplaySummaryExpanded ? '' : 'is-collapsed'}"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="font-size:12px;font-weight:750;color:#183A62">粉丝端行情版面</div><div style="font-size:11px;color:#62758A;margin-top:3px">${settings.configured ? `已发布 · ${escapeHtml(settings.updated_at || '--')}` : '尚未发布，可按需选择，不必填满'}</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button type="button" class="btn btn-light border btn-sm" onclick="toggleH5MarketDisplaySummary()">${h5MarketDisplaySummaryExpanded ? '收起' : '展开'}</button><button type="button" class="btn btn-outline-primary btn-sm" onclick="openH5MarketDisplayModal()">调整版面</button></div></div>${summary}</section>`;
 }
+
+function toggleH5MarketDisplaySummary() { h5MarketDisplaySummaryExpanded = !h5MarketDisplaySummaryExpanded; renderH5MarketDisplayConfig(h5MarketDisplayConfig); }
 
 function openH5MarketDisplayModal() {
   const settings = h5MarketDisplayConfig.settings || {};
-  h5MarketDisplayDraft = { market_overview_codes: [...(settings.market_overview_codes || [])], sector_names: [...(settings.sector_names || [])] };
+  h5MarketDisplayDraft = { market_overview_codes: [...(settings.market_overview_codes || [])], sector_names: [...(settings.sector_names || [])], macro_economic_codes: [...(settings.macro_economic_codes || [])] };
   h5MarketPickerTab = 'sectors';
   renderH5MarketDisplayModal();
   document.getElementById('h5-market-layout-modal')?.classList.add('show');
@@ -8227,11 +8235,12 @@ function renderH5MarketDisplayModal() {
   if (!host) return;
   const catalog = h5MarketDisplayConfig.catalog || {};
   const isSector = h5MarketPickerTab === 'sectors';
-  const field = isSector ? 'sector_names' : 'market_overview_codes';
-  const limit = isSector ? 10 : 4;
-  const options = isSector ? (catalog.hot_industries || []).map((item) => ({ value: String(item || ''), label: String(item || '') })) : (catalog.market_overview || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' }));
+  const isMacro = h5MarketPickerTab === 'macro';
+  const field = isSector ? 'sector_names' : (isMacro ? 'macro_economic_codes' : 'market_overview_codes');
+  const limit = isSector ? 10 : (isMacro ? 6 : 4);
+  const options = isSector ? (catalog.hot_industries || []).map((item) => ({ value: String(item || ''), label: String(item || '') })) : (isMacro ? (catalog.macro_economic || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' })) : (catalog.market_overview || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' })));
   const selected = h5MarketDisplayDraft[field] || [];
-  host.innerHTML = `<div class="p-3 p-md-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="fw-bold" style="color:#183A62">配置粉丝端行情版面</div><div class="small mt-1" style="color:#62758A">选择需要展示的指标即可，未选满不会影响发布。</div></div><button type="button" class="btn-close" aria-label="关闭" onclick="closeH5MarketDisplayModal()"></button></div><div class="market-picker-tabs mt-3"><button type="button" class="market-picker-tab ${isSector ? 'active' : ''}" data-h5-market-picker="sectors" onclick="setH5MarketPickerTab('sectors')">热门行业</button><button type="button" class="market-picker-tab ${isSector ? '' : 'active'}" data-h5-market-picker="market" onclick="setH5MarketPickerTab('market')">市场一览</button></div><div class="d-flex justify-content-between align-items-center mt-3"><strong style="font-size:13px;color:#183A62">${isSector ? '选择热门行业' : '选择市场指标'}</strong><span class="badge text-bg-light border" style="color:#2F74C0!important;border-color:#CFE2F6!important">已选择 ${selected.length} / ${limit} · 可留空</span></div><div class="row row-cols-3 g-2 mt-1">${options.map((item) => `<div class="col"><button type="button" class="market-picker-tile ${selected.includes(item.value) ? 'is-selected' : ''}" data-h5-market-picker-tile="${escapeAttr(item.value)}" onclick="toggleH5MarketDraftSelection('${field}','${escapeAttr(item.value)}',${limit})">${selected.includes(item.value) ? '<span class="market-picker-check">✓</span>' : ''}<span>${escapeHtml(item.label)}</span></button></div>`).join('') || '<div class="col-12 small text-center py-4" style="color:#62758A">暂无可选择的指标</div>'}</div><div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top"><button type="button" class="btn btn-light border" onclick="closeH5MarketDisplayModal()">取消</button><button type="button" class="btn btn-primary" onclick="publishH5MarketDisplayDraft()">发布版面</button></div></div>`;
+  host.innerHTML = `<div class="p-3 p-md-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="fw-bold" style="color:#183A62">配置粉丝端行情版面</div><div class="small mt-1" style="color:#62758A">选择需要展示的指标即可，未选满不会影响发布。</div></div><button type="button" class="btn-close" aria-label="关闭" onclick="closeH5MarketDisplayModal()"></button></div><div class="market-picker-tabs mt-3"><button type="button" class="market-picker-tab ${isSector ? 'active' : ''}" data-h5-market-picker="sectors" onclick="setH5MarketPickerTab('sectors')">热门行业</button><button type="button" class="market-picker-tab ${!isSector && !isMacro ? 'active' : ''}" data-h5-market-picker="market" onclick="setH5MarketPickerTab('market')">市场一览</button><button type="button" class="market-picker-tab ${isMacro ? 'active' : ''}" data-h5-market-picker="macro" onclick="setH5MarketPickerTab('macro')">宏观经济</button></div><div class="d-flex justify-content-between align-items-center mt-3"><strong style="font-size:13px;color:#183A62">${isSector ? '选择热门行业' : (isMacro ? '选择宏观指标' : '选择市场指标')}</strong><span class="badge text-bg-light border" style="color:#2F74C0!important;border-color:#CFE2F6!important">已选择 ${selected.length} / ${limit} · 可留空</span></div><div class="row row-cols-3 g-2 mt-1">${options.map((item) => `<div class="col"><button type="button" class="market-picker-tile ${selected.includes(item.value) ? 'is-selected' : ''}" data-h5-market-picker-tile="${escapeAttr(item.value)}" onclick="toggleH5MarketDraftSelection('${field}','${escapeAttr(item.value)}',${limit})">${selected.includes(item.value) ? '<span class="market-picker-check">✓</span>' : ''}<span>${escapeHtml(item.label)}</span></button></div>`).join('') || '<div class="col-12 small text-center py-4" style="color:#62758A">暂无可选择的指标</div>'}</div><div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top"><button type="button" class="btn btn-light border" onclick="closeH5MarketDisplayModal()">取消</button><button type="button" class="btn btn-primary" onclick="publishH5MarketDisplayDraft()">发布版面</button></div></div>`;
 }
 
 async function loadH5MarketDisplayConfig() {
@@ -8256,10 +8265,11 @@ async function saveH5MarketDisplayConfig() {
   if (!tenantSlug) return;
   const market = [...(h5MarketDisplayDraft.market_overview_codes || [])];
   const sectors = [...(h5MarketDisplayDraft.sector_names || [])];
+  const macro = [...(h5MarketDisplayDraft.macro_economic_codes || [])];
   try {
     const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, {
       method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({market_overview_codes: market, sector_names: sectors}),
+      body: JSON.stringify({market_overview_codes: market, sector_names: sectors, macro_economic_codes: macro}),
     });
     const payload = await response.json();
     if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_save_failed');
@@ -14869,18 +14879,18 @@ function renderMarketMacro(items) {
       <div style="display:flex;justify-content:space-between;gap:8px;margin-top:9px;font-size:10px;color:var(--gray-400)"><span>${available ? (Number.isFinite(change) ? `较上期 ${change > 0 ? '+' : ''}${change.toFixed(2)}${escapeHtml(unit)}` : '暂无上期数据') : escapeHtml(item.message || '暂未获取到精确口径数据')}</span><span>${escapeHtml(item.updated_at || '--')}</span></div>
     </div>`;
   }).join('');
-  if (!rows.length) host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">宏观数据正在由后台同步，请稍后查看</div>';
+  if (!rows.length) host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">暂无已发布的宏观指标</div>';
 }
 
 async function loadMarketMacro() {
   const host = document.getElementById('market-macro-list');
   if (!host) return;
   try {
-    const response = await fetch('/api/macro-overview');
+    const response = await fetch(`/api/macro-overview${marketSnapshotTenantQuery()}`);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.ok === false) throw new Error(payload.error || 'macro_overview_failed');
     const items = Array.isArray(payload.items) ? payload.items : [];
-    marketMacroLoaded = items.length > 0;
+    marketMacroLoaded = items.length > 0 || Boolean((payload.tenant_display_config || {}).configured);
     if (marketMacroLoaded) marketMacroRetryCount = 0;
     renderMarketMacro(items);
     if (!marketMacroLoaded && marketMacroRetryCount < 10) {
