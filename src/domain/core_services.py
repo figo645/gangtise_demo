@@ -6196,16 +6196,25 @@ def normalize_user_payload(source, context=None):
     phone = str(raw.get("phone") or "").strip()
     role = _normalize_user_role_for_scope(raw.get("role"), scope)
     status = _normalize_user_status(raw.get("status"))
-    tenant_slug = str(raw.get("tenant_slug") or target_tenant_slug or get_default_tenant_slug()).strip().lower()
+    tenant_slug = str(raw.get("tenant_slug") or target_tenant_slug).strip().lower()
     if scope == "kol":
         tenant_slug = target_tenant_slug
-    tenant = get_tenant_by_slug(tenant_slug)
+    if scope == "admin" and role == "investor" and not tenant_slug:
+        raise ValueError("tenant_required")
+    # DAv and platform-admin accounts are not assigned to another DAv during
+    # account creation. A DAv's tenant is configured separately when their
+    # tenant is provisioned.
+    if scope == "admin" and role in {"dav", "admin"}:
+        tenant_slug = ""
+    tenant = get_tenant_by_slug(tenant_slug) if tenant_slug else {}
+    if tenant_slug and str(tenant.get("slug") or "").strip().lower() != tenant_slug:
+        raise ValueError("tenant_not_found")
     advisor_name = str(raw.get("advisor_name") or "").strip()
     if scope == "kol":
         advisor_name = tenant.get("advisor") or ctx.get("advisor_name") or ""
     elif role == "investor" and not advisor_name:
         advisor_name = tenant.get("advisor") or ""
-    elif role == "admin":
+    elif role in {"dav", "admin"}:
         advisor_name = ""
     is_paid_sample = _is_truthy_user_flag(raw.get("is_paid_sample")) if role == "investor" else False
     default_source_label = "用户导入" if scope == "kol" or role == "investor" else "管理录入"
