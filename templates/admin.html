@@ -9593,7 +9593,7 @@ function buildAdminUserImportRow(row = {}) {
   });
   const roleOptions = configuredRoles.map((role) => `<option value="${escapeAttr(role)}" ${String(row.role || 'investor') === role ? 'selected' : ''}>${escapeHtml(role)}</option>`).join('');
   const selectedTenant = String(row.tenant_slug || '').trim();
-  const tenantOptions = (Array.isArray(adminSiteConfig.tenants) ? adminSiteConfig.tenants : []).map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}" ${String(tenant.slug || '') === selectedTenant ? 'selected' : ''}>${escapeHtml(tenant.name || tenant.slug || '')} · ${escapeHtml(tenant.advisor || '--')}</option>`).join('');
+  const advisorOptions = getAdminDavAccountOptions(selectedTenant, row.advisor_name);
   return `
     <tr>
       <td><input data-field="username" type="text" value="${escapeAttr(row.username || '')}" placeholder="用户名"></td>
@@ -9604,7 +9604,7 @@ function buildAdminUserImportRow(row = {}) {
           ${roleOptions}
         </select>
       </td>
-      <td><select data-field="tenant_slug"><option value="">请选择所属大V</option>${tenantOptions}</select><div data-import-tenant-note style="font-size:10px;color:#8899aa;margin-top:4px">粉丝必须选择所属大V</div></td>
+      <td><select data-field="tenant_slug"><option value="">请选择所属大V</option>${advisorOptions}</select><div data-import-tenant-note style="font-size:10px;color:#8899aa;margin-top:4px">粉丝必须选择所属大V</div></td>
       <td>
         <select data-field="status">
           <option value="active" ${String(row.status || 'active') === 'active' ? 'selected' : ''}>正常</option>
@@ -9622,6 +9622,18 @@ function buildAdminUserImportRow(row = {}) {
       <td><button class="btn-outline" type="button" style="padding:4px 10px;font-size:11px" onclick="removeAdminUserImportRow(this)">删除</button></td>
     </tr>
   `;
+}
+
+function getAdminDavAccountOptions(selectedTenant = '', selectedAdvisor = '') {
+  const selectedTenantText = String(selectedTenant || '').trim();
+  const selectedAdvisorText = String(selectedAdvisor || '').trim();
+  return adminUsers.filter((user) => String(user.role || '').toLowerCase() === 'dav' && String(user.status || 'active') === 'active' && String(user.tenant_slug || '').trim()).map((user) => {
+    const tenantSlug = String(user.tenant_slug || '').trim();
+    const username = String(user.username || '').trim();
+    const isSelected = (selectedAdvisorText && username === selectedAdvisorText) || (!selectedAdvisorText && tenantSlug === selectedTenantText);
+    const tenantName = String((user.tenant || {}).name || tenantSlug).trim();
+    return `<option value="${escapeAttr(tenantSlug)}" data-advisor-name="${escapeAttr(username)}" ${isSelected ? 'selected' : ''}>${escapeHtml(username)} · ${escapeHtml(tenantName)}</option>`;
+  }).join('');
 }
 
 function syncAdminImportRowRole(roleNode) {
@@ -9661,6 +9673,8 @@ function collectAdminUserImportRows() {
       const node = row.querySelector(`[data-field="${field}"]`);
       payload[field] = node ? String(node.value || '').trim() : '';
     });
+    const advisorOption = row.querySelector('[data-field="tenant_slug"] option:checked');
+    payload.advisor_name = String(advisorOption?.dataset?.advisorName || '').trim();
     return payload;
   }).filter((item) => item.username || item.phone);
 }
@@ -9717,8 +9731,7 @@ function renderAdminAiNamePreview() {
     host.innerHTML = '<div class="feature-note">没有解析到可导入的姓名，请检查输入。</div>';
     return;
   }
-  const tenantOptions = (selectedSlug) => (Array.isArray(adminSiteConfig.tenants) ? adminSiteConfig.tenants : []).map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}" ${String(tenant.slug || '') === String(selectedSlug || '') ? 'selected' : ''}>${escapeHtml(tenant.name || tenant.slug || '')} · ${escapeHtml(tenant.advisor || '--')}</option>`).join('');
-  host.innerHTML = `<div style="overflow:auto"><table><thead><tr><th>用户名（可修改）</th><th>初始密码</th><th>账户类别</th><th>所属大V</th><th>状态</th><th>操作</th></tr></thead><tbody>${adminAiNameRows.map((item, index) => `<tr><td><input data-admin-ai-name="${index}" value="${escapeAttr(item.name)}" style="min-width:160px"></td><td><code>Abc123456</code></td><td><select data-admin-ai-role="${index}" onchange="syncAdminAiNameRowRole(${index})"><option value="investor" ${item.role === 'investor' ? 'selected' : ''}>粉丝 / 投资者</option><option value="dav" ${item.role === 'dav' ? 'selected' : ''}>大V</option><option value="admin" ${item.role === 'admin' ? 'selected' : ''}>管理员</option></select></td><td><select data-admin-ai-tenant="${index}" ${item.role === 'investor' ? '' : 'disabled'}><option value="">请选择所属大V</option>${tenantOptions(item.tenant_slug)}</select><div data-admin-ai-tenant-note="${index}" style="font-size:10px;color:#8899aa;margin-top:4px">${item.role === 'investor' ? '粉丝必须选择所属大V' : (item.role === 'dav' ? '大V账号无需选择所属大V' : '管理员账号无需选择所属大V')}</div></td><td>${item.exists ? '<span class="tag tag-red">已存在，不导入</span>' : '<span class="tag tag-green">可创建</span>'}</td><td><button class="btn-outline" type="button" onclick="removeAdminAiName(${index})">删除</button></td></tr>`).join('')}</tbody></table></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn-gold" type="button" onclick="confirmAdminAiNames()">确认并批量创建 ${adminAiNameRows.filter((item) => !item.exists).length} 个用户</button></div>`;
+  host.innerHTML = `<div style="overflow:auto"><table><thead><tr><th>用户名（可修改）</th><th>初始密码</th><th>账户类别</th><th>所属大V</th><th>状态</th><th>操作</th></tr></thead><tbody>${adminAiNameRows.map((item, index) => `<tr><td><input data-admin-ai-name="${index}" value="${escapeAttr(item.name)}" style="min-width:160px"></td><td><code>Abc123456</code></td><td><select data-admin-ai-role="${index}" onchange="syncAdminAiNameRowRole(${index})"><option value="investor" ${item.role === 'investor' ? 'selected' : ''}>粉丝 / 投资者</option><option value="dav" ${item.role === 'dav' ? 'selected' : ''}>大V</option><option value="admin" ${item.role === 'admin' ? 'selected' : ''}>管理员</option></select></td><td><select data-admin-ai-tenant="${index}" ${item.role === 'investor' ? '' : 'disabled'}><option value="">请选择所属大V</option>${getAdminDavAccountOptions(item.tenant_slug, item.advisor_name)}</select><div data-admin-ai-tenant-note="${index}" style="font-size:10px;color:#8899aa;margin-top:4px">${item.role === 'investor' ? '粉丝必须选择所属大V' : (item.role === 'dav' ? '大V账号无需选择所属大V' : '管理员账号无需选择所属大V')}</div></td><td>${item.exists ? '<span class="tag tag-red">已存在，不导入</span>' : '<span class="tag tag-green">可创建</span>'}</td><td><button class="btn-outline" type="button" onclick="removeAdminAiName(${index})">删除</button></td></tr>`).join('')}</tbody></table></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn-gold" type="button" onclick="confirmAdminAiNames()">确认并批量创建 ${adminAiNameRows.filter((item) => !item.exists).length} 个用户</button></div>`;
 }
 
 function syncAdminAiNameRowRole(index) {
@@ -9737,8 +9750,10 @@ function syncAdminAiNameRowRole(index) {
 function syncAdminAiNameRows() {
   adminAiNameRows = Array.from(document.querySelectorAll('[data-admin-ai-name]')).map((node, index) => {
     const role = String(document.querySelector(`[data-admin-ai-role="${index}"]`)?.value || adminAiNameRows[index]?.role || 'investor').trim().toLowerCase();
-    const selectedTenant = String(document.querySelector(`[data-admin-ai-tenant="${index}"]`)?.value || '').trim();
-    return {name: String(node.value || '').trim(), role, tenant_slug: role === 'investor' ? selectedTenant : '', exists: Boolean(adminAiNameRows[index]?.exists)};
+    const selectedNode = document.querySelector(`[data-admin-ai-tenant="${index}"]`);
+    const selectedTenant = String(selectedNode?.value || '').trim();
+    const advisorName = String(selectedNode?.selectedOptions?.[0]?.dataset?.advisorName || '').trim();
+    return {name: String(node.value || '').trim(), role, tenant_slug: role === 'investor' ? selectedTenant : '', advisor_name: role === 'investor' ? advisorName : '', exists: Boolean(adminAiNameRows[index]?.exists)};
   }).filter((item) => item.name);
 }
 
@@ -9766,7 +9781,7 @@ async function parseAdminAiNames() {
 
 async function confirmAdminAiNames() {
   syncAdminAiNameRows();
-  const namesToImport = adminAiNameRows.filter((item) => !item.exists).map((item) => ({name: item.name, role: item.role || 'investor', tenant_slug: item.role === 'investor' ? item.tenant_slug : ''}));
+  const namesToImport = adminAiNameRows.filter((item) => !item.exists).map((item) => ({name: item.name, role: item.role || 'investor', tenant_slug: item.role === 'investor' ? item.tenant_slug : '', advisor_name: item.role === 'investor' ? item.advisor_name : ''}));
   if (namesToImport.some((item) => item.role === 'investor' && !item.tenant_slug)) { showToast('请为每位粉丝选择所属大V'); return; }
   if (!namesToImport.length) { showToast('没有新的用户名可导入'); return; }
   try {

@@ -6296,6 +6296,7 @@ def build_name_batch_user_rows(names, source_label="AI批量导入"):
             "phone": f"139{phone_seed}",
             "role": role,
             "tenant_slug": str(item.get("tenant_slug") or "").strip().lower(),
+            "advisor_name": str(item.get("advisor_name") or "").strip()[:120],
             "status": "active",
             "is_paid_sample": False,
             "source_label": str(source_label or "AI批量导入").strip()[:80] or "AI批量导入",
