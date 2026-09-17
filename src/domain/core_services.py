@@ -5645,6 +5645,137 @@ def update_user_status(user_id, status, actor_user_id=None):
     return get_user_by_id(target_id)
 
 
+def _allocate_dav_tenant_slug(username, tenants):
+    """Create a stable, URL-safe slug without ever reusing another DAv's tenant."""
+    occupied = {str((item or {}).get("slug") or "").strip().lower() for item in (tenants or [])}
+    preferred = slugify_code(username, "dav")[:48]
+    if preferred not in occupied:
+        return preferred
+    suffix = hashlib.sha1(str(username or "").encode("utf-8")).hexdigest()[:8]
+    candidate = f"dav-{suffix}"
+    sequence = 2
+    while candidate in occupied:
+        candidate = f"dav-{suffix}-{sequence}"
+        sequence += 1
+    return candidate
+
+
+def provision_dav_tenant(username):
+    """Return the single tenant owned by a DAv, creating it when necessary.
+
+    Tenant scoping is the isolation key for fan statistics, messages and
+    content. A DAv account must therefore never silently inherit the platform
+    default tenant.
+    """
+    normalized_username = str(username or "").strip()
+    if not normalized_username:
+        raise ValueError("username_required")
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    for tenant in tenants:
+        if str(tenant.get("advisor") or "").strip() == normalized_username:
+            return str(tenant.get("slug") or "").strip().lower()
+    slug = _allocate_dav_tenant_slug(normalized_username, tenants)
+    tenants.append({
+        "id": f"tenant_{slug}",
+        "slug": slug,
+        "name": f"{normalized_username}研究空间",
+        "short_name": normalized_username,
+        "advisor": normalized_username,
+        "tier": "标准租户",
+        "focus": "待配置研究方向",
+        "rights": "复盘专区 · 知识专区 · Hermes 摘要 · 社群问答",
+        "description": f"由大V账户 {normalized_username} 创建的独立粉丝服务空间。",
+        "portal_headline": "聚焦研究内容、重点个股和粉丝互动。",
+        "portal_description": "这是该大V独立运营的粉丝服务空间。",
+        "dashboard_title": f"{normalized_username}租户经营 Dashboard",
+        "dashboard_description": "面向该大V及其粉丝的独立运营数据。",
+    })
+    next_config = dict(site_config)
+    next_config["tenants"] = tenants
+    saved = save_site_config(next_config)
+    tenant = get_tenant_by_slug(slug, saved)
+    return str(tenant.get("slug") or "").strip().lower()
+
+
+def _rename_dav_tenant_owner(tenant_slug, previous_username, next_username):
+    """Keep tenant metadata and every fan's display attribution in sync."""
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant or str(previous_username or "").strip() == str(next_username or "").strip():
+        return normalized_tenant
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    changed = False
+    for index, tenant in enumerate(tenants):
+        if str(tenant.get("slug") or "").strip().lower() != normalized_tenant:
+            continue
+        if str(tenant.get("advisor") or "").strip() != str(previous_username or "").strip():
+            raise ValueError("dav_tenant_owner_mismatch")
+        tenants[index] = {**tenant, "advisor": str(next_username or "").strip()}
+        changed = True
+        break
+    if not changed:
+        raise ValueError("tenant_not_found")
+    next_config = dict(site_config)
+    next_config["tenants"] = tenants
+    save_site_config(next_config)
+    db = get_db()
+    db.execute(
+        "UPDATE users SET advisor_name = ?, updated_at = ? WHERE role = ? AND tenant_slug = ?",
+        (str(next_username or "").strip(), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "investor", normalized_tenant),
+    )
+    db.commit()
+    return normalized_tenant
+
+
+def reconcile_dav_tenant_relationships(users=None):
+    """Backfill legacy DAv accounts into one dedicated tenant each.
+
+    Earlier account creation could place a newly created DAv in the platform
+    default tenant. That makes every tenant-scoped metric and broadcast mix
+    audiences. The reconciliation is idempotent and only moves fans that
+    explicitly name the affected DAv in ``advisor_name``.
+    """
+    account_rows = users if isinstance(users, list) else list_users()
+    davs = [item for item in account_rows if str((item or {}).get("role") or "").strip().lower() == "dav"]
+    if not davs:
+        return {"repaired_davs": 0, "reassigned_fans": 0}
+    db = get_db()
+    repaired_davs = 0
+    reassigned_fans = 0
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for dav in davs:
+        username = str(dav.get("username") or "").strip()
+        if not username:
+            continue
+        current_slug = str(dav.get("tenant_slug") or "").strip().lower()
+        current_tenant = get_tenant_by_slug(current_slug) if current_slug else {}
+        owned = str(current_tenant.get("advisor") or "").strip() == username
+        target_slug = current_slug if owned else provision_dav_tenant(username)
+        if target_slug == current_slug and not str(dav.get("advisor_name") or "").strip():
+            continue
+        db.execute(
+            "UPDATE users SET tenant_slug = ?, advisor_name = ?, updated_at = ? WHERE id = ?",
+            (target_slug, "", now, dav.get("id")),
+        )
+        repaired_davs += 1
+        for fan in account_rows:
+            if str((fan or {}).get("role") or "").strip().lower() != "investor":
+                continue
+            if str(fan.get("advisor_name") or "").strip() != username:
+                continue
+            if str(fan.get("tenant_slug") or "").strip().lower() == target_slug:
+                continue
+            db.execute(
+                "UPDATE users SET tenant_slug = ?, advisor_name = ?, updated_at = ? WHERE id = ?",
+                (target_slug, username, now, fan.get("id")),
+            )
+            reassigned_fans += 1
+    if repaired_davs or reassigned_fans:
+        db.commit()
+    return {"repaired_davs": repaired_davs, "reassigned_fans": reassigned_fans}
+
+
 def update_user_account(user_id, username, password="", tenant_slug=None, role=None, advisor_name=None, scope_tenant_slug=None):
     """Update account credentials while keeping the existing role and tenant.
 
@@ -5667,26 +5798,37 @@ def update_user_account(user_id, username, password="", tenant_slug=None, role=N
     normalized_scope_tenant = str(scope_tenant_slug or "").strip().lower()
     if normalized_scope_tenant and str(target.get("tenant_slug") or "").strip().lower() != normalized_scope_tenant:
         raise ValueError("tenant_user_not_found")
-    if normalized_tenant:
-        tenant = get_tenant_by_slug(normalized_tenant)
-        if not tenant:
-            raise ValueError("tenant_not_found")
     normalized_role = str(role or target.get("role") or "investor").strip().lower()
     configured_roles = normalize_role_capabilities(get_site_config().get("role_capabilities"))
     if normalized_role not in configured_roles:
         raise ValueError("invalid_user_role")
     if normalized_scope_tenant and normalized_role != "investor":
         raise ValueError("tenant_user_not_found")
-    # Platform administrators are not owned by a tenant. For investor/DAV
-    # accounts, callers must pass the selected tenant explicitly; preserving
-    # an old tenant here would make an account role change ambiguous.
-    resolved_tenant = "" if normalized_role == "admin" else (normalized_tenant or str(target.get("tenant_slug") or "").strip().lower())
-    resolved_advisor = str(advisor_name if advisor_name is not None else target.get("advisor_name") or "").strip()[:120]
-    if resolved_tenant and normalized_role != "admin":
-        resolved_advisor = str(get_tenant_by_slug(resolved_tenant).get("advisor") or resolved_advisor).strip()[:120]
     existing = get_user_by_username(normalized_username)
     if existing and int(existing.get("id") or 0) != target_id:
         raise ValueError("username_exists")
+    if normalized_role == "dav":
+        previous_username = str(target.get("username") or "").strip()
+        existing_tenant = str(target.get("tenant_slug") or "").strip().lower() if str(target.get("role") or "").strip().lower() == "dav" else ""
+        existing_tenant_owner = str(get_tenant_by_slug(existing_tenant).get("advisor") or "").strip() if existing_tenant else ""
+        if existing_tenant and existing_tenant_owner == previous_username:
+            resolved_tenant = _rename_dav_tenant_owner(existing_tenant, previous_username, normalized_username)
+        else:
+            resolved_tenant = provision_dav_tenant(normalized_username)
+    elif normalized_role == "admin":
+        resolved_tenant = ""
+    else:
+        resolved_tenant = normalized_tenant or str(target.get("tenant_slug") or "").strip().lower()
+        if not resolved_tenant:
+            raise ValueError("tenant_required")
+        tenant = get_tenant_by_slug(resolved_tenant)
+        if str(tenant.get("slug") or "").strip().lower() != resolved_tenant:
+            raise ValueError("tenant_not_found")
+    resolved_advisor = str(advisor_name if advisor_name is not None else target.get("advisor_name") or "").strip()[:120]
+    if resolved_tenant and normalized_role == "investor":
+        resolved_advisor = str(get_tenant_by_slug(resolved_tenant).get("advisor") or resolved_advisor).strip()[:120]
+    elif normalized_role in {"dav", "admin"}:
+        resolved_advisor = ""
     normalized_password = str(password or "").strip()
     if normalized_password and len(normalized_password) < 6:
         raise ValueError("password_too_short")
@@ -5896,7 +6038,7 @@ def create_user(payload):
     username = str(source.get("username") or "").strip()
     password = str(source.get("password") or "").strip()
     role = str(source.get("role") or "investor").strip().lower()
-    tenant_slug = str(source.get("tenant_slug") or get_default_tenant_slug()).strip().lower()
+    tenant_slug = str(source.get("tenant_slug") or "").strip().lower()
     advisor_name = str(source.get("advisor_name") or "").strip()
     phone = str(source.get("phone") or "").strip()
     status = str(source.get("status") or "active").strip().lower()
@@ -5922,6 +6064,18 @@ def create_user(payload):
         existing = get_user_by_wechat_identity(openid=wechat_openid, unionid=wechat_unionid)
         if existing:
             raise ValueError("wechat_identity_bound")
+    if role == "dav":
+        tenant_slug = provision_dav_tenant(username)
+        advisor_name = ""
+    elif role == "admin":
+        tenant_slug = ""
+        advisor_name = ""
+    else:
+        tenant_slug = tenant_slug or get_default_tenant_slug()
+        tenant = get_tenant_by_slug(tenant_slug)
+        if str(tenant.get("slug") or "").strip().lower() != tenant_slug:
+            raise ValueError("tenant_not_found")
+        advisor_name = str(tenant.get("advisor") or advisor_name).strip()[:120]
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     paid_sample_marked_at = now if role == "investor" and is_paid_sample else ""
     wechat_bound_at = now if wechat_openid or wechat_unionid else ""
@@ -6053,7 +6207,8 @@ def ensure_default_users():
                 user = create_user(default_admin)
                 if user:
                     created.append(user)
-        return {"created": created, "skipped": skipped}
+        reconciliation = reconcile_dav_tenant_relationships(existing_users)
+        return {"created": created, "skipped": skipped, "relationship_reconciliation": reconciliation}
 
     for item in DEFAULT_USERS:
         try:
@@ -6067,7 +6222,8 @@ def ensure_default_users():
                     "reason": str(exc),
                 }
             )
-    return {"created": created, "skipped": skipped}
+    reconciliation = reconcile_dav_tenant_relationships(created)
+    return {"created": created, "skipped": skipped, "relationship_reconciliation": reconciliation}
 
 
 USER_IMPORT_TEMPLATE_FIELDS = [

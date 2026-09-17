@@ -64,6 +64,30 @@ def _resolve_authenticated_watchlist_comment_actor(requested_tenant_slug=""):
     }, None
 
 
+def _resolve_kol_tenant_access():
+    """Resolve the tenant for KOL fan operations from the signed-in account.
+
+    Every fan list and its derived statistics use ``tenant_slug`` as the
+    isolation key. Never allow a DAv to choose another tenant through a query
+    parameter; administrators retain cross-tenant operational access.
+    """
+    requested_slug = str(request.args.get("tenant") or request.args.get("tenant_slug") or "").strip().lower()
+    tenant = get_tenant_by_slug(requested_slug) if requested_slug else get_active_tenant_from_request()
+    tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
+    if not tenant_slug or (requested_slug and requested_slug != tenant_slug):
+        return None, (jsonify({"ok": False, "error": "tenant_not_found"}), 404)
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if role == "admin":
+        return tenant, None
+    if role != "dav":
+        return None, (jsonify({"ok": False, "error": "dav_required"}), 403)
+    if not current_tenant or current_tenant != tenant_slug:
+        return None, (jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403)
+    return tenant, None
+
+
 def _database_release_operation_password():
     return str(os.environ.get("DATABASE_RELEASE_OPERATION_PASSWORD") or "536953")
 
@@ -731,6 +755,11 @@ def api_watchlist_comment_analytics(tenant_slug):
     normalized_tenant = str(tenant_slug or "").strip().lower()
     if not normalized_tenant:
         return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if role != "admin" and (role != "dav" or current_tenant != normalized_tenant):
+        return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
     try:
         analytics = build_watchlist_comment_analytics(normalized_tenant)
     except Exception as exc:
@@ -1985,7 +2014,9 @@ def api_admin_users_template():
 
 @app.route("/api/kol/users")
 def api_kol_users():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     try:
         summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
     except Exception as exc:
@@ -1997,7 +2028,9 @@ def api_kol_users():
 
 @app.route("/api/kol/users/settings", methods=["GET", "POST"])
 def api_kol_user_settings():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     if request.method == "GET":
         try:
             settings = load_tenant_fan_ops_settings(tenant["slug"])
@@ -2022,7 +2055,9 @@ def api_kol_user_settings():
 
 @app.route("/api/kol/users", methods=["POST"])
 def api_create_kol_user():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     body = request.get_json(silent=True) or {}
     try:
         payload = normalize_user_payload(body, context=build_user_import_context(scope="kol", tenant_slug=tenant["slug"]))
@@ -2040,7 +2075,9 @@ def api_update_kol_user_account():
 
 @app.route("/api/kol/users/labels", methods=["POST"])
 def api_update_kol_user_labels():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     body = request.get_json(silent=True) or {}
     try:
         result = update_tenant_user_labels(
@@ -2061,7 +2098,9 @@ def api_update_kol_user_labels():
 
 @app.route("/api/kol/users/status", methods=["POST"])
 def api_update_kol_user_status():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     body = request.get_json(silent=True) or {}
     current_user = get_current_authenticated_user() or {}
     current_role = str(current_user.get("role") or "").strip().lower()
@@ -2084,7 +2123,9 @@ def api_update_kol_user_status():
 
 @app.route("/api/kol/business-analytics")
 def api_kol_business_analytics():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     try:
         users = [user for user in list_users(tenant_slug=tenant["slug"]) if user.get("role") == "investor"]
         ops_stats = build_tenant_ops_stats(tenant=tenant, investor_users=users)
@@ -2098,7 +2139,9 @@ def api_kol_business_analytics():
 
 @app.route("/api/kol/users/import", methods=["POST"])
 def api_import_kol_users():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     body = request.get_json(silent=True) or {}
     users = body.get("users", [])
     created, skipped = bulk_create_users(
@@ -2111,7 +2154,9 @@ def api_import_kol_users():
 
 @app.route("/api/kol/users/parse-names", methods=["POST"])
 def api_parse_kol_user_names():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     try:
         result = parse_user_names_with_llm(
             (request.get_json(silent=True) or {}).get("text"),
@@ -2129,7 +2174,9 @@ def api_parse_kol_user_names():
 
 @app.route("/api/kol/users/import-names", methods=["POST"])
 def api_import_kol_user_names():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     names = (request.get_json(silent=True) or {}).get("names")
     current_user = get_current_authenticated_user() or {}
     current_role = str(current_user.get("role") or "").strip().lower()
@@ -2154,7 +2201,9 @@ def api_import_kol_user_names():
 
 @app.route("/api/kol/users/import-csv", methods=["POST"])
 def api_import_kol_users_csv():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     try:
         rows = parse_user_csv_import(
             request.files.get("file"),
@@ -2172,7 +2221,9 @@ def api_import_kol_users_csv():
 
 @app.route("/api/kol/users/template.csv")
 def api_kol_users_template():
-    tenant = get_active_tenant_from_request()
+    tenant, denied = _resolve_kol_tenant_access()
+    if denied:
+        return denied
     content = build_user_import_template_csv(scope="kol", tenant_slug=tenant["slug"])
     return app.response_class(
         content,

@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -70,10 +71,11 @@ class KolBusinessAnalyticsBddTest(unittest.TestCase):
         self.assertEqual(payload["rows"][0]["source"], "付费用户标注 × 注册单价")
 
     def test_given_channel_labeled_users_when_channel_payload_builds_then_no_demo_metrics_are_used(self):
+        current_month = datetime.now().strftime("%Y-%m")
         users = [
             {
                 "role": "investor", "status": "active", "source_label": "微信社群",
-                "created_at": "2026-08-03 10:00:00", "is_paid_sample": True,
+                "created_at": f"{current_month}-03 10:00:00", "is_paid_sample": True,
                 "tenant_slug": "demo",
             },
             {

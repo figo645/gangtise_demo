@@ -979,16 +979,32 @@ def api_save_tenant_dashboard(tenant_slug):
 
 @app.route("/api/tenant/<tenant_slug>/fan-stock-observation", methods=["GET", "POST"])
 def api_tenant_fan_stock_observation(tenant_slug):
-    tenant = get_tenant_by_slug(tenant_slug)
-    if not tenant or tenant["slug"] != tenant_slug:
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(normalized_tenant)
+    if not tenant or tenant["slug"] != normalized_tenant:
         return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    current_user = get_current_authenticated_user() or {}
+    current_role = str(current_user.get("role") or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if current_role == "admin":
+        can_read_aggregate = True
+    elif current_role == "dav" and current_tenant == normalized_tenant:
+        can_read_aggregate = True
+    elif request.method == "POST" and current_role == "investor" and current_tenant == normalized_tenant:
+        can_read_aggregate = False
+    else:
+        return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
     recorded_payload = None
     if request.method == "POST":
         body = request.get_json(silent=True) or {}
-        actor = resolve_hermes_actor_context(body, tenant_slug=tenant_slug, user_role=body.get("user_role"))
+        actor = resolve_hermes_actor_context(
+            {"user_role": current_role, "user_profile_id": current_user.get("username")},
+            tenant_slug=normalized_tenant,
+            user_role=current_role,
+        )
         try:
             recorded_payload = record_fan_stock_observation_event(
-                tenant_slug=tenant_slug,
+                tenant_slug=normalized_tenant,
                 user_profile_id=actor.get("profile_id") or "",
                 user_role=actor.get("user_role") or "",
                 stock_code=body.get("stock_code"),
@@ -1001,6 +1017,8 @@ def api_tenant_fan_stock_observation(tenant_slug):
             if not is_db_unavailable_error(exc):
                 raise
             app.logger.warning("Database unavailable while recording fan stock observation event, using fallback payload")
+    if not can_read_aggregate:
+        return jsonify({"ok": True, "recorded": bool(recorded_payload)})
     try:
         payload = build_fan_stock_observation_payload(tenant)
     except Exception as exc:
@@ -1008,13 +1026,7 @@ def api_tenant_fan_stock_observation(tenant_slug):
             raise
         app.logger.warning("Database unavailable while building fan stock observation payload, using fallback data")
         payload = (build_tenant_dashboard_payload_fallback(tenant) or {}).get("fan_stock_observation") or {}
-    return jsonify(
-        {
-            "ok": True,
-            "recorded": bool(recorded_payload),
-            "fan_stock_observation": payload,
-        }
-    )
+    return jsonify({"ok": True, "recorded": bool(recorded_payload), "fan_stock_observation": payload})
 
 
 @app.route("/api/tenant/<tenant_slug>/smart-indicators", methods=["GET", "POST"])

@@ -11,12 +11,25 @@ def _quiz_user():
     return user, None
 
 
+def _quiz_tenant_for_user(user, requested_tenant=""):
+    """Keep quiz attempts and the DAv's quiz statistics in the user's tenant."""
+    role = str((user or {}).get("role") or "").strip().lower()
+    account_tenant = str((user or {}).get("tenant_slug") or "").strip().lower()
+    requested = str(requested_tenant or "").strip().lower()
+    if role != "admin" and requested and requested != account_tenant:
+        raise ValueError("tenant_scope_forbidden")
+    return requested if role == "admin" and requested else account_tenant
+
+
 @app.route("/api/quiz/daily", methods=["GET"])
 def api_quiz_daily():
     user, denied = _quiz_user()
     if denied:
         return denied
-    tenant_slug = str(request.args.get("tenant") or user.get("tenant_slug") or "").strip().lower()
+    try:
+        tenant_slug = _quiz_tenant_for_user(user, request.args.get("tenant"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 403
     try:
         return jsonify({"ok": True, **get_daily_quiz_payload(user, tenant_slug)})
     except Exception:
@@ -30,7 +43,10 @@ def api_quiz_start():
     if denied:
         return denied
     body = request.get_json(silent=True) or {}
-    tenant_slug = str(body.get("tenant_slug") or user.get("tenant_slug") or "").strip().lower()
+    try:
+        tenant_slug = _quiz_tenant_for_user(user, body.get("tenant_slug"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 403
     quiz_date = str(body.get("quiz_date") or date.today().isoformat())
     try:
         return jsonify({"ok": True, "attempt": start_quiz_attempt(user, tenant_slug, quiz_date)})
@@ -45,7 +61,10 @@ def api_quiz_submit():
     if denied:
         return denied
     body = request.get_json(silent=True) or {}
-    tenant_slug = str(body.get("tenant_slug") or user.get("tenant_slug") or "").strip().lower()
+    try:
+        tenant_slug = _quiz_tenant_for_user(user, body.get("tenant_slug"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 403
     quiz_date = str(body.get("quiz_date") or date.today().isoformat())
     try:
         return jsonify({"ok": True, "result": submit_quiz_attempt(user, tenant_slug, quiz_date, body.get("answers"), body.get("attempt_id"))})
