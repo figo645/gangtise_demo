@@ -1925,12 +1925,12 @@ def build_gangtise_market_runtime_diagnostic(probe_security_code="600519.SH"):
     }
 
 
-def _load_gangtise_intraday_snapshot(security_code, trade_date):
+def _load_gangtise_intraday_snapshot(security_code, trade_date, ttl_seconds=15 * 60):
     effective_date = str(trade_date or "").strip()
     if not effective_date:
         return None
     cache_key = f"{str(security_code or '').strip().upper()}:{effective_date}"
-    cached = _load_watchlist_cache("watchlist_intraday_cache", cache_key, 15 * 60)
+    cached = _load_watchlist_cache("watchlist_intraday_cache", cache_key, ttl_seconds)
     if not isinstance(cached, dict):
         return None
     cached_points = cached.get("points") if isinstance(cached.get("points"), list) else []
@@ -1948,11 +1948,11 @@ def _load_gangtise_intraday_snapshot(security_code, trade_date):
     }
 
 
-def fetch_gangtise_intraday_series(security_code, token="", trade_date="", limit=600, timeout=30, force_refresh=False):
+def fetch_gangtise_intraday_series(security_code, token="", trade_date="", limit=600, timeout=30, force_refresh=False, cache_ttl_seconds=15 * 60):
     effective_date = str(trade_date or _current_cn_market_date().isoformat()).strip()
     cache_key = f"{str(security_code or '').strip().upper()}:{effective_date}"
     if not force_refresh:
-        cached = _load_gangtise_intraday_snapshot(security_code, effective_date)
+        cached = _load_gangtise_intraday_snapshot(security_code, effective_date, cache_ttl_seconds)
         if cached:
             return cached
     payload = {
@@ -4435,7 +4435,7 @@ DEFAULT_ADMIN_TASKS = [
         "task_name": "Gangtise 市场与行业指标同步",
         "task_group": "indicator",
         "task_type": "sync_market_snapshot",
-        "description": "每日 09:30、12:00、14:00、15:30 仅采集各大V已发布的标准市场指数与申万一级行业面板指标去重并集：A股及 .SWI 使用日K，海外指数使用固定 EDB ID；个股 K 线与分时仅按需获取，写入 PostgreSQL 共享快照供全部租户展示。",
+        "description": "每日 09:30、12:00、14:00、15:30 执行共享兜底同步；盘中页面读取发现快照超过 5 分钟时，仅排队一次按需共享刷新。仅采集各大V已发布的标准市场指数与申万一级行业（.SWI）面板指标去重并集，写入 PostgreSQL 供全部租户复用。",
         "schedule_type": "daily",
         "schedule_value": "09:30,12:00,14:00,15:30",
         "enabled": 1,
@@ -6891,6 +6891,9 @@ def _build_market_index_snapshot_item(indicator_code, series_result):
         "change": round(change, 2),
         "change_pct": round(change / previous_value * 100, 2) if previous_value else 0,
         "updated_at": str(latest.get("date") or "").strip(),
+        "quote_mode": str((series_result or {}).get("quote_mode") or "daily_close"),
+        "realtime": bool((series_result or {}).get("realtime")),
+        "intraday_message": str((series_result or {}).get("intraday_message") or ""),
         "available": True,
         "message": "",
     }
@@ -7025,6 +7028,7 @@ def build_macro_economic_payload(tenant_slug=""):
 
 _market_snapshot_refresh_lock = threading.Lock()
 _market_snapshot_refresh_running = False
+_market_snapshot_refresh_last_started_at = 0.0
 _market_snapshot_selection_refresh_lock = threading.Lock()
 _market_snapshot_selection_refresh_running = False
 _market_snapshot_pending_market_codes = set()
@@ -7058,11 +7062,69 @@ def fetch_gangtise_market_index_history(indicator_code, start_date, end_date):
             "/application/open-quote/kline/daily", entry.get("security_code"),
             start_date=start_date, end_date=end_date, limit=240, timeout=30,
         )
-        return {**result, "provider": "Gangtise OpenAPI", "source_meta": {"type": "index_kline", "path": "/application/open-quote/kline/daily", "securityCode": entry.get("security_code")}}
+        result = _with_gangtise_intraday_market_quote(result, entry.get("security_code"))
+        return {**result, "provider": "Gangtise OpenAPI", "source_meta": result.get("source_meta") or {"type": "index_kline", "path": "/application/open-quote/kline/daily", "securityCode": entry.get("security_code")}}
     indicator_id = str(entry.get("preferred_indicator_id") or "").strip()
     if entry.get("query_kind") == "edb_fixed" and indicator_id:
         return _fetch_gangtise_fixed_edb_series(indicator_id, start_date, end_date)
     return {"ok": False, "provider": "Gangtise OpenAPI", "points": [], "message": "未配置报告验证的市场指数取数路径", "source_meta": {}}
+
+
+def _with_gangtise_intraday_market_quote(daily_result, security_code):
+    """Overlay today's latest minute quote on a daily series during A-share hours.
+
+    The daily endpoint can legitimately lag until the post-close update. It is
+    retained for yesterday's close, while the minute endpoint supplies today's
+    latest price. If minutes are unsupported for a symbol, callers retain the
+    verified daily close and explicitly mark it as non-realtime.
+    """
+    result = copy.deepcopy(daily_result) if isinstance(daily_result, dict) else {}
+    points = list(result.get("points") or [])
+    normalized_code = str(security_code or "").strip().upper()
+    is_cn_quote = normalized_code.endswith((".SH", ".SZ", ".SWI"))
+    if not is_cn_quote or not is_cn_stock_market_open():
+        result["quote_mode"] = "daily_close"
+        result["realtime"] = False
+        return result
+    trade_date = _current_cn_market_date().isoformat()
+    intraday = fetch_gangtise_intraday_series(
+        normalized_code,
+        trade_date=trade_date,
+        limit=600,
+        timeout=30,
+        cache_ttl_seconds=MARKET_SNAPSHOT_ON_DEMAND_FRESHNESS_SECONDS,
+    )
+    minute_points = list(intraday.get("points") or [])
+    if not intraday.get("available") or not minute_points:
+        result["quote_mode"] = "daily_close_fallback"
+        result["realtime"] = False
+        result["intraday_message"] = str(intraday.get("message") or "分钟行情暂不可用")[:240]
+        return result
+    latest = minute_points[-1]
+    latest_value = numeric_value(latest.get("value"))
+    if latest_value is None:
+        result["quote_mode"] = "daily_close_fallback"
+        result["realtime"] = False
+        result["intraday_message"] = "分钟行情缺少最新价"
+        return result
+    # Replace a provider's partial daily row, if one exists, so the preceding
+    # point remains the prior close used for today's change calculation.
+    prior_points = [
+        point for point in points
+        if str(point.get("date") or "")[:10] != trade_date
+    ]
+    prior_points.append({"date": str(latest.get("date") or ""), "close": round(latest_value, 2)})
+    result["points"] = prior_points
+    result["ok"] = len(prior_points) >= 2
+    result["quote_mode"] = "intraday_minute"
+    result["realtime"] = True
+    result["intraday_updated_at"] = str(latest.get("date") or "")
+    result["source_meta"] = {
+        "type": "intraday_minute_with_daily_previous_close",
+        "path": "/application/open-quote/kline/minute",
+        "securityCode": normalized_code,
+    }
+    return result
 
 
 def _resolve_shared_market_snapshot_selection():
@@ -7113,6 +7175,7 @@ def _fetch_gangtise_sector_overview(start_date, end_date, sector_names=None):
             "/application/open-quote/kline/daily", security_code,
             start_date=start_date, end_date=end_date, limit=240, timeout=30,
         )
+        series = _with_gangtise_intraday_market_quote(series, security_code)
         points = list(series.get("points") or [])
         if not series.get("ok") or len(points) < 2:
             missing.append(f"{sector}({str(series.get('message') or '无有效日K')[:80]})")
@@ -7129,7 +7192,10 @@ def _fetch_gangtise_sector_overview(start_date, end_date, sector_names=None):
             "change_pct": round((value - previous_value) / previous_value * 100, 2) if previous_value else 0,
             "updated_at": str(latest.get("date") or ""), "available": True,
             "data_source": "Gangtise OpenAPI",
-            "source_meta": {"type": "index_kline", "path": "/application/open-quote/kline/daily", "securityCode": security_code},
+            "quote_mode": str(series.get("quote_mode") or "daily_close"),
+            "realtime": bool(series.get("realtime")),
+            "intraday_message": str(series.get("intraday_message") or ""),
+            "source_meta": series.get("source_meta") or {"type": "index_kline", "path": "/application/open-quote/kline/daily", "securityCode": security_code},
         })
     return items, (["未返回有效申万行业：" + "、".join(missing[:10])] if missing else [])
 
@@ -7200,12 +7266,15 @@ def sync_market_snapshot(force=False, selection=None, merge_existing=False):
 
 
 def request_market_snapshot_refresh():
-    """Start one controlled backend refresh when a required cache is missing."""
-    global _market_snapshot_refresh_running
+    """Queue one process-local shared refresh; page reads remain non-blocking."""
+    global _market_snapshot_refresh_running, _market_snapshot_refresh_last_started_at
     with _market_snapshot_refresh_lock:
         if _market_snapshot_refresh_running:
-            return False
+            return {"queued": True, "started": False}
+        if time.time() - _market_snapshot_refresh_last_started_at < MARKET_SNAPSHOT_ON_DEMAND_FRESHNESS_SECONDS:
+            return {"queued": False, "started": False, "throttled": True}
         _market_snapshot_refresh_running = True
+        _market_snapshot_refresh_last_started_at = time.time()
 
     def worker():
         global _market_snapshot_refresh_running
@@ -7219,7 +7288,60 @@ def request_market_snapshot_refresh():
                 _market_snapshot_refresh_running = False
 
     threading.Thread(target=worker, name="market-snapshot-refresh", daemon=True).start()
-    return True
+    return {"queued": True, "started": True}
+
+
+def _market_snapshot_freshness(payload, now=None):
+    """Return UI-safe freshness metadata without mutating persisted payloads."""
+    current = now or datetime.now()
+    updated_at = str((payload or {}).get("updated_at") or "").strip()
+    captured_at = _parse_market_datetime(updated_at)
+    age_seconds = None
+    if captured_at is not None:
+        age_seconds = max(0, int((current.replace(tzinfo=None) - captured_at.replace(tzinfo=None)).total_seconds()))
+    market_open = is_cn_stock_market_open(current)
+    trade_date = _current_cn_market_date().isoformat()
+    domestic_quote_stale = False
+    if market_open:
+        for item in (payload or {}).get("items") or []:
+            if not isinstance(item, dict) or item.get("available") is False:
+                continue
+            code = str(item.get("security_code") or item.get("code") or "").upper()
+            quote_date = str(item.get("updated_at") or "")[:10]
+            if code.endswith((".SH", ".SZ", ".SWI")) and quote_date != trade_date:
+                domestic_quote_stale = True
+                break
+    needs_refresh = not updated_at or (market_open and (
+        age_seconds is None
+        or age_seconds >= MARKET_SNAPSHOT_ON_DEMAND_FRESHNESS_SECONDS
+        or domestic_quote_stale
+    ))
+    return {
+        "updated_at": updated_at,
+        "age_seconds": age_seconds,
+        "market_open": market_open,
+        "domestic_quote_stale": domestic_quote_stale,
+        "needs_refresh": needs_refresh,
+    }
+
+
+def _apply_market_snapshot_on_demand_refresh(payload):
+    """Expose cached data immediately and queue an in-process refresh if stale."""
+    result = copy.deepcopy(payload) if isinstance(payload, dict) else {"ok": True, "items": []}
+    freshness = _market_snapshot_freshness(result)
+    result["freshness"] = freshness
+    if not freshness["needs_refresh"]:
+        return result
+    queued = request_market_snapshot_refresh()
+    result["refreshing"] = True
+    result["refresh_reason"] = "cache_missing" if not freshness["updated_at"] else "on_demand_stale"
+    result["refresh_after_ms"] = 3000
+    result["refresh_queued"] = bool(queued.get("queued"))
+    # Do not hide a last-known good quote merely because a new fetch is queued.
+    if result.get("items"):
+        result["stale"] = True
+        result["message"] = "正在后台刷新最新行情，当前展示最近一次成功同步的数据。"
+    return result
 
 
 def request_market_snapshot_selection_refresh(market_codes=None, sector_names=None):
@@ -7303,7 +7425,9 @@ def build_market_overview_payload(tenant_slug=""):
         and str(cached.get("source") or "").lower() == "gangtise openapi"
         and cached.get("snapshot_version") == 10
     ):
-        return _apply_tenant_market_display_selection(cached, tenant_slug, "market")
+        return _apply_market_snapshot_on_demand_refresh(
+            _apply_tenant_market_display_selection(cached, tenant_slug, "market")
+        )
     stale = _load_market_snapshot_payload("market_overview", cache_key, 0)
     if stale is None:
         stale = _load_watchlist_cache("market_overview", cache_key, 0)
@@ -7319,8 +7443,12 @@ def build_market_overview_payload(tenant_slug=""):
         preserved["items"] = []
         preserved["message"] = "市场快照已超过一个交易日未同步，请检查 Gangtise 市场与行业指标同步任务。"
         preserved["last_success_at"] = str(stale.get("updated_at") or "")
-        return _apply_tenant_market_display_selection(preserved, tenant_slug, "market")
-    return _apply_tenant_market_display_selection({"ok": True, "items": [], "source": "Gangtise OpenAPI", "refreshing": True, "message": "后台正在同步 Gangtise 市场快照"}, tenant_slug, "market")
+        return _apply_market_snapshot_on_demand_refresh(
+            _apply_tenant_market_display_selection(preserved, tenant_slug, "market")
+        )
+    return _apply_market_snapshot_on_demand_refresh(
+        _apply_tenant_market_display_selection({"ok": True, "items": [], "source": "Gangtise OpenAPI", "message": "后台正在同步 Gangtise 市场快照"}, tenant_slug, "market")
+    )
 
 
 SHENWAN_LEVEL1_INDUSTRIES = (
@@ -7347,9 +7475,12 @@ GANGTISE_SHENWAN_LEVEL1_CODES = {
     "美容护理": "801980.SWI",
 }
 
-# Gangtise snapshots are scheduled four times per trading day. They must stay
-# readable between slots and through the overnight close; the UI carries the
-# exact source timestamp so users can judge freshness without losing data.
+# The scheduled task is a baseline only. During an open A-share session, an
+# H5/Web read can enqueue one shared refresh when the snapshot is older than
+# five minutes. The read itself never waits for, or directly calls, Gangtise.
+# Keep the longer TTL so a transient provider failure does not turn a usable
+# previous quote into an empty dashboard.
+MARKET_SNAPSHOT_ON_DEMAND_FRESHNESS_SECONDS = 5 * 60
 MARKET_SECTOR_OVERVIEW_CACHE_TTL_SECONDS = 20 * 60 * 60
 MARKET_SECTOR_SNAPSHOT_REFRESH_TTL_SECONDS = 20 * 60 * 60
 MARKET_SNAPSHOT_CACHE_TTL_SECONDS = 20 * 60 * 60
@@ -7479,7 +7610,9 @@ def build_market_sector_overview_payload(force_refresh=False, tenant_slug=""):
             cached = _load_watchlist_cache("market_sector_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
         if isinstance(cached, dict) and isinstance(cached.get("items"), list) and cached["items"]:
             if cached.get("snapshot_version") == 10 and str(cached.get("source") or "").lower() == "gangtise openapi":
-                return _apply_tenant_market_display_selection(cached, tenant_slug, "sector")
+                return _apply_market_snapshot_on_demand_refresh(
+                    _apply_tenant_market_display_selection(cached, tenant_slug, "sector")
+                )
     stale = _load_market_snapshot_payload("market_sector_overview", cache_key, 0)
     if stale is None:
         stale = _load_watchlist_cache("market_sector_overview", cache_key, 0)
@@ -7491,8 +7624,12 @@ def build_market_sector_overview_payload(force_refresh=False, tenant_slug=""):
             preserved["items"] = []
             preserved["message"] = "行业快照已超过一个交易日未同步，请检查 Gangtise 市场与行业指标同步任务。"
             preserved["last_success_at"] = str(stale.get("updated_at") or "")
-            return _apply_tenant_market_display_selection(preserved, tenant_slug, "sector")
-    return _apply_tenant_market_display_selection({"ok": True, "items": [], "total": 0, "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "Gangtise OpenAPI", "refreshing": True, "message": "后台正在同步 Gangtise 申万行业快照"}, tenant_slug, "sector")
+            return _apply_market_snapshot_on_demand_refresh(
+                _apply_tenant_market_display_selection(preserved, tenant_slug, "sector")
+            )
+    return _apply_market_snapshot_on_demand_refresh(
+        _apply_tenant_market_display_selection({"ok": True, "items": [], "total": 0, "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "Gangtise OpenAPI", "message": "后台正在同步 Gangtise 申万行业快照"}, tenant_slug, "sector")
+    )
 
 
 def normalize_watchlist_indicator_code(value):

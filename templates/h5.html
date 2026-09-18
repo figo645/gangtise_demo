@@ -8128,6 +8128,9 @@ function renderFeaturedInsightCard() {
 function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 Gangtise OpenAPI 共享快照', syncTime = '', stale = false) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false);
   const syncLabel = syncTime ? `${stale ? '最近一次成功同步' : '数据同步时间'}：${syncTime}` : '数据同步时间：暂无同步记录';
+  const quoteLabel = rows.some((item) => item.quote_mode === 'daily_close_fallback')
+    ? '盘中分钟行情暂不可用，当前展示上一交易日收盘数据'
+    : (rows.some((item) => item.realtime) ? '盘中分钟行情' : '最近收盘行情');
   if (!rows.length) return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div class="feed-market-economy-desc">暂无可用的最新数据</div><div class="feed-market-sync-time">${escapeHtml(syncLabel)}</div></div>`;
   const chartRows = rows.slice().sort((left, right) => {
     return Number(right.change_pct || 0) - Number(left.change_pct || 0);
@@ -8137,7 +8140,7 @@ function renderFeedMarketEconomy(items, title, chartId, limit = 10, description 
   }));
   const safeChartId = chartId || `feed-market-chart-${Math.random().toString(36).slice(2, 8)}`;
   window.setTimeout(() => renderFeedMarketEconomyChart(safeChartId, chartRows), 0);
-  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(syncLabel)}</div></div>`;
+  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(quoteLabel)} · ${escapeHtml(syncLabel)}</div></div>`;
 }
 
 function renderFeedMarketEconomyChart(chartId, rows) {
@@ -8217,7 +8220,8 @@ function renderMarketQuoteCards(items, type) {
       ? `${arrow} ${rawChange > 0 ? '+' : ''}${rawChange.toFixed(2)}${hasPct ? ` (${rawChange > 0 ? '+' : ''}${pct.toFixed(2)}%)` : ''}`
       : (hasPct ? `${arrow} ${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : '暂无涨跌数据');
     const code = item.code || item.security_code || (type === 'sector' ? '申万一级行业' : item.market || '--');
-    return `<article class="market-quote-card"><div class="market-quote-name">${escapeHtml(name || '--')}</div><div class="market-quote-code">${escapeHtml(code)}</div><div class="market-quote-value">${valueText}</div><div class="market-quote-change ${direction}">${changeText}</div></article>`;
+    const quoteLabel = item.quote_mode === 'daily_close_fallback' ? '上一交易日收盘' : (item.realtime ? '盘中分钟行情' : '最近收盘');
+    return `<article class="market-quote-card"><div class="market-quote-name">${escapeHtml(name || '--')}</div><div class="market-quote-code">${escapeHtml(code)}</div><div class="market-quote-value">${valueText}</div><div class="market-quote-change ${direction}">${changeText}</div><div style="margin-top:5px;font-size:10px;color:var(--gray-400)">${escapeHtml(quoteLabel)} · ${escapeHtml(item.updated_at || '--')}</div></article>`;
   }).join('');
 }
 
@@ -8371,6 +8375,14 @@ async function loadFeedMarketEconomy() {
     const sectors = await sectorResponse.json().catch(() => ({}));
     const overview = await overviewResponse.json().catch(() => ({}));
     renderFeedMarketEconomyPanel(overview, sectors);
+    const retryAfterMs = Math.max(Number(sectors.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
+    if (retryAfterMs && !window.feedMarketOnDemandRetryPending) {
+      window.feedMarketOnDemandRetryPending = true;
+      window.setTimeout(() => {
+        window.feedMarketOnDemandRetryPending = false;
+        loadFeedMarketEconomy();
+      }, retryAfterMs);
+    }
   } catch (error) {
     renderFeedMarketEconomyPanel({}, {});
   }

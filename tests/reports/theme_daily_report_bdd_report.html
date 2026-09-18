@@ -1,0 +1,52 @@
+<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>theme_daily_report BDD 测试报告</title><style>
+body{margin:0;background:#f5f7f7;color:#172326;font:14px/1.65 -apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif}main{max-width:1160px;margin:auto;padding:30px 20px 60px}h1{margin:0 0 6px}h2{font-size:17px;margin:0}.sub{color:#607175}.hero,.panel,.scenario{background:#fff;border:1px solid #d8e2e1;border-radius:8px;padding:18px;margin:14px 0}.hero{background:#172b3a;color:#fff;border:0}.metrics{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}.metric{background:#ffffff16;border:1px solid #ffffff2b;border-radius:6px;padding:10px 14px;min-width:120px}.metric strong{display:block;font-size:23px}.pass{color:#087443}.fail{color:#b42318}.hero .pass{color:#9bf0bd}.hero .fail{color:#ffb2ac}.scenario{border-left:4px solid #087443}.scenario.fail{border-left-color:#b42318}.scenario header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.evidence{background:#eef4f3;color:#52656a;padding:8px 10px;border-radius:4px;overflow-wrap:anywhere}.message{color:#607175}table{width:100%;border-collapse:collapse}th,td{padding:9px 8px;border-bottom:1px solid #e7eded;text-align:left;vertical-align:top}th{background:#edf5f4}code,pre{font:12px ui-monospace,SFMono-Regular,Menlo,monospace}pre{max-height:480px;overflow:auto;background:#172127;color:#e4f0ef;padding:12px;border-radius:4px;white-space:pre-wrap;word-break:break-word}.note{border-left:4px solid #006c69;background:#e7f4f2;padding:12px 14px}details{margin-top:10px}summary{cursor:pointer;font-weight:650}@media(max-width:640px){main{padding:22px 14px}.scenario header{display:block}}
+</style></head><body><main><section class='hero'><h1>Gangtise theme_daily_report BDD 测试报告</h1><div class='sub'>生成时间：2026-09-17T19:35:34+00:00 · 目标日期：2026-09-17 · 主题 ID：121000130</div><div style='margin-top:10px'>总体结果：<b class='fail'>FAIL</b></div><div class='metrics'><div class='metric'>契约场景<strong>4</strong></div><div class='metric'>契约通过<strong class='pass'>4</strong></div><div class='metric'>真实探针<strong>3</strong></div><div class='metric'>真实通过<strong class='pass'>0</strong></div><div class='metric'>真实失败<strong class='fail'>3</strong></div></div></section>
+<section class='panel'><h2>测试结论</h2><div class='note'>参考材料确认的主题日报接口为 <code>/application/open-ai/agent/theme-tracking</code>，请求体为 <code>{themeId,type}</code>，返回正文位于 <code>data.content</code>。接口示例没有日期字段，因此本报告不会把“请求成功”误判为“已获得 2026-09-17”；只有返回中出现可识别的日期并等于目标日期，才能完成日期断言。内容长度按最多 1000 字进行展示截断，原始响应不在本探针中发布。</div></section>
+<section class='panel'><h2>Feature: 获取主题日报早报、午间报、晚报</h2><article class='scenario fail'><header><h2>晨报 <code>type=[morning]</code></h2><b>FAIL</b></header><p><strong>When</strong> POST <code>/application/open-ai/agent/theme-tracking</code>，payload 为 <code>{"themeId":"121000130","type":["morning"]}</code></p><p><strong>Then</strong> HTTP 200、业务码 <code>000000</code>、<code>data.content</code> 非空；目标日期：<code>2026-09-17</code>。</p><div class='evidence'>HTTP 0 · 17 ms · provider_date=-- · content_chars=0</div><p class='message'>Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known</p><details><summary>响应摘要</summary><pre>{
+  &quot;period&quot;: &quot;morning&quot;,
+  &quot;label&quot;: &quot;晨报&quot;,
+  &quot;status&quot;: &quot;FAIL&quot;,
+  &quot;http_status&quot;: 0,
+  &quot;duration_ms&quot;: 17,
+  &quot;provider_date&quot;: &quot;&quot;,
+  &quot;content_chars&quot;: 0,
+  &quot;content_preview&quot;: &quot;&quot;,
+  &quot;response_keys&quot;: [
+    &quot;duration_ms&quot;,
+    &quot;http_status&quot;,
+    &quot;message&quot;
+  ],
+  &quot;message&quot;: &quot;Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known&quot;
+}</pre></details></article><article class='scenario fail'><header><h2>午间报 <code>type=[noon]</code></h2><b>FAIL</b></header><p><strong>When</strong> POST <code>/application/open-ai/agent/theme-tracking</code>，payload 为 <code>{"themeId":"121000130","type":["noon"]}</code></p><p><strong>Then</strong> HTTP 200、业务码 <code>000000</code>、<code>data.content</code> 非空；目标日期：<code>2026-09-17</code>。</p><div class='evidence'>HTTP 0 · 4 ms · provider_date=-- · content_chars=0</div><p class='message'>Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known</p><details><summary>响应摘要</summary><pre>{
+  &quot;period&quot;: &quot;noon&quot;,
+  &quot;label&quot;: &quot;午间报&quot;,
+  &quot;status&quot;: &quot;FAIL&quot;,
+  &quot;http_status&quot;: 0,
+  &quot;duration_ms&quot;: 4,
+  &quot;provider_date&quot;: &quot;&quot;,
+  &quot;content_chars&quot;: 0,
+  &quot;content_preview&quot;: &quot;&quot;,
+  &quot;response_keys&quot;: [
+    &quot;duration_ms&quot;,
+    &quot;http_status&quot;,
+    &quot;message&quot;
+  ],
+  &quot;message&quot;: &quot;Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known&quot;
+}</pre></details></article><article class='scenario fail'><header><h2>晚报 <code>type=[night]</code></h2><b>FAIL</b></header><p><strong>When</strong> POST <code>/application/open-ai/agent/theme-tracking</code>，payload 为 <code>{"themeId":"121000130","type":["night"]}</code></p><p><strong>Then</strong> HTTP 200、业务码 <code>000000</code>、<code>data.content</code> 非空；目标日期：<code>2026-09-17</code>。</p><div class='evidence'>HTTP 0 · 5 ms · provider_date=-- · content_chars=0</div><p class='message'>Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known</p><details><summary>响应摘要</summary><pre>{
+  &quot;period&quot;: &quot;night&quot;,
+  &quot;label&quot;: &quot;晚报&quot;,
+  &quot;status&quot;: &quot;FAIL&quot;,
+  &quot;http_status&quot;: 0,
+  &quot;duration_ms&quot;: 5,
+  &quot;provider_date&quot;: &quot;&quot;,
+  &quot;content_chars&quot;: 0,
+  &quot;content_preview&quot;: &quot;&quot;,
+  &quot;response_keys&quot;: [
+    &quot;duration_ms&quot;,
+    &quot;http_status&quot;,
+    &quot;message&quot;
+  ],
+  &quot;message&quot;: &quot;Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known&quot;
+}</pre></details></article></section>
+<section class='panel'><h2>离线契约 BDD 场景</h2><table><thead><tr><th>结果</th><th>场景</th><th>耗时</th><th>断言</th></tr></thead><tbody><tr><td>PASS</td><td>test_given_theme_daily_report_contract_when_requesting_each_period_then_type_is_explicit</td><td>0.001s</td><td>BDD 断言通过</td></tr><tr><td>PASS</td><td>test_given_theme_daily_report_response_when_reading_then_content_is_bounded_to_about_1000_chars</td><td>0.000s</td><td>BDD 断言通过</td></tr><tr><td>PASS</td><td>test_given_theme_daily_report_response_when_validating_then_date_can_only_be_asserted_if_provider_returns_it</td><td>0.000s</td><td>BDD 断言通过</td></tr><tr><td>PASS</td><td>test_given_success_json_when_validating_then_no_sse_parser_is_required</td><td>0.000s</td><td>BDD 断言通过</td></tr></tbody></table></section>
+<section class='panel'><h2>接口与日期说明</h2><p>早报使用 <code>type=[morning]</code>，午间报使用 <code>type=[noon]</code>，晚报使用 <code>type=[night]</code>。当前 API 契约不包含 <code>startDate/endDate</code>，因此若服务端只返回最新一份主题日报，无法通过此接口强制读取历史 9 月 17 日版本；需要上游返回 <code>reportDate/date</code> 或提供历史查询参数后才能严格验收。</p></section></main></body></html>
