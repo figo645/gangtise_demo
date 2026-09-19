@@ -4749,6 +4749,170 @@ def _save_encrypted_app_setting(setting_key, payload):
     _encrypted_setting_decryption_errors.discard(setting_key)
 
 
+OPEN_API_INSIGHT_PUBLISH_SCOPE = "insight.publish"
+OPEN_API_TOKEN_PREFIX = "gti_live_"
+
+
+def _open_api_token_digest(token):
+    return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def get_open_api_dav_identity(tenant_slug):
+    """Return the stable DAV identity used by the tenant-scoped Open API."""
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    # The tenant lookup is intentionally forgiving for browser routes. Public
+    # API authorization must reject its default-tenant fallback.
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
+        return None
+    return {
+        "dav_id": str(tenant.get("id") or f"tenant_{normalized_tenant_slug}").strip(),
+        "tenant_slug": normalized_tenant_slug,
+        "dav_name": str(tenant.get("advisor") or tenant.get("name") or normalized_tenant_slug).strip(),
+        "tenant_name": str(tenant.get("name") or tenant.get("advisor") or normalized_tenant_slug).strip(),
+    }
+
+
+def _normalize_open_api_token_row(row):
+    raw = dict(row or {})
+    scopes = raw.get("scopes_json")
+    if isinstance(scopes, str):
+        try:
+            scopes = json.loads(scopes)
+        except (TypeError, ValueError):
+            scopes = []
+    return {
+        "token_id": str(raw.get("token_id") or ""),
+        "tenant_slug": str(raw.get("tenant_slug") or ""),
+        "token_name": str(raw.get("token_name") or ""),
+        "token_prefix": str(raw.get("token_prefix") or ""),
+        "scopes": [str(item) for item in scopes] if isinstance(scopes, list) else [],
+        "status": str(raw.get("status") or "revoked"),
+        "created_by_username": str(raw.get("created_by_username") or ""),
+        "created_at": str(raw.get("created_at") or ""),
+        "last_used_at": str(raw.get("last_used_at") or ""),
+        "revoked_at": str(raw.get("revoked_at") or ""),
+        "usage_count": int(raw.get("usage_count") or 0),
+    }
+
+
+def list_open_api_tokens(tenant_slug=""):
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    sql = """
+        SELECT token_id, tenant_slug, token_name, token_prefix, scopes_json, status,
+               created_by_username, created_at, last_used_at, revoked_at, usage_count
+        FROM open_api_tokens
+    """
+    params = []
+    if normalized_tenant_slug:
+        sql += " WHERE tenant_slug = ?"
+        params.append(normalized_tenant_slug)
+    sql += " ORDER BY created_at DESC, id DESC"
+    return [_normalize_open_api_token_row(row) for row in get_db().execute(sql, params).fetchall()]
+
+
+def create_open_api_insight_token(tenant_slug, token_name, created_by_username=""):
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    # get_tenant_by_slug deliberately falls back to the default tenant for UI
+    # rendering. Token issuance must never inherit that fallback.
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    normalized_name = re.sub(r"\s+", " ", str(token_name or "").strip())[:80]
+    if not normalized_name:
+        raise ValueError("open_api_token_name_required")
+    raw_token = OPEN_API_TOKEN_PREFIX + secrets.token_urlsafe(32)
+    token_id = "oat_" + secrets.token_urlsafe(12)
+    ciphertext = _gangtise_openapi_credential_fernet().encrypt(raw_token.encode("utf-8")).decode("ascii")
+    row = get_db().execute(
+        """
+        INSERT INTO open_api_tokens
+          (token_id, tenant_slug, token_name, token_prefix, token_digest, token_ciphertext,
+           scopes_json, status, created_by_username)
+        VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, 'active', ?)
+        RETURNING token_id, tenant_slug, token_name, token_prefix, scopes_json, status,
+                  created_by_username, created_at, last_used_at, revoked_at, usage_count
+        """,
+        (
+            token_id, normalized_tenant_slug, normalized_name, raw_token[:16],
+            _open_api_token_digest(raw_token), ciphertext,
+            json.dumps([OPEN_API_INSIGHT_PUBLISH_SCOPE]), str(created_by_username or "").strip(),
+        ),
+    ).fetchone()
+    get_db().commit()
+    return {"token": raw_token, "token_info": _normalize_open_api_token_row(row)}
+
+
+def reveal_open_api_token(token_id):
+    row = get_db().execute(
+        """SELECT token_id, token_digest, token_ciphertext, status
+           FROM open_api_tokens WHERE token_id = ?""",
+        (str(token_id or "").strip(),),
+    ).fetchone()
+    if not row:
+        raise ValueError("open_api_token_not_found")
+    if str(row.get("status") or "") != "active":
+        raise ValueError("open_api_token_revoked")
+    try:
+        token = _gangtise_openapi_credential_fernet().decrypt(str(row["token_ciphertext"]).encode("ascii")).decode("utf-8")
+    except (InvalidToken, UnicodeDecodeError, TypeError, ValueError) as exc:
+        raise ValueError("open_api_token_unreadable") from exc
+    if not compare_digest(_open_api_token_digest(token), str(row.get("token_digest") or "")):
+        raise ValueError("open_api_token_integrity_invalid")
+    return token
+
+
+def revoke_open_api_token(token_id):
+    row = get_db().execute(
+        """
+        UPDATE open_api_tokens
+        SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP
+        WHERE token_id = ? AND status = 'active'
+        RETURNING token_id
+        """,
+        (str(token_id or "").strip(),),
+    ).fetchone()
+    if not row:
+        raise ValueError("open_api_token_not_found_or_revoked")
+    get_db().commit()
+    return str(row["token_id"])
+
+
+def authenticate_open_api_insight_token(token):
+    raw_token = str(token or "").strip()
+    if not raw_token or not raw_token.startswith(OPEN_API_TOKEN_PREFIX):
+        return None
+    row = get_db().execute(
+        """
+        SELECT token_id, tenant_slug, token_name, token_digest, scopes_json, status
+        FROM open_api_tokens WHERE token_digest = ? AND status = 'active'
+        """,
+        (_open_api_token_digest(raw_token),),
+    ).fetchone()
+    if not row or not compare_digest(str(row.get("token_digest") or ""), _open_api_token_digest(raw_token)):
+        return None
+    scopes = row.get("scopes_json")
+    if isinstance(scopes, str):
+        try:
+            scopes = json.loads(scopes)
+        except (TypeError, ValueError):
+            scopes = []
+    if OPEN_API_INSIGHT_PUBLISH_SCOPE not in (scopes if isinstance(scopes, list) else []):
+        return None
+    get_db().execute(
+        """UPDATE open_api_tokens
+           SET last_used_at = CURRENT_TIMESTAMP, usage_count = usage_count + 1
+           WHERE token_id = ? AND status = 'active'""",
+        (str(row["token_id"]),),
+    )
+    get_db().commit()
+    return {
+        "token_id": str(row["token_id"]),
+        "tenant_slug": str(row["tenant_slug"]),
+        "token_name": str(row["token_name"]),
+    }
+
+
 def _normalize_gangtise_openapi_credentials(payload=None):
     source = payload if isinstance(payload, dict) else {}
     return {
@@ -8308,6 +8472,8 @@ def init_db():
         execute_sql_file(conn, sql_dir / "133_repair_market_snapshot_schedule.sql")
         execute_sql_file(conn, sql_dir / "134_hourly_shared_market_and_news_sync.sql")
         execute_sql_file(conn, sql_dir / "135_use_gangtise_market_snapshots.sql")
+        execute_sql_file(conn, sql_dir / "136_market_snapshot_intraday_on_demand.sql")
+        execute_sql_file(conn, sql_dir / "137_open_api_insight_tokens.sql")
 
 
 def init_db_safe():

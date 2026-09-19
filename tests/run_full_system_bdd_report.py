@@ -38,6 +38,7 @@ MODULE_LABELS = {
     "test_hermes_gangtise_capabilities.py": "Hermes 能力调用",
     "test_gangtise_review_sse.py": "Agent SSE 与洞见流程",
     "test_review_module_bdd.py": "洞见与个股研究",
+    "test_open_api_insights_bdd.py": "Open API 洞见发布与令牌治理",
 }
 
 

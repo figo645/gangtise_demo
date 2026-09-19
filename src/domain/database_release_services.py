@@ -456,8 +456,8 @@ def _classify_database_table(table_name):
         return {"key": "release_control", "label": "发布控制数据", "owner": "5051 发布控制面", "policy": "仅由发布流程维护，不参与业务数据覆盖。", "description": "迁移文件 checksum、发布状态和执行记录。"}
     if name == "users":
         return {"key": "user_accounts", "label": "用户账户数据", "owner": "账户与权限模块", "policy": "生产账户默认保留，禁止本地覆盖。", "description": "用户账户、角色、租户归属和登录状态。"}
-    if name in {"app_settings", "admin_task_configs", "tenant_registry", "tenant_subscription_products", "tenant_fan_qr_invites"}:
-        return {"key": "configuration", "label": "配置数据", "owner": "平台配置与租户管理", "policy": "按环境和租户隔离，生产敏感配置禁止覆盖。", "description": "系统、租户、订阅和后台任务配置。"}
+    if name in {"app_settings", "admin_task_configs", "tenant_registry", "tenant_subscription_products", "tenant_fan_qr_invites", "open_api_tokens"}:
+        return {"key": "configuration", "label": "配置数据", "owner": "平台配置与租户管理", "policy": "按环境和租户隔离，生产敏感配置禁止覆盖。", "description": "系统、租户、订阅、后台任务和 Open API 授权配置。"}
     if name in {"security_master", "indicator_definitions", "indicator_mapping_rules", "indicator_source_defs", "market_snapshot_payloads", "indicator_series", "indicator_kline_points", "indicator_latest_values", "indicator_raw_records", "indicator_load_batches", "daily_quiz_sets", "quiz_questions"}:
         return {"key": "master_data", "label": "主数据", "owner": "平台数据服务", "policy": "可通过审核后的版本包发布，目标端独有记录不应被删除。", "description": "证券、指标、行情快照和平台统一内容目录。"}
     if name in {"knowledge_embeddings", "review_voice_embeddings"}:

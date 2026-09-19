@@ -149,7 +149,7 @@ def require_user_login():
     }
     # Tenant portals are public acquisition pages. Their protected content is
     # still stripped in the payload builder for anonymous visitors.
-    if request.path.startswith("/static/") or request.path.startswith("/fan-join/") or request.path.startswith("/tenant/") or request.path in public_paths:
+    if request.path.startswith("/static/") or request.path.startswith("/fan-join/") or request.path.startswith("/tenant/") or request.path.startswith("/api/open/") or request.path in public_paths:
         return None
     if is_database_release_api_request(request.path):
         # Database writes still require the independent operation password in

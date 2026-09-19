@@ -40,6 +40,97 @@ def api_public_registration_options():
     return jsonify({"ok": True, "tenant_slug": tenant_slug, "options": options})
 
 
+def _open_api_bearer_token():
+    authorization = str(request.headers.get("Authorization") or "").strip()
+    scheme, _, token = authorization.partition(" ")
+    return token.strip() if scheme.lower() == "bearer" else ""
+
+
+def _open_api_authenticated_principal():
+    principal = authenticate_open_api_insight_token(_open_api_bearer_token())
+    if principal:
+        return principal, None
+    response = jsonify({"ok": False, "error": "open_api_unauthorized"})
+    response.headers["WWW-Authenticate"] = 'Bearer realm="insight-publish"'
+    return None, (response, 401)
+
+
+@app.route("/api/open/v1/davs")
+def api_open_v1_list_davs():
+    """Return the DAV identity available to the current tenant-scoped token."""
+    principal, rejected = _open_api_authenticated_principal()
+    if rejected:
+        return rejected
+    dav = get_open_api_dav_identity(principal["tenant_slug"])
+    if not dav:
+        return jsonify({"ok": False, "error": "open_api_dav_scope_unavailable"}), 403
+    return jsonify({"ok": True, "data": [dav]})
+
+
+@app.route("/api/open/v1/insights", methods=["POST"])
+def api_open_v1_publish_insight():
+    """Publish a tenant Insight note directly from a bearer-authorized client."""
+    principal, rejected = _open_api_authenticated_principal()
+    if rejected:
+        return rejected
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "open_api_json_body_required"}), 400
+    dav = get_open_api_dav_identity(principal["tenant_slug"])
+    if not dav:
+        return jsonify({"ok": False, "error": "open_api_dav_scope_unavailable"}), 403
+    requested_dav_id = str(body.get("dav_id") or "").strip()
+    if not requested_dav_id:
+        return jsonify({"ok": False, "error": "open_api_dav_id_required"}), 400
+    if requested_dav_id != dav["dav_id"]:
+        return jsonify({"ok": False, "error": "open_api_dav_scope_forbidden"}), 403
+    requested_tenant = str(body.get("tenant_slug") or "").strip().lower()
+    if requested_tenant and requested_tenant != principal["tenant_slug"]:
+        return jsonify({"ok": False, "error": "open_api_tenant_scope_forbidden"}), 403
+    title = str(body.get("title") or "").strip()
+    content = body.get("content_text", body.get("content"))
+    if not title:
+        return jsonify({"ok": False, "error": "open_api_insight_title_required"}), 400
+    if not isinstance(content, str) or not content.strip():
+        return jsonify({"ok": False, "error": "open_api_insight_content_required"}), 400
+    if len(title) > 80:
+        return jsonify({"ok": False, "error": "open_api_insight_title_too_long"}), 400
+    if len(content.strip()) > 20000:
+        return jsonify({"ok": False, "error": "open_api_insight_content_too_long"}), 400
+    access_mode = str(body.get("access_mode") or "public").strip().lower()
+    if access_mode not in {"public", "subscriber"}:
+        return jsonify({"ok": False, "error": "open_api_insight_access_mode_invalid"}), 400
+    try:
+        result = persist_review_publish_snapshot(
+            tenant_slug=principal["tenant_slug"],
+            text=content.strip(),
+            content_html="",
+            review_period="open_api",
+            review_title=title,
+            speaker_name="",
+            source_mode="open_api",
+            paragraph_mode="manual",
+            # Keep integration details out of the reader-facing note tags.
+            prompt_tags=[],
+            review_summary="",
+            access_mode=access_mode,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    snapshot = result.get("snapshot") or {}
+    return jsonify({
+        "ok": True,
+        "data": {
+            "id": snapshot.get("id"),
+            "dav_id": dav["dav_id"],
+            "tenant_slug": principal["tenant_slug"],
+            "title": snapshot.get("title"),
+            "access_mode": snapshot.get("access_mode"),
+            "published_at": snapshot.get("published_at"),
+        },
+    }), 201
+
+
 def _resolve_authenticated_watchlist_comment_actor(requested_tenant_slug=""):
     """Use the signed-in account as the sole authority for comment identity."""
     current_user = get_current_authenticated_user() or {}
@@ -1916,6 +2007,43 @@ def api_h5_help_center():
 @app.route("/api/admin/users")
 def api_admin_users():
     return jsonify({"users": list_users()})
+
+
+@app.route("/api/admin/open-api/tokens")
+def api_admin_open_api_tokens():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    return jsonify({"ok": True, "tokens": list_open_api_tokens(tenant_slug)})
+
+
+@app.route("/api/admin/open-api/tokens", methods=["POST"])
+def api_admin_create_open_api_token():
+    body = request.get_json(silent=True) or {}
+    current_user = get_current_authenticated_user() or {}
+    try:
+        result = create_open_api_insight_token(
+            body.get("tenant_slug"), body.get("token_name"), current_user.get("username"),
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, **result}), 201
+
+
+@app.route("/api/admin/open-api/tokens/<token_id>/reveal", methods=["POST"])
+def api_admin_reveal_open_api_token(token_id):
+    try:
+        token = reveal_open_api_token(token_id)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "token": token})
+
+
+@app.route("/api/admin/open-api/tokens/<token_id>/revoke", methods=["POST"])
+def api_admin_revoke_open_api_token(token_id):
+    try:
+        revoked_id = revoke_open_api_token(token_id)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "token_id": revoked_id})
 
 
 @app.route("/api/admin/users/status", methods=["POST"])

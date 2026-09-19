@@ -2272,6 +2272,9 @@
           <div class="admin-nav-item" data-section="task-center" data-feature="system_module" onclick="showSection('task-center', this)">
             <span class="admin-nav-icon">&#9201;</span> 定时任务专区
           </div>
+          <div class="admin-nav-item" data-section="open-api" data-feature="system_module" onclick="showSection('open-api', this)">
+            <span class="admin-nav-icon">&#128273;</span> Open API
+          </div>
         </div>
         <div class="admin-nav-item" data-section="access" data-feature="system_module" onclick="showSection('access', this)">
           <span class="admin-nav-icon">&#128737;</span> 访问审计
@@ -5852,6 +5855,52 @@
         </div>
       </div><!-- end section-task-center -->
 
+      <!-- ===== OPEN API ===== -->
+      <div id="section-open-api" style="display:none">
+        <div class="section-header">
+          <div><div class="section-title">Open API · 洞见笔记发布</div><div class="section-subtitle">外部系统可用租户专属 Bearer Token 直接发布标题与原文正文。该接口不调用大模型、不做智能优化，发布后与工作台的洞见笔记使用同一内容链路。</div></div>
+          <span class="tag tag-gold">Bearer Auth</span>
+        </div>
+        <div class="sync-note-grid" style="margin-bottom:20px">
+          <div class="sync-note-card"><div class="sync-note-title">租户隔离</div><div class="sync-note-desc">每个 Token 固定绑定一个大V租户；请求体不能借由 tenant_slug 跨租户发布。</div></div>
+          <div class="sync-note-card"><div class="sync-note-title">安全存储</div><div class="sync-note-desc">列表只展示前缀。点击眼睛由管理员受控查看；撤销后 Token 立即失效。</div></div>
+          <div class="sync-note-card"><div class="sync-note-title">发布边界</div><div class="sync-note-desc">只接收标题、正文和发布范围。不接收提示词或优化参数，也不会触发 LLM。</div></div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px;padding:18px 20px">
+          <div class="table-header" style="padding:0;border:0"><div><div class="table-title">发放发布 Token</div><div style="font-size:12px;color:#8899aa;margin-top:6px">请按租户和集成系统分别创建 Token，便于撤销与审计。</div></div></div>
+          <div style="display:grid;grid-template-columns:minmax(180px,260px) minmax(220px,1fr) auto;gap:10px;align-items:end;margin-top:16px">
+            <label class="field">发布租户<select id="admin-open-api-tenant" onchange="loadAdminOpenApiTokens(false).catch((error) => showToast(error.message || 'Open API Token 加载失败'))"></select></label>
+            <label class="field">Token 名称<input id="admin-open-api-token-name" type="text" maxlength="80" placeholder="例如：内容中台生产发布"></label>
+            <button class="btn-gold" type="button" style="padding:9px 16px;font-size:12px" onclick="createAdminOpenApiToken(this)">生成 Token</button>
+          </div>
+          <div id="admin-open-api-status" style="font-size:12px;color:#8899aa;margin-top:12px">Token 仅限管理员使用；生成后可点击眼睛查看。</div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header"><div><div class="table-title">已发放 Token</div><div style="font-size:12px;color:#8899aa;margin-top:6px">明文不会出现在列表中。使用次数和最后使用时间来自真实 Bearer 请求。</div></div><button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminOpenApiTokens(true)">刷新</button></div>
+          <div style="overflow-x:auto"><table><thead><tr><th>名称 / 租户</th><th>Token</th><th>权限</th><th>状态</th><th>使用次数</th><th>最后使用</th><th>创建时间</th><th>操作</th></tr></thead><tbody id="admin-open-api-token-rows"><tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">正在加载...</td></tr></tbody></table></div>
+        </div>
+        <div class="table-wrap" style="padding:18px 20px">
+          <div class="table-header" style="padding:0;border:0"><div><div class="table-title">接入说明</div><div style="font-size:12px;color:#8899aa;margin-top:6px">POST /api/open/v1/insights · Content-Type: application/json · Bearer Token</div></div><span class="tag tag-blue">v1</span></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:16px;margin-top:16px">
+            <pre id="admin-open-api-curl" style="margin:0;white-space:pre-wrap;word-break:break-word;background:#0D1B2A;color:#D8E5F0;border:1px solid rgba(200,169,110,.16);border-radius:10px;padding:14px;font-size:12px;line-height:1.7"># 1. 查询此 Token 可发布的大V，取得 dav_id
+curl -X GET "https://your-domain/api/open/v1/davs" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# 2. 使用返回的 dav_id 直接发布洞见
+curl -X POST "https://your-domain/api/open/v1/insights" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dav_id": "DAV_ID_FROM_PREVIOUS_RESPONSE",
+    "title": "9月市场观察",
+    "content_text": "这里是直接发布的洞见正文。",
+    "access_mode": "public"
+  }'</pre>
+            <div style="font-size:12px;color:#8899aa;line-height:1.8"><b style="color:#F8F6F0">调用顺序与鉴权</b><br>先调用 <code>GET /api/open/v1/davs</code> 获取 <code>dav_id</code>，再传给发布接口。<br><code>Authorization</code>：必填，<code>Bearer YOUR_TOKEN</code>。<br><code>dav_id</code>：必填，必须是上一步返回且属于当前 Token 的大V。<br><code>title</code>：必填，最多 80 字。<br><code>content_text</code>：必填，最多 20,000 字。也兼容 <code>content</code>。<br><code>access_mode</code>：可选，<code>public</code> 或 <code>subscriber</code>。<br><br><b style="color:#F8F6F0">响应与边界</b><br>成功返回 <code>201</code>，包含洞见 ID、大V ID、租户、标题、发布范围和发布时间。认证失败返回 <code>401</code>；字段错误返回 <code>400</code>；越权大V返回 <code>403</code>。请求体传入的提示词、富文本或模型参数均不会被使用。</div>
+          </div>
+        </div>
+      </div><!-- end section-open-api -->
+
       <!-- ===== ACCESS AUDIT ===== -->
       <div id="section-access" style="display:none">
         <div class="stats-grid">
@@ -5963,6 +6012,7 @@ const sectionTitles = {
   'settings-llm-features':'系统专区 · 功能级模型映射',
   'token-usage':'系统专区 · Token 监控',
   'task-center':'系统专区 · 定时任务专区',
+  'open-api':'系统专区 · Open API',
   access:'访问审计',
   'event-analytics':'数据分析 · 埋点分析'
 };
@@ -6624,6 +6674,10 @@ function showSection(name, navEl) {
   if (name === 'task-center') {
     refreshAdminTaskCenter(false).catch((error) => showToast(error.message || '加载失败'));
   }
+  if (name === 'open-api') {
+    populateAdminOpenApiTenants();
+    loadAdminOpenApiTokens(false).catch((error) => showToast(error.message || 'Open API Token 加载失败'));
+  }
   if (name === 'settings-features') {
     const url = new URL(window.location.href);
     const queryPanel = String(url.searchParams.get('settings_panel') || '').trim();
@@ -6762,6 +6816,198 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value);
+}
+
+const adminOpenApiRevealCache = Object.create(null);
+
+function getAdminOpenApiTenantOptions() {
+  const candidates = [
+    adminSiteConfig && adminSiteConfig.tenants,
+    window.SITE_CONFIG && window.SITE_CONFIG.tenants,
+  ];
+  for (const tenants of candidates) {
+    if (Array.isArray(tenants) && tenants.length) return tenants;
+  }
+  return [];
+}
+
+function populateAdminOpenApiTenants() {
+  const select = document.getElementById('admin-open-api-tenant');
+  if (!select) return;
+  const previous = String(select.value || '');
+  const tenants = getAdminOpenApiTenantOptions();
+  select.innerHTML = tenants.map((tenant) => {
+    const slug = String((tenant && tenant.slug) || '').trim();
+    const label = `${String((tenant && (tenant.name || tenant.advisor)) || slug).trim()} · ${slug}`;
+    return `<option value="${escapeAttr(slug)}">${escapeHtml(label)}</option>`;
+  }).join('') || '<option value="">暂无可用租户</option>';
+  const fallback = String((adminSiteConfig && adminSiteConfig.default_tenant_slug) || ((tenants[0] || {}).slug) || '');
+  select.value = tenants.some((tenant) => String((tenant && tenant.slug) || '') === previous) ? previous : fallback;
+  const curl = document.getElementById('admin-open-api-curl');
+  if (curl) {
+    const origin = window.location.origin || 'https://your-domain';
+    curl.textContent = `# 1. 查询此 Token 可发布的大V，取得 dav_id
+curl -X GET "${origin}/api/open/v1/davs" \\
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# 2. 使用返回的 dav_id 直接发布洞见
+curl -X POST "${origin}/api/open/v1/insights" \\
+  -H "Authorization: Bearer YOUR_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "dav_id": "DAV_ID_FROM_PREVIOUS_RESPONSE",
+    "title": "9月市场观察",
+    "content_text": "这里是直接发布的洞见正文。",
+    "access_mode": "public"
+  }'`;
+  }
+}
+
+function setAdminOpenApiStatus(message, isError = false) {
+  const host = document.getElementById('admin-open-api-status');
+  if (!host) return;
+  host.textContent = message;
+  host.style.color = isError ? '#E67E73' : '#8899aa';
+}
+
+function formatAdminOpenApiTime(value) {
+  const text = String(value || '').trim();
+  if (!text) return '--';
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? text : parsed.toLocaleString('zh-CN', { hour12: false });
+}
+
+function adminOpenApiTokenMask(item) {
+  return `${String((item && item.token_prefix) || '').trim() || 'gti_live_'}••••••••`;
+}
+
+function renderAdminOpenApiTokens(tokens) {
+  const body = document.getElementById('admin-open-api-token-rows');
+  if (!body) return;
+  const rows = Array.isArray(tokens) ? tokens : [];
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">尚未发放 Open API Token</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((item) => {
+    const tokenId = String(item.token_id || '');
+    const active = item.status === 'active';
+    const revealed = adminOpenApiRevealCache[tokenId];
+    const tokenValue = revealed || adminOpenApiTokenMask(item);
+    const scopeLabel = Array.isArray(item.scopes) && item.scopes.includes('insight.publish') ? '发布洞见' : '未授权';
+    const encodedId = encodeURIComponent(tokenId);
+    const encodedName = encodeURIComponent(String(item.token_name || '未命名 Token'));
+    return `<tr>
+      <td><div style="color:#F8F6F0;font-weight:600">${escapeHtml(item.token_name || '--')}</div><div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(item.tenant_slug || '--')}</div></td>
+      <td><code style="font-size:11px;color:#C8A96E;word-break:break-all">${escapeHtml(tokenValue)}</code></td>
+      <td>${escapeHtml(scopeLabel)}</td>
+      <td><span class="tag ${active ? 'tag-green' : 'tag-red'}">${active ? '有效' : '已撤销'}</span></td>
+      <td>${escapeHtml(String(item.usage_count || 0))}</td>
+      <td>${escapeHtml(formatAdminOpenApiTime(item.last_used_at))}</td>
+      <td>${escapeHtml(formatAdminOpenApiTime(item.created_at))}</td>
+      <td style="white-space:nowrap">
+        ${active ? `<button class="btn-outline" type="button" style="padding:4px 8px;font-size:11px" title="${revealed ? '隐藏 Token' : '查看 Token'}" onclick="revealAdminOpenApiToken(decodeURIComponent('${encodedId}'))">${revealed ? '隐藏' : '&#128065; 查看'}</button>
+        <button class="btn-sm-red" type="button" style="padding:4px 8px;font-size:11px;margin-left:5px" onclick="revokeAdminOpenApiToken(decodeURIComponent('${encodedId}'), decodeURIComponent('${encodedName}'))">撤销</button>` : '--'}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function readAdminOpenApiResponse(response) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) throw new Error(payload.error || `request_failed_${response.status}`);
+  return payload;
+}
+
+async function loadAdminOpenApiTokens(showMessage = false) {
+  const tenant = document.getElementById('admin-open-api-tenant');
+  const tenantSlug = String((tenant && tenant.value) || '').trim();
+  const query = tenantSlug ? `?tenant_slug=${encodeURIComponent(tenantSlug)}` : '';
+  const response = await fetch(`/api/admin/open-api/tokens${query}`, { cache: 'no-store' });
+  const payload = await readAdminOpenApiResponse(response);
+  renderAdminOpenApiTokens(payload.tokens || []);
+  setAdminOpenApiStatus(`已读取 ${Array.isArray(payload.tokens) ? payload.tokens.length : 0} 个 Token。完整 Token 仅在点击眼睛时显示。`);
+  if (showMessage) showToast('Open API Token 已刷新');
+  return payload.tokens || [];
+}
+
+async function createAdminOpenApiToken(button) {
+  const tenant = document.getElementById('admin-open-api-tenant');
+  const name = document.getElementById('admin-open-api-token-name');
+  const tenantSlug = String((tenant && tenant.value) || '').trim();
+  const tokenName = String((name && name.value) || '').trim();
+  if (!tenantSlug) {
+    setAdminOpenApiStatus('请先选择发布租户。', true);
+    return;
+  }
+  if (!tokenName) {
+    setAdminOpenApiStatus('请填写 Token 名称，便于后续审计和撤销。', true);
+    return;
+  }
+  const originalText = button ? button.textContent : '';
+  if (button) {
+    button.disabled = true;
+    button.textContent = '正在生成...';
+  }
+  setAdminOpenApiStatus('正在生成租户专属 Token...');
+  try {
+    const response = await fetch('/api/admin/open-api/tokens', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tenant_slug: tenantSlug, token_name: tokenName}),
+    });
+    const payload = await readAdminOpenApiResponse(response);
+    const info = payload.token_info || {};
+    if (info.token_id && payload.token) adminOpenApiRevealCache[info.token_id] = payload.token;
+    if (name) name.value = '';
+    await loadAdminOpenApiTokens(false);
+    setAdminOpenApiStatus('Token 已生成。列表默认掩码显示；点击眼睛可查看完整值。');
+    showToast('Open API Token 已生成');
+  } catch (error) {
+    setAdminOpenApiStatus(`Token 生成失败：${error.message || '网络连接不可用'}`, true);
+    showToast('Token 生成失败');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || '生成 Token';
+    }
+  }
+}
+
+async function revealAdminOpenApiToken(tokenId) {
+  if (!tokenId) return;
+  if (adminOpenApiRevealCache[tokenId]) {
+    delete adminOpenApiRevealCache[tokenId];
+    await loadAdminOpenApiTokens(false);
+    return;
+  }
+  setAdminOpenApiStatus('正在读取 Token 明文...');
+  try {
+    const response = await fetch(`/api/admin/open-api/tokens/${encodeURIComponent(tokenId)}/reveal`, {method: 'POST'});
+    const payload = await readAdminOpenApiResponse(response);
+    adminOpenApiRevealCache[tokenId] = String(payload.token || '');
+    await loadAdminOpenApiTokens(false);
+    setAdminOpenApiStatus('Token 明文已显示。请避免在不受信任的屏幕或录屏环境中查看。');
+  } catch (error) {
+    setAdminOpenApiStatus(`无法读取 Token：${error.message || '网络连接不可用'}`, true);
+    showToast('Token 读取失败');
+  }
+}
+
+async function revokeAdminOpenApiToken(tokenId, tokenName) {
+  if (!tokenId || !window.confirm(`确定撤销“${tokenName || '该 Token'}”？撤销后外部系统将立即无法发布洞见。`)) return;
+  setAdminOpenApiStatus('正在撤销 Token...');
+  try {
+    const response = await fetch(`/api/admin/open-api/tokens/${encodeURIComponent(tokenId)}/revoke`, {method: 'POST'});
+    await readAdminOpenApiResponse(response);
+    delete adminOpenApiRevealCache[tokenId];
+    await loadAdminOpenApiTokens(false);
+    setAdminOpenApiStatus('Token 已撤销，后续 Bearer 请求会被拒绝。');
+    showToast('Open API Token 已撤销');
+  } catch (error) {
+    setAdminOpenApiStatus(`Token 撤销失败：${error.message || '网络连接不可用'}`, true);
+    showToast('Token 撤销失败');
+  }
 }
 
 function formatAdminNumber(value) {

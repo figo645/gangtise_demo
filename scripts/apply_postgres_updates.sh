@@ -99,7 +99,7 @@ for file in "${FILES[@]}"; do
     0??)
       scope="schema"
       ;;
-    113|114|115|122|123|124|125|126|127|128|129|131|132|133|134|135)
+    113|114|115|122|123|124|125|126|127|128|129|131|132|133|134|135|137)
       # These post-100 migrations only establish application tables,
       # columns, indexes, or constraints. They are schema migrations even
       # though their historical file number is in the master-data range.
