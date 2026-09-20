@@ -29,6 +29,85 @@ def test_gangtise_fixed_overseas_index_reads_the_reported_id_without_searching()
     assert post.call_args.args[1]["indicatorIdList"] == ["M00015437"]
 
 
+def test_gangtise_index_contract_preserves_the_reference_market_values():
+    """BDD: source rows must become the exact cards shown to users.
+
+    2026-09-18 was the latest trading date before the 2026-09-20 test date.
+    These accepted values are deliberately hard assertions, rather than an
+    availability-only check, so a stock endpoint or an incorrectly selected
+    row cannot silently publish misleading market data.
+    """
+    from src.domain import market_services
+
+    shanghai_response = {
+        "code": "000000",
+        "status": True,
+        "data": {
+            "fieldList": ["securityCode", "securityName", "tradeDate", "open", "high", "low", "close", "volume"],
+            "list": [
+                ["000001.SH", "上证指数", "2026-09-17", "3890.12", "3910.00", "3885.00", "3899.62", "100"],
+                ["000001.SH", "上证指数", "2026-09-18", "3901.00", "3920.00", "3898.00", "3911.87", "100"],
+            ],
+        },
+    }
+    electronic_response = {
+        "code": "000000",
+        "status": True,
+        "data": {
+            "fieldList": ["securityCode", "securityName", "tradeDate", "open", "high", "low", "close", "volume"],
+            "list": [
+                ["801080.SWI", "电子", "2026-09-17", "8600.00", "8700.00", "8590.00", "8678.99", "100"],
+                ["801080.SWI", "电子", "2026-09-18", "8700.00", "9000.00", "8690.00", "8935.03", "100"],
+            ],
+        },
+    }
+
+    def source_response(path, payload, **_kwargs):
+        assert path == market_services.GANGTISE_INDEX_KLINE_DAILY_PATH
+        security_code = payload["securityList"][0]
+        assert payload["endDate"] == "2026-09-20"
+        return 200, {"000001.SH": shanghai_response, "801080.SWI": electronic_response}[security_code], 8
+
+    with patch.object(market_services, "post_gangtise_openapi_json", side_effect=source_response) as post, patch.object(
+        market_services, "is_cn_stock_market_open", return_value=False
+    ):
+        shanghai_series = market_services.fetch_gangtise_market_index_history(
+            "source_shanghai_index", "2026-09-01", "2026-09-20"
+        )
+        shanghai_card = market_services._build_market_index_snapshot_item("source_shanghai_index", shanghai_series)
+        sectors, errors = market_services._fetch_gangtise_sector_overview(
+            "2026-09-01", "2026-09-20", ["电子"]
+        )
+
+    assert post.call_count == 2
+    assert shanghai_series["source_meta"]["path"] == market_services.GANGTISE_INDEX_KLINE_DAILY_PATH
+    assert shanghai_card["price"] == 3911.87
+    assert shanghai_card["updated_at"] == "2026-09-18"
+    assert errors == []
+    assert sectors == [
+        {
+            "sector": "电子",
+            "code": "801080.SWI",
+            "security_code": "801080.SWI",
+            "indicator_name": "申万一级行业指数:电子",
+            "value": 8935.03,
+            "change": 256.04,
+            "change_pct": 2.95,
+            "updated_at": "2026-09-18",
+            "available": True,
+            "data_source": "Gangtise OpenAPI",
+            "quote_mode": "daily_close",
+            "realtime": False,
+            "intraday_message": "",
+            "source_meta": {
+                "type": "index_kline",
+                "path": market_services.GANGTISE_INDEX_KLINE_DAILY_PATH,
+                "securityCode": "801080.SWI",
+            },
+        }
+    ]
+
+
 def test_gangtise_industry_snapshot_uses_all_static_swi_symbols():
     from src.domain import market_services
 
@@ -71,6 +150,73 @@ def test_default_task_setup_never_reenables_an_operator_stopped_shared_task():
     market_update = source[start:end]
     assert "schedule_type = ?" not in market_update
     assert "enabled = ?" not in market_update
+
+
+def test_closed_market_keeps_the_last_successful_market_and_industry_snapshots_visible():
+    from src.domain import market_services
+
+    overview = {
+        "ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3875.6, "available": True}],
+    }
+    sectors = {
+        "ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "items": [{"sector": "电子", "value": 1234.5, "change_pct": 1.2, "available": True}],
+    }
+    with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, overview, None, sectors]), patch.object(
+        market_services, "_load_watchlist_cache", return_value=None
+    ), patch.object(market_services, "is_cn_stock_market_open", return_value=False):
+        market_payload = market_services.build_market_overview_payload()
+        sector_payload = market_services.build_market_sector_overview_payload()
+
+    assert market_payload["items"] == overview["items"]
+    assert sector_payload["items"] == sectors["items"]
+    assert market_payload["historical"] is True
+    assert sector_payload["historical"] is True
+    assert "非交易时段" in market_payload["message"]
+
+
+def test_deployed_v8_market_snapshots_remain_readable_after_the_v10_upgrade():
+    """A production v8 payload has the same reader-facing item schema as v10."""
+    from src.domain import market_services
+
+    overview = {
+        "ok": True, "snapshot_version": 8, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3875.6, "available": True}],
+    }
+    sectors = {
+        "ok": True, "snapshot_version": 8, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "items": [{"sector": "电子", "value": 1234.5, "change_pct": 1.2, "available": True}],
+    }
+    with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[overview, sectors]), patch.object(
+        market_services, "_load_watchlist_cache", return_value=None
+    ), patch.object(market_services, "is_cn_stock_market_open", return_value=False):
+        market_payload = market_services.build_market_overview_payload()
+        sector_payload = market_services.build_market_sector_overview_payload()
+
+    assert market_payload["items"] == overview["items"]
+    assert sector_payload["items"] == sectors["items"]
+    assert market_payload["snapshot_version"] == 8
+    assert sector_payload["snapshot_version"] == 8
+
+
+def test_open_market_hides_an_expired_snapshot_before_the_refresh_completes():
+    from src.domain import market_services
+
+    snapshot = {
+        "ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3875.6, "available": True}],
+    }
+    with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, snapshot]), patch.object(
+        market_services, "_load_watchlist_cache", return_value=None
+    ), patch.object(market_services, "is_cn_stock_market_open", return_value=True), patch.object(
+        market_services, "request_market_snapshot_refresh", return_value={"queued": False}
+    ):
+        payload = market_services.build_market_overview_payload()
+
+    assert payload["items"] == []
+    assert payload["stale"] is True
+    assert "超过一个交易日" in payload["message"]
 
 
 def test_gangtise_indicator_mapping_write_retries_once_after_a_severed_postgres_connection():

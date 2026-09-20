@@ -114,6 +114,76 @@ def test_watchlist_intraday_never_calls_gangtise():
     assert result["source"] == "Sina"
 
 
+def test_open_market_intraday_points_append_a_provisional_current_day_candle():
+    detail = {
+        "price": 10.2,
+        "change": 0.2,
+        "change_pct": 2.0,
+        "kline": [
+            {"date": "2026-09-18", "open": 9.8, "high": 10.1, "low": 9.7, "close": 10.0},
+            {"date": "2026-09-19", "open": 10.0, "high": 10.3, "low": 9.9, "close": 10.2},
+        ],
+        "history_kline": {"candles": [
+            {"date": "2026-09-18", "open": 9.8, "high": 10.1, "low": 9.7, "close": 10.0},
+            {"date": "2026-09-19", "open": 10.0, "high": 10.3, "low": 9.9, "close": 10.2},
+        ]},
+    }
+    points = [
+        {"date": "2026-09-20 09:31:00", "value": 10.3},
+        {"date": "2026-09-20 09:32:00", "value": 10.5},
+        {"date": "2026-09-20 09:33:00", "value": 10.4},
+    ]
+    with patch.object(market_services, "is_cn_stock_market_open", return_value=True), patch.object(
+        market_services, "_current_cn_market_date", return_value=__import__("datetime").date(2026, 9, 20)
+    ):
+        result = market_services._merge_watchlist_intraday_candle(detail, points)
+
+    candle = result["kline"][-1]
+    assert candle == {
+        "date": "2026-09-20", "open": 10.3, "high": 10.5, "low": 10.3, "close": 10.4, "provisional": True,
+    }
+    assert result["price"] == 10.4
+    assert result["change_pct"] == 1.96
+    assert result["kline_contains_intraday"] is True
+
+
+def test_closed_market_does_not_synthesize_a_daily_candle_from_minutes():
+    detail = {"kline": [{"date": "2026-09-19", "close": 10.2}]}
+    with patch.object(market_services, "is_cn_stock_market_open", return_value=False):
+        result = market_services._merge_watchlist_intraday_candle(
+            detail, [{"date": "2026-09-20 09:31:00", "value": 10.3}]
+        )
+    assert result["kline"] == [{"date": "2026-09-19", "close": 10.2}]
+
+
+def test_attach_intraday_exposes_the_current_day_candle_on_watchlist_detail():
+    detail = {
+        "code": "600519", "market": "SH", "standard_code": "600519.SH",
+        "kline": [
+            {"date": "2026-09-18", "open": 9.8, "high": 10.1, "low": 9.7, "close": 10.0},
+            {"date": "2026-09-19", "open": 10.0, "high": 10.3, "low": 9.9, "close": 10.2},
+        ],
+    }
+    intraday = {
+        "available": True, "source": "Sina", "updated_at": "2026-09-20 09:33:00", "message": "",
+        "points": [
+            {"date": "2026-09-20 09:31:00", "value": 10.3},
+            {"date": "2026-09-20 09:33:00", "value": 10.4},
+        ],
+    }
+    with patch.object(market_services, "fetch_watchlist_intraday_series", return_value=intraday), patch.object(
+        market_services, "is_cn_stock_market_open", return_value=True
+    ), patch.object(market_services, "_current_cn_market_date", return_value=__import__("datetime").date(2026, 9, 20)), patch.object(
+        market_services, "_resolve_watchlist_intraday_trade_date", return_value=""
+    ):
+        result = market_services.attach_watchlist_intraday(detail)
+
+    assert result["intraday_available"] is True
+    assert result["kline"][-1]["date"] == "2026-09-20"
+    assert result["kline"][-1]["close"] == 10.4
+    assert result["kline_contains_intraday"] is True
+
+
 def test_old_gangtise_watchlist_cache_is_not_usable():
     cached = {
         "data_source": "gangtise_openapi",

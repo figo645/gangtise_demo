@@ -143,6 +143,10 @@ def _resolve_authenticated_watchlist_comment_actor(requested_tenant_slug=""):
     if not has_role_capability(role, "h5"):
         return None, (jsonify({"ok": False, "error": "watchlist_comment_role_invalid"}), 403)
     # Only an administrator may select the tenant shown by the H5 preview.
+    # Reject, rather than silently rewrite, a regular user's forged tenant.
+    # This guard is shared by comments and K-line annotations.
+    if role != "admin" and requested_tenant and requested_tenant != account_tenant:
+        return None, (jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403)
     # Regular users always remain bound to their authenticated tenant.
     tenant_slug = requested_tenant if role == "admin" and requested_tenant else account_tenant
     if not tenant_slug:
@@ -777,19 +781,17 @@ def api_watchlist_detail(stock_code):
 
 @app.route("/api/watchlist/<stock_code>/annotations")
 def api_watchlist_annotations(stock_code):
-    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     stock_name = str(request.args.get("stock_name") or "").strip()
-    viewer_role = str(request.args.get("user_role") or "investor").strip().lower()
-    viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
-    if not tenant_slug:
-        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    actor, error_response = _resolve_authenticated_watchlist_comment_actor(request.args.get("tenant_slug"))
+    if error_response:
+        return error_response
     try:
         items = list_watchlist_kline_annotations(
-            tenant_slug=tenant_slug,
+            tenant_slug=actor["tenant_slug"],
             stock_code=stock_code,
             stock_name=stock_name,
-            viewer_role=viewer_role,
-            viewer_profile_id=viewer_profile_id,
+            viewer_role=actor["user_role"],
+            viewer_profile_id=actor["user_profile_id"],
         )
     except Exception as exc:
         if is_db_unavailable_error(exc):
@@ -802,16 +804,12 @@ def api_watchlist_annotations(stock_code):
 @app.route("/api/watchlist/<stock_code>/annotations", methods=["POST"])
 def api_save_watchlist_annotation(stock_code):
     body = request.get_json(silent=True) or {}
-    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
-    user_role = str(body.get("user_role") or "").strip().lower()
-    if not tenant_slug:
-        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
-    user_profile_id = str(body.get("user_profile_id") or "").strip()
-    if not has_role_capability(user_role, "h5") or not user_profile_id:
-        return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
+    actor, error_response = _resolve_authenticated_watchlist_comment_actor(body.get("tenant_slug"))
+    if error_response:
+        return error_response
     try:
         item = save_watchlist_kline_annotation(
-            tenant_slug=tenant_slug,
+            tenant_slug=actor["tenant_slug"],
             stock_code=stock_code,
             stock_name=body.get("stock_name"),
             candle_index=body.get("candle_index"),
@@ -824,9 +822,9 @@ def api_save_watchlist_annotation(stock_code):
             title=body.get("title"),
             note=body.get("note"),
             trigger=body.get("trigger"),
-            created_by_user_id=body.get("user_profile_id"),
-            created_by_name=body.get("user_name"),
-            created_by_role=user_role,
+            created_by_user_id=actor["user_profile_id"],
+            created_by_name=actor["user_name"],
+            created_by_role=actor["user_role"],
             source_client=body.get("source_client") or body.get("entry_point") or "h5",
         )
     except ValueError as exc:
@@ -941,20 +939,16 @@ def api_delete_watchlist_comment(stock_code, comment_ref):
 
 @app.route("/api/watchlist/<stock_code>/annotations/<annotation_ref>", methods=["DELETE"])
 def api_delete_watchlist_annotation(stock_code, annotation_ref):
-    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
-    user_role = str(request.args.get("user_role") or "").strip().lower()
-    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
-    if not tenant_slug:
-        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
-    if not has_role_capability(user_role, "h5") or not user_profile_id:
-        return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
+    actor, error_response = _resolve_authenticated_watchlist_comment_actor(request.args.get("tenant_slug"))
+    if error_response:
+        return error_response
     try:
         deleted = delete_watchlist_kline_annotation(
-            tenant_slug=tenant_slug,
+            tenant_slug=actor["tenant_slug"],
             stock_code=stock_code,
             annotation_id=int(annotation_ref) if str(annotation_ref).isdigit() else None,
             candle_index=int(annotation_ref) if str(annotation_ref).isdigit() else None,
-            actor_profile_id=user_profile_id,
+            actor_profile_id=actor["user_profile_id"],
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400

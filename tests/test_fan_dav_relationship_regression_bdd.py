@@ -136,6 +136,78 @@ class FanDavRelationshipRegressionBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.get_json()["error"], "tenant_scope_forbidden")
 
+    def test_given_fan_when_forging_another_tenant_then_comments_are_not_exposed(self):
+        with patch.object(api_core, "get_current_authenticated_user", return_value=USERS[2]), patch.object(
+            api_core, "list_watchlist_comments"
+        ) as list_comments:
+            response = self.client.get("/api/watchlist/600519/comments?tenant_slug=duoge")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()["error"], "tenant_scope_forbidden")
+        list_comments.assert_not_called()
+
+    def test_given_dav_when_forging_another_tenant_then_h5_detail_and_fan_management_are_denied(self):
+        with patch.object(api_core, "get_current_authenticated_user", return_value=USERS[1]), patch.object(
+            api_core, "build_user_import_summary"
+        ) as build_summary:
+            detail_response = self.client.get("/api/watchlist/600519?tenant_slug=laowang")
+            users_response = self.client.get("/api/kol/users?tenant=laowang")
+
+        self.assertEqual(detail_response.status_code, 403, detail_response.get_data(as_text=True))
+        self.assertEqual(detail_response.get_json()["error"], "tenant_scope_forbidden")
+        self.assertEqual(users_response.status_code, 403, users_response.get_data(as_text=True))
+        self.assertEqual(users_response.get_json()["error"], "tenant_scope_forbidden")
+        build_summary.assert_not_called()
+
+    def test_given_fan_when_forging_another_tenant_then_annotations_are_not_exposed_or_mutated(self):
+        with patch.object(api_core, "get_current_authenticated_user", return_value=USERS[2]), patch.object(
+            api_core, "list_watchlist_kline_annotations"
+        ) as list_annotations, patch.object(api_core, "save_watchlist_kline_annotation") as save_annotation, patch.object(
+            api_core, "delete_watchlist_kline_annotation"
+        ) as delete_annotation:
+            read_response = self.client.get("/api/watchlist/600519/annotations?tenant_slug=duoge")
+            write_response = self.client.post(
+                "/api/watchlist/600519/annotations",
+                json={"tenant_slug": "duoge", "user_profile_id": "多哥粉丝", "content": "伪造标注"},
+            )
+            delete_response = self.client.delete(
+                "/api/watchlist/600519/annotations/1?tenant_slug=duoge&user_profile_id=%E5%A4%9A%E5%93%A5%E7%B2%89%E4%B8%9D"
+            )
+
+        for response in (read_response, write_response, delete_response):
+            self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+            self.assertEqual(response.get_json()["error"], "tenant_scope_forbidden")
+        list_annotations.assert_not_called()
+        save_annotation.assert_not_called()
+        delete_annotation.assert_not_called()
+
+    def test_given_fan_when_using_own_tenant_then_annotation_identity_comes_from_session(self):
+        captured = {}
+
+        def save_annotation(**kwargs):
+            captured.update(kwargs)
+            return {"id": 1, "content": kwargs["content"]}
+
+        with patch.object(api_core, "get_current_authenticated_user", return_value=USERS[2]), patch.object(
+            api_core, "get_tenant_by_slug", side_effect=_tenant
+        ), patch.object(api_core, "save_watchlist_kline_annotation", side_effect=save_annotation):
+            response = self.client.post(
+                "/api/watchlist/600519/annotations",
+                json={
+                    "tenant_slug": "laowang",
+                    "user_role": "dav",
+                    "user_profile_id": "财经老王",
+                    "user_name": "伪造投顾",
+                    "content": "自己的标注",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        self.assertEqual(captured["tenant_slug"], "laowang")
+        self.assertEqual(captured["created_by_user_id"], "老王粉丝")
+        self.assertEqual(captured["created_by_name"], "老王粉丝")
+        self.assertEqual(captured["created_by_role"], "investor")
+
     def test_given_fan_observation_event_when_saved_then_investor_cannot_read_tenant_aggregate(self):
         with patch.object(api_kol, "get_current_authenticated_user", return_value=USERS[2]), patch.object(
             api_kol, "get_tenant_by_slug", side_effect=_tenant

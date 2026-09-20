@@ -40,7 +40,7 @@ def test_market_snapshot_source_definition_identifies_the_gangtise_shared_snapsh
     source = market_services.build_akshare_market_snapshot_source_seed_payload("source_shanghai_index")
 
     assert source["provider"] == "Gangtise OpenAPI"
-    assert source["path"] == "gangtise://application/open-quote/kline/daily"
+    assert source["path"] == "gangtise://application/open-quote/index/kline/daily"
     assert source["auth_type"] == "none"
     assert source["response_mapping"]["connector_type"] == "gangtise_market_snapshot"
 

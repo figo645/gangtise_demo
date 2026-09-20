@@ -15344,7 +15344,7 @@ function renderWatchlistDetail(data, section) {
       candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
   }));
   const klineChart = buildWatchlistKlineSvg(data.kline || [], {
-    candleLabel: `${data.name || '标的'} 日K线`,
+    candleLabel: `${data.name || '标的'} 日K线${data.kline_contains_intraday ? '（含盘中）' : ''}`,
     annotations,
   });
   const intradayChart = buildWatchlistIntradaySvg(
@@ -15359,7 +15359,7 @@ function renderWatchlistDetail(data, section) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
         <div>
           <div class="watch-section-title">纯计算信息</div>
-          <div class="watch-section-desc">仅展示由日 K 线序列直接计算出的结果。${activeUser.role === 'dav' ? ' 点击任一 K 线可添加或编辑标注。' : ''}</div>
+          <div class="watch-section-desc">仅展示由日 K 线序列直接计算出的结果。${data.kline_contains_intraday ? ` 当前日K为盘中分钟行情合成，更新至 ${escapeHtml(String(data.kline_intraday_updated_at || '').slice(11, 16) || '--')}。` : ''}${activeUser.role === 'dav' ? ' 点击任一 K 线可添加或编辑标注。' : ''}</div>
         </div>
       </div>
       ${klineChart}

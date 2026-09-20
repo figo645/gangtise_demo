@@ -1,0 +1,90 @@
+<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Gangtise 市场精确值 BDD 报告</title><style>
+body{margin:0;background:#eef3f7;color:#132a3d;font:14px/1.65 -apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif}main{max-width:1024px;margin:auto;padding:28px 16px 50px}section,article{background:#fff;border:1px solid #d8e1e8;border-radius:12px;padding:18px;margin-bottom:14px}h1,h2{margin:0 0 8px}h1{font-size:27px}h2{font-size:18px}.hero{border-top:5px solid #16704d}.metric{display:inline-block;margin:12px 10px 0 0;padding:8px 12px;border-radius:8px;background:#f5f8fa}.pass{border-left:5px solid #16704d}.blocked{border-left:5px solid #a66710}header{display:flex;justify-content:space-between;gap:12px}.pass strong{color:#16704d}.blocked strong{color:#a66710}pre{white-space:pre-wrap;word-break:break-word;background:#102b40;color:#eaf2f7;padding:12px;border-radius:8px;font-size:11px}summary{cursor:pointer;color:#1769aa;font-weight:700}</style></head><body><main><section class='hero'><h1>Gangtise 市场精确值 BDD 报告</h1><p>生成时间：2026-09-20 11:32:20 +0800（北京时间）</p><p>验收锚点：上证指数 <b>3911.87</b>；电子 <b>8935.03</b>；电子涨跌 <b>+2.95%</b>。</p><div class='metric'>合同场景：True</div><div class='metric'>实时接口：未完成实时核验</div><p>实时接口无数据时，本报告保持 BLOCKED，不使用测试夹具或历史快照替代。</p></section><article class='case pass'><header><h2>指数日K合同与卡片数值映射</h2><strong>PASS</strong></header><p><b>Given</b> 已配置 Gangtise 指数日 K 合同与验收锚点。</p><p><b>When</b> deterministic_contract</p><p><b>Then</b> 指数接口、最新交易日选择、点位及涨跌幅计算均为严格断言。</p><details><summary>查看脱敏证据</summary><pre>{
+  &quot;requests&quot;: [
+    {
+      &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+      &quot;security_code&quot;: &quot;000001.SH&quot;,
+      &quot;end_date&quot;: &quot;2026-09-20&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+      &quot;security_code&quot;: &quot;801080.SWI&quot;,
+      &quot;end_date&quot;: &quot;2026-09-20&quot;
+    }
+  ],
+  &quot;market_card&quot;: {
+    &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+    &quot;name&quot;: &quot;上证指数&quot;,
+    &quot;code&quot;: &quot;000001.SH&quot;,
+    &quot;market&quot;: &quot;CN&quot;,
+    &quot;data_source&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;price&quot;: 3911.87,
+    &quot;change&quot;: 12.25,
+    &quot;change_pct&quot;: 0.31,
+    &quot;updated_at&quot;: &quot;2026-09-18&quot;,
+    &quot;quote_mode&quot;: &quot;daily_close&quot;,
+    &quot;realtime&quot;: false,
+    &quot;intraday_message&quot;: &quot;&quot;,
+    &quot;available&quot;: true,
+    &quot;message&quot;: &quot;&quot;
+  },
+  &quot;sector_card&quot;: {
+    &quot;sector&quot;: &quot;电子&quot;,
+    &quot;code&quot;: &quot;801080.SWI&quot;,
+    &quot;security_code&quot;: &quot;801080.SWI&quot;,
+    &quot;indicator_name&quot;: &quot;申万一级行业指数:电子&quot;,
+    &quot;value&quot;: 8935.03,
+    &quot;change&quot;: 256.04,
+    &quot;change_pct&quot;: 2.95,
+    &quot;updated_at&quot;: &quot;2026-09-18&quot;,
+    &quot;available&quot;: true,
+    &quot;data_source&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;quote_mode&quot;: &quot;daily_close&quot;,
+    &quot;realtime&quot;: false,
+    &quot;intraday_message&quot;: &quot;&quot;,
+    &quot;source_meta&quot;: {
+      &quot;type&quot;: &quot;index_kline&quot;,
+      &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+      &quot;securityCode&quot;: &quot;801080.SWI&quot;
+    }
+  },
+  &quot;errors&quot;: []
+}</pre></details></article><article class='case blocked'><header><h2>Gangtise 实时接口精确值核验</h2><strong>BLOCKED</strong></header><p><b>Given</b> 已配置 Gangtise 指数日 K 合同与验收锚点。</p><p><b>When</b> live_api</p><p><b>Then</b> 实时调用未返回两张可用卡片</p><details><summary>查看脱敏证据</summary><pre>{
+  &quot;index&quot;: {
+    &quot;http_status&quot;: 0,
+    &quot;duration_ms&quot;: 18,
+    &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;payload&quot;: {
+      &quot;securityList&quot;: [
+        &quot;000001.SH&quot;
+      ],
+      &quot;startDate&quot;: &quot;2026-09-01&quot;,
+      &quot;endDate&quot;: &quot;2026-09-20&quot;,
+      &quot;limit&quot;: 240,
+      &quot;fieldList&quot;: [
+        &quot;securityCode&quot;,
+        &quot;securityName&quot;,
+        &quot;tradeDate&quot;,
+        &quot;open&quot;,
+        &quot;high&quot;,
+        &quot;low&quot;,
+        &quot;close&quot;,
+        &quot;volume&quot;
+      ]
+    },
+    &quot;message&quot;: &quot;Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known&quot;
+  },
+  &quot;market_card&quot;: {
+    &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+    &quot;name&quot;: &quot;上证指数&quot;,
+    &quot;code&quot;: &quot;000001.SH&quot;,
+    &quot;market&quot;: &quot;CN&quot;,
+    &quot;data_source&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;available&quot;: false,
+    &quot;message&quot;: &quot;Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known&quot;
+  },
+  &quot;sector_card&quot;: {},
+  &quot;sector_errors&quot;: [
+    &quot;未返回有效申万行业：电子(Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servn)&quot;
+  ]
+}</pre></details></article></main></body></html>

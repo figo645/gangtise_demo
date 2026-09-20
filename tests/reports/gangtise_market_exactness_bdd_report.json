@@ -1,0 +1,110 @@
+{
+  "generated_at": "2026-09-20 11:32:20 +0800",
+  "contract_passed": true,
+  "live_passed": false,
+  "cases": [
+    {
+      "name": "指数日K合同与卡片数值映射",
+      "mode": "deterministic_contract",
+      "passed": true,
+      "detail": "指数接口、最新交易日选择、点位及涨跌幅计算均为严格断言。",
+      "evidence": {
+        "requests": [
+          {
+            "path": "/application/open-quote/index/kline/daily",
+            "security_code": "000001.SH",
+            "end_date": "2026-09-20"
+          },
+          {
+            "path": "/application/open-quote/index/kline/daily",
+            "security_code": "801080.SWI",
+            "end_date": "2026-09-20"
+          }
+        ],
+        "market_card": {
+          "indicator_code": "source_shanghai_index",
+          "name": "上证指数",
+          "code": "000001.SH",
+          "market": "CN",
+          "data_source": "Gangtise OpenAPI",
+          "price": 3911.87,
+          "change": 12.25,
+          "change_pct": 0.31,
+          "updated_at": "2026-09-18",
+          "quote_mode": "daily_close",
+          "realtime": false,
+          "intraday_message": "",
+          "available": true,
+          "message": ""
+        },
+        "sector_card": {
+          "sector": "电子",
+          "code": "801080.SWI",
+          "security_code": "801080.SWI",
+          "indicator_name": "申万一级行业指数:电子",
+          "value": 8935.03,
+          "change": 256.04,
+          "change_pct": 2.95,
+          "updated_at": "2026-09-18",
+          "available": true,
+          "data_source": "Gangtise OpenAPI",
+          "quote_mode": "daily_close",
+          "realtime": false,
+          "intraday_message": "",
+          "source_meta": {
+            "type": "index_kline",
+            "path": "/application/open-quote/index/kline/daily",
+            "securityCode": "801080.SWI"
+          }
+        },
+        "errors": []
+      }
+    },
+    {
+      "name": "Gangtise 实时接口精确值核验",
+      "mode": "live_api",
+      "passed": false,
+      "blocked": true,
+      "detail": "实时调用未返回两张可用卡片",
+      "evidence": {
+        "index": {
+          "http_status": 0,
+          "duration_ms": 18,
+          "path": "/application/open-quote/index/kline/daily",
+          "payload": {
+            "securityList": [
+              "000001.SH"
+            ],
+            "startDate": "2026-09-01",
+            "endDate": "2026-09-20",
+            "limit": 240,
+            "fieldList": [
+              "securityCode",
+              "securityName",
+              "tradeDate",
+              "open",
+              "high",
+              "low",
+              "close",
+              "volume"
+            ]
+          },
+          "message": "Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known"
+        },
+        "market_card": {
+          "indicator_code": "source_shanghai_index",
+          "name": "上证指数",
+          "code": "000001.SH",
+          "market": "CN",
+          "data_source": "Gangtise OpenAPI",
+          "available": false,
+          "message": "Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known"
+        },
+        "sector_card": {},
+        "sector_errors": [
+          "未返回有效申万行业：电子(Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servn)"
+        ]
+      }
+    }
+  ]
+}

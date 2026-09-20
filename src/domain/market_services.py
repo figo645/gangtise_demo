@@ -572,6 +572,9 @@ def gen_macro_indicators():
 
 GANGTISE_OPENAPI_SUCCESS_CODE = "000000"
 GANGTISE_OPENAPI_LOGIN_PATH = "/application/auth/oauth/open/loginV2"
+# Gangtise distinguishes securities from indices.  Standard market indices
+# and Shenwan `.SWI` industry indices must never use the stock K-line path.
+GANGTISE_INDEX_KLINE_DAILY_PATH = "/application/open-quote/index/kline/daily"
 _gangtise_env_loaded = False
 _gangtise_token_lock = threading.Lock()
 _gangtise_token_cache = {"token": "", "fetched_at": 0.0}
@@ -2047,7 +2050,7 @@ def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", 
             limit=240,
         )
         status, response, duration = post_gangtise_openapi_json(
-            "/application/open-quote/kline/daily",
+            GANGTISE_INDEX_KLINE_DAILY_PATH,
             payload,
             token=token,
             timeout=30,
@@ -2073,7 +2076,7 @@ def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", 
             "points": points,
             "response": response if isinstance(response, dict) else {},
             "duration_ms": int(duration or 0),
-            "source_meta": {"type": "index_kline", "path": "/application/open-quote/kline/daily", "securityCode": entry["security_code"]},
+            "source_meta": {"type": "index_kline", "path": GANGTISE_INDEX_KLINE_DAILY_PATH, "securityCode": entry["security_code"]},
         }
     search_payload = {"keyword": entry.get("search_keyword") or entry.get("indicator_name") or indicator_code, "Limit": 20}
     search_status, search_response, search_duration = post_gangtise_openapi_json("/application/open-alternative/EDB/search", search_payload, token=token, timeout=30)
@@ -2189,7 +2192,7 @@ def build_gangtise_source_seed_payload(indicator_code, existing=None):
     entry = GANGTISE_INDICATOR_REGISTRY.get(slugify_code(indicator_code, "indicator")) or {}
     existing = existing or {}
     query_kind = str(entry.get("query_kind") or "edb_search").strip()
-    path = "/application/open-quote/kline/daily" if query_kind == "index_kline" else "/application/open-alternative/EDB/getData"
+    path = GANGTISE_INDEX_KLINE_DAILY_PATH if query_kind == "index_kline" else "/application/open-alternative/EDB/getData"
     search_keyword = str(entry.get("search_keyword") or entry.get("indicator_name") or indicator_code).strip()
     preferred_indicator_id = str(entry.get("preferred_indicator_id") or "").strip()
     response_sample = existing.get("response_sample") if isinstance(existing.get("response_sample"), dict) and existing.get("response_sample") else {
@@ -2244,7 +2247,7 @@ def build_akshare_market_snapshot_source_seed_payload(indicator_code):
     entry = GANGTISE_INDICATOR_REGISTRY.get(slugify_code(indicator_code, "indicator")) or {}
     indicator_name = str(entry.get("indicator_name") or indicator_code).strip()
     is_daily_kline = entry.get("query_kind") == "index_kline"
-    source_path = "/application/open-quote/kline/daily" if is_daily_kline else "/application/open-alternative/EDB/getData"
+    source_path = GANGTISE_INDEX_KLINE_DAILY_PATH if is_daily_kline else "/application/open-alternative/EDB/getData"
     return {
         "source_code": slugify_code(indicator_code, "source"),
         "indicator_code": slugify_code(indicator_code, "indicator"),
@@ -7059,11 +7062,11 @@ def fetch_gangtise_market_index_history(indicator_code, start_date, end_date):
     entry = GANGTISE_INDICATOR_REGISTRY.get(indicator_code) or {}
     if entry.get("query_kind") == "index_kline":
         result = fetch_gangtise_market_kline_series(
-            "/application/open-quote/kline/daily", entry.get("security_code"),
+            GANGTISE_INDEX_KLINE_DAILY_PATH, entry.get("security_code"),
             start_date=start_date, end_date=end_date, limit=240, timeout=30,
         )
         result = _with_gangtise_intraday_market_quote(result, entry.get("security_code"))
-        return {**result, "provider": "Gangtise OpenAPI", "source_meta": result.get("source_meta") or {"type": "index_kline", "path": "/application/open-quote/kline/daily", "securityCode": entry.get("security_code")}}
+        return {**result, "provider": "Gangtise OpenAPI", "source_meta": result.get("source_meta") or {"type": "index_kline", "path": GANGTISE_INDEX_KLINE_DAILY_PATH, "securityCode": entry.get("security_code")}}
     indicator_id = str(entry.get("preferred_indicator_id") or "").strip()
     if entry.get("query_kind") == "edb_fixed" and indicator_id:
         return _fetch_gangtise_fixed_edb_series(indicator_id, start_date, end_date)
@@ -7172,7 +7175,7 @@ def _fetch_gangtise_sector_overview(start_date, end_date, sector_names=None):
         assert_admin_task_not_stopped("market_snapshot_sync")
         security_code = GANGTISE_SHENWAN_LEVEL1_CODES[sector]
         series = fetch_gangtise_market_kline_series(
-            "/application/open-quote/kline/daily", security_code,
+            GANGTISE_INDEX_KLINE_DAILY_PATH, security_code,
             start_date=start_date, end_date=end_date, limit=240, timeout=30,
         )
         series = _with_gangtise_intraday_market_quote(series, security_code)
@@ -7195,7 +7198,7 @@ def _fetch_gangtise_sector_overview(start_date, end_date, sector_names=None):
             "quote_mode": str(series.get("quote_mode") or "daily_close"),
             "realtime": bool(series.get("realtime")),
             "intraday_message": str(series.get("intraday_message") or ""),
-            "source_meta": series.get("source_meta") or {"type": "index_kline", "path": "/application/open-quote/kline/daily", "securityCode": security_code},
+            "source_meta": series.get("source_meta") or {"type": "index_kline", "path": GANGTISE_INDEX_KLINE_DAILY_PATH, "securityCode": security_code},
         })
     return items, (["未返回有效申万行业：" + "、".join(missing[:10])] if missing else [])
 
@@ -7205,7 +7208,7 @@ def _merge_market_snapshot_items(snapshot_type, snapshot_key, items, item_key):
     existing = _load_market_snapshot_payload(snapshot_type, snapshot_key, 0)
     if not (
         isinstance(existing, dict)
-        and existing.get("snapshot_version") == 10
+        and _is_supported_gangtise_market_snapshot(existing)
         and str(existing.get("source") or "").lower() == "gangtise openapi"
         and isinstance(existing.get("items"), list)
     ):
@@ -7215,6 +7218,21 @@ def _merge_market_snapshot_items(snapshot_type, snapshot_key, items, item_key):
         if isinstance(item, dict) and str(item.get(item_key) or ""):
             merged[str(item[item_key])] = item
     return list(merged.values())
+
+
+def _is_supported_gangtise_market_snapshot(payload):
+    """Accept the deployed v8 snapshot contract while new writes use v10.
+
+    v8 and v10 have the same public item schema. Rejecting v8 made a valid
+    production snapshot appear empty after an application upgrade, even though
+    no provider or data format had changed.
+    """
+    if not isinstance(payload, dict):
+        return False
+    try:
+        return int(payload.get("snapshot_version")) in {8, 10}
+    except (TypeError, ValueError):
+        return False
 
 
 def sync_market_snapshot(force=False, selection=None, merge_existing=False):
@@ -7344,6 +7362,26 @@ def _apply_market_snapshot_on_demand_refresh(payload):
     return result
 
 
+def _preserve_last_market_snapshot_for_closed_session(payload, label):
+    """Keep the last successful quote visible whenever China is not trading.
+
+    Snapshot TTL protects a live session from silently showing an old quote. It
+    must not blank the boards overnight, on weekends, or on exchange holidays:
+    there cannot be a newer domestic quote in those periods. The H5 surface
+    marks this payload as historical and retains its exact sync time.
+    """
+    result = copy.deepcopy(payload) if isinstance(payload, dict) else {"ok": True, "items": []}
+    result["stale"] = True
+    result["last_success_at"] = str(result.get("updated_at") or "")
+    if not is_cn_stock_market_open():
+        result["historical"] = True
+        result["message"] = f"当前为非交易时段，展示最近一次成功同步的{label}数据。"
+        return result
+    result["items"] = []
+    result["message"] = f"{label}快照已超过一个交易日未同步，请检查 Gangtise 市场与行业指标同步任务。"
+    return result
+
+
 def request_market_snapshot_selection_refresh(market_codes=None, sector_names=None):
     """Queue an immediate, de-duplicated fetch for DaV panel additions only."""
     global _market_snapshot_selection_refresh_running
@@ -7423,7 +7461,7 @@ def build_market_overview_payload(tenant_slug=""):
         and isinstance(cached.get("items"), list)
         and cached.get("items")
         and str(cached.get("source") or "").lower() == "gangtise openapi"
-        and cached.get("snapshot_version") == 10
+        and _is_supported_gangtise_market_snapshot(cached)
     ):
         return _apply_market_snapshot_on_demand_refresh(
             _apply_tenant_market_display_selection(cached, tenant_slug, "market")
@@ -7436,13 +7474,9 @@ def build_market_overview_payload(tenant_slug=""):
         and isinstance(stale.get("items"), list)
         and stale.get("items")
         and str(stale.get("source") or "").lower() == "gangtise openapi"
-        and stale.get("snapshot_version") == 10
+        and _is_supported_gangtise_market_snapshot(stale)
     ):
-        preserved = copy.deepcopy(stale)
-        preserved["stale"] = True
-        preserved["items"] = []
-        preserved["message"] = "市场快照已超过一个交易日未同步，请检查 Gangtise 市场与行业指标同步任务。"
-        preserved["last_success_at"] = str(stale.get("updated_at") or "")
+        preserved = _preserve_last_market_snapshot_for_closed_session(stale, "市场")
         return _apply_market_snapshot_on_demand_refresh(
             _apply_tenant_market_display_selection(preserved, tenant_slug, "market")
         )
@@ -7460,7 +7494,8 @@ SHENWAN_LEVEL1_INDUSTRIES = (
 )
 
 # The supplied industry report verified all of these symbols against
-# /application/open-quote/kline/daily. They are quote codes, not EDB IDs.
+# /application/open-quote/index/kline/daily. They are index quote codes, not
+# EDB IDs.
 GANGTISE_SHENWAN_LEVEL1_CODES = {
     "农林牧渔": "801010.SWI", "基础化工": "801030.SWI", "钢铁": "801040.SWI",
     "有色金属": "801050.SWI", "电子": "801080.SWI", "汽车": "801880.SWI",
@@ -7609,7 +7644,7 @@ def build_market_sector_overview_payload(force_refresh=False, tenant_slug=""):
         if cached is None:
             cached = _load_watchlist_cache("market_sector_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
         if isinstance(cached, dict) and isinstance(cached.get("items"), list) and cached["items"]:
-            if cached.get("snapshot_version") == 10 and str(cached.get("source") or "").lower() == "gangtise openapi":
+            if _is_supported_gangtise_market_snapshot(cached) and str(cached.get("source") or "").lower() == "gangtise openapi":
                 return _apply_market_snapshot_on_demand_refresh(
                     _apply_tenant_market_display_selection(cached, tenant_slug, "sector")
                 )
@@ -7618,12 +7653,8 @@ def build_market_sector_overview_payload(force_refresh=False, tenant_slug=""):
         stale = _load_watchlist_cache("market_sector_overview", cache_key, 0)
     if isinstance(stale, dict) and isinstance(stale.get("items"), list) and stale.get("items"):
         source = str(stale.get("source") or "").lower()
-        if source == "gangtise openapi" and stale.get("snapshot_version") == 10:
-            preserved = copy.deepcopy(stale)
-            preserved["stale"] = True
-            preserved["items"] = []
-            preserved["message"] = "行业快照已超过一个交易日未同步，请检查 Gangtise 市场与行业指标同步任务。"
-            preserved["last_success_at"] = str(stale.get("updated_at") or "")
+        if source == "gangtise openapi" and _is_supported_gangtise_market_snapshot(stale):
+            preserved = _preserve_last_market_snapshot_for_closed_session(stale, "行业")
             return _apply_market_snapshot_on_demand_refresh(
                 _apply_tenant_market_display_selection(preserved, tenant_slug, "sector")
             )
@@ -8918,6 +8949,71 @@ def fetch_watchlist_intraday_series(detail, allow_provider_fetch=True):
         return result
 
 
+def _merge_watchlist_intraday_candle(detail, intraday_points):
+    """Expose the live minute quote as today's provisional daily candle.
+
+    Sina's daily endpoint commonly publishes only the last completed session
+    during market hours. The detail page already retrieves a real minute series,
+    so use it to append/replace only today's candle without altering closed-day
+    daily history.
+    """
+    if not is_cn_stock_market_open() or not isinstance(detail, dict):
+        return detail
+    trade_date = _current_cn_market_date().isoformat()
+    points = [
+        item for item in (intraday_points or [])
+        if isinstance(item, dict)
+        and str(item.get("date") or "")[:10] == trade_date
+        and numeric_value(item.get("value")) is not None
+    ]
+    if not points:
+        return detail
+    points.sort(key=lambda item: str(item.get("date") or ""))
+    values = [numeric_value(item.get("value")) for item in points]
+    if not values or any(value is None for value in values):
+        return detail
+    candle = {
+        "date": trade_date,
+        "open": round(values[0], 2),
+        "high": round(max(values), 2),
+        "low": round(min(values), 2),
+        "close": round(values[-1], 2),
+        "provisional": True,
+    }
+
+    def merge_candles(candles):
+        rows = [item for item in (candles or []) if isinstance(item, dict) and str(item.get("date") or "")[:10] != trade_date]
+        rows.append(candle)
+        return sorted(rows, key=lambda item: str(item.get("date") or ""))
+
+    daily_candles = merge_candles(detail.get("kline"))
+    detail["kline"] = daily_candles[-20:]
+    history_payload = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    history_candles = merge_candles(history_payload.get("candles") or detail.get("kline"))[-60:]
+    detail["history_kline"] = build_real_indicator_kline_payload(history_candles)
+    detail["history_series"] = [
+        {
+            "date": item["date"],
+            "value": item["close"],
+            "status": build_real_indicator_status(
+                NumberLike(item["close"]),
+                NumberLike(history_candles[index - 1]["close"]) if index else NumberLike(item["close"]),
+            ),
+        }
+        for index, item in enumerate(history_candles)
+    ]
+    previous = next((item for item in reversed(daily_candles[:-1]) if NumberLike(item.get("close")) > 0), None)
+    if previous:
+        previous_close = NumberLike(previous.get("close"))
+        change = candle["close"] - previous_close
+        detail["price"] = candle["close"]
+        detail["change"] = round(change, 2)
+        detail["change_pct"] = round(change / previous_close * 100, 2) if previous_close else 0.0
+    detail["kline_contains_intraday"] = True
+    detail["kline_intraday_updated_at"] = str(points[-1].get("date") or "")
+    return detail
+
+
 def attach_watchlist_intraday(detail, allow_provider_fetch=True):
     if not isinstance(detail, dict) or not detail:
         return detail
@@ -8940,6 +9036,8 @@ def attach_watchlist_intraday(detail, allow_provider_fetch=True):
     detail["intraday_updated_at"] = str(result.get("updated_at") or "").strip()
     detail["intraday_trade_date"] = _resolve_watchlist_intraday_trade_date(detail) or _current_cn_market_date().isoformat()
     detail["intraday_message"] = str(result.get("message") or "").strip()
+    if detail["intraday_available"]:
+        _merge_watchlist_intraday_candle(detail, detail["intraday_series"])
     return detail
 
 
