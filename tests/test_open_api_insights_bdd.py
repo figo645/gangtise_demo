@@ -259,6 +259,15 @@ class OpenApiInsightsBddTest(unittest.TestCase):
         self.assertIn("jsonb_array_elements", migration)
         self.assertIn("review_snapshots", migration)
 
+    def test_given_open_api_published_insights_when_h5_renders_then_dashboard_reviews_are_the_feed_source(self):
+        h5_source = (PROJECT_ROOT / "templates/h5.html").read_text(encoding="utf-8")
+
+        self.assertIn("const dashboardReviews = Array.isArray(dashboard.reviews) ? dashboard.reviews : null;", h5_source)
+        self.assertIn("tenant.review_snapshots = dashboardReviews;", h5_source)
+        self.assertIn("currentTenantDashboardPayload = { ...currentTenantDashboardPayload, reviews: payload.snapshots.slice(0, 200) };", h5_source)
+        self.assertIn("refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});", h5_source)
+        self.assertIn("rerenderReviews: true", h5_source)
+
     def test_given_domain_storage_migrations_when_checked_then_messages_knowledge_and_config_lock_are_separated(self):
         message_sql = (PROJECT_ROOT / "sql/postgres/139_message_center_domain.sql").read_text(encoding="utf-8")
         knowledge_sql = (PROJECT_ROOT / "sql/postgres/140_knowledge_domain.sql").read_text(encoding="utf-8")

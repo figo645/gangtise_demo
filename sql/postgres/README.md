@@ -33,6 +33,9 @@ Notes:
   PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=sprint_dashboard PGUSER=postgres PGPASSWORD='***' \
     ./scripts/apply_postgres_updates.sh
   ```
+- The compatibility shell command delegates all migration work to
+  [`scripts/run_postgres_migrations.py`](/Users/xuchenfei/PycharmProjects/gangtise_demo/scripts/run_postgres_migrations.py). Python uses `psycopg2` to acquire a PostgreSQL advisory lock, execute each numbered SQL file in a transaction, verify its SHA-256 checksum, and write `schema_migrations`; it does not invoke `psql` to execute migrations.
+- Jenkins `gangtise_database_CD` calls this Python runner directly. The `psql`, `pg_dump` and `pg_restore` checks in that Pipeline are only used to validate and build the required rollback snapshot, not to execute migration SQL.
 - Schema-only update command:
   ```bash
   ./scripts/apply_postgres_updates.sh --schema-only
@@ -40,7 +43,7 @@ Notes:
 - Before a full local-to-production database replacement, apply the numbered migrations to the target. Local and production use the same PostgreSQL rows and application visibility rules; explicit simulation batches remain identifiable and removable through database-release tooling.
 - One-shot bootstrap for a new database (creates database and then calls the same incremental updater):
   [scripts/init_postgres_vector_db.sh](/Users/xuchenfei/PycharmProjects/gangtise_demo/scripts/init_postgres_vector_db.sh)
-- Daemon deployment default: [`start_daemon_app.sh`](/Users/xuchenfei/PycharmProjects/gangtise_demo/start_daemon_app.sh) checks and automatically starts local PostgreSQL, then runs the same updater before restarting the application. Set `AUTO_START_POSTGRES=0` when PostgreSQL is managed externally; set `AUTO_DB_UPDATE=0` only for an emergency application-only restart.
+- Daemon startup: [`start_daemon_app.sh`](/Users/xuchenfei/PycharmProjects/gangtise_demo/start_daemon_app.sh) checks and may start local PostgreSQL, but deliberately does not apply migrations. Jenkins Database CD or the Admin database-release workflow must finish the Python migration runner and its validation before the daemon is restarted.
 - Real market data credentials are configured per environment from Admin > 市场数据 > Gangtise 数据连接 and stored in that environment's PostgreSQL. Access Key / Secret Key remain encrypted; Long Token is deliberately stored as a separate plaintext PostgreSQL setting. Full-database releases preserve the target environment's credential records and never copy them from local, staging, or production.
 - The daemon also starts a non-blocking real-market snapshot refresh. Existing snapshots remain visible during refresh; set `AUTO_MARKET_SNAPSHOT_SYNC=0` only to skip that refresh.
 - Remote diagnosis command: [`scripts/check_market_data.sh`](/Users/xuchenfei/PycharmProjects/gangtise_demo/scripts/check_market_data.sh). It reports migration status, snapshot source and item counts, and exits with code `2` when no market snapshot is persisted.

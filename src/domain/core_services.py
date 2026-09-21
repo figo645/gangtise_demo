@@ -9067,6 +9067,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "142_domain_foreign_keys.sql")
         execute_sql_file(conn, sql_dir / "143_domain_tenant_ownership.sql")
         execute_sql_file(conn, sql_dir / "144_message_domain_user_identity.sql")
+        execute_sql_file(conn, sql_dir / "145_reconcile_tenant_registry_references.sql")
 
 
 def init_db_safe():

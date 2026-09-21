@@ -1,0 +1,221 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'MIGRATION_SCOPE',
+            choices: ['schema_only', 'schema_and_master_data'],
+            description: '默认只执行结构迁移。主数据或数据回填迁移必须单独审核后选择第二项。'
+        )
+        string(
+            name: 'PRODUCTION_CONFIRMATION',
+            defaultValue: '',
+            description: '输入 APPLY_PRODUCTION_DATABASE_MIGRATION 才允许写入 Production。'
+        )
+        booleanParam(
+            name: 'RESTART_APPLICATION',
+            defaultValue: true,
+            description: '迁移和账本核验成功后才重启 Web、Worker、Scheduler。'
+        )
+    }
+
+    environment {
+        // Matches gangtise_CI and gangtise_CD. The deployed code and its
+        // untracked production credential files remain in this directory.
+        DEPLOY_DIR = '/opt/devsource/gangtise_demo'
+        CREDENTIALS_FILE = '/opt/devsource/gangtise_demo/.gangtise_postgres_credentials'
+        MIGRATION_LOCK = '/opt/devsource/gangtise_demo/.deploy/jenkins-production-migration.lock'
+        RELEASE_MANIFEST = '/opt/devsource/gangtise_demo/jenkinsfiles/database/release-manifest.json'
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    stages {
+        stage('Require Production Approval') {
+            steps {
+                script {
+                    if (params.PRODUCTION_CONFIRMATION != 'APPLY_PRODUCTION_DATABASE_MIGRATION') {
+                        error('Production migration was not confirmed. No database action was started.')
+                    }
+                }
+            }
+        }
+
+        stage('Preflight Deployed Release') {
+            steps {
+                dir("${DEPLOY_DIR}") {
+                    sh '''
+                        set -euo pipefail
+                        test -f "$CREDENTIALS_FILE"
+                        test -x ./scripts/apply_postgres_updates.sh
+                        test -x ./scripts/run_postgres_migrations.py
+                        test -x ./scripts/create_database_release_backup.sh
+                        test -f "$RELEASE_MANIFEST"
+                        command -v psql >/dev/null
+                        command -v pg_dump >/dev/null
+                        command -v pg_restore >/dev/null
+                        command -v pg_isready >/dev/null
+                        command -v flock >/dev/null
+                        bash -n ./scripts/apply_postgres_updates.sh
+
+                        PYTHON_BIN=""
+                        for candidate in ./venv/bin/python ./.venv/bin/python ./env/bin/python python3; do
+                          if command -v "$candidate" >/dev/null 2>&1 || [ -x "$candidate" ]; then
+                            PYTHON_BIN="$candidate"
+                            break
+                          fi
+                        done
+                        [ -n "$PYTHON_BIN" ] || { echo 'Python runtime is unavailable.' >&2; exit 1; }
+                        "$PYTHON_BIN" -c 'import psycopg2; print("Python migration runtime verified")'
+                        "$PYTHON_BIN" ./scripts/run_postgres_migrations.py \
+                          --release-manifest "$RELEASE_MANIFEST" \
+                          --verify-release-manifest
+
+                        set -a
+                        . "$CREDENTIALS_FILE"
+                        set +a
+                        : "${APP_DB_HOST:?APP_DB_HOST is required}"
+                        : "${APP_DB_PORT:?APP_DB_PORT is required}"
+                        : "${APP_DB_NAME:?APP_DB_NAME is required}"
+                        : "${APP_DB_USER:?APP_DB_USER is required}"
+                        : "${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}"
+                        export PGPASSWORD="$APP_DB_PASSWORD"
+                        pg_isready -t 8 -h "$APP_DB_HOST" -p "$APP_DB_PORT"
+                        psql -w -h "$APP_DB_HOST" -p "$APP_DB_PORT" -U "$APP_DB_USER" -d "$APP_DB_NAME" -v ON_ERROR_STOP=1 -Atqc \
+                          "SELECT 'database=' || current_database() || ', migrations=' || count(*) FROM schema_migrations;"
+                    '''
+                }
+            }
+        }
+
+        stage('Create Verified Rollback Point') {
+            steps {
+                dir("${DEPLOY_DIR}") {
+                    sh '''
+                        set -euo pipefail
+                        set -a
+                        . "$CREDENTIALS_FILE"
+                        set +a
+                        DATABASE_RELEASE_TARGET=production \
+                        REMOTE_DB_HOST="$APP_DB_HOST" \
+                        REMOTE_DB_PORT="$APP_DB_PORT" \
+                        REMOTE_DB_NAME="$APP_DB_NAME" \
+                        REMOTE_DB_USER="$APP_DB_USER" \
+                        REMOTE_DB_PASSWORD="$APP_DB_PASSWORD" \
+                        REMOTE_MAINTENANCE_DB=postgres \
+                        DATABASE_RELEASE_WORK_DIR="$DEPLOY_DIR/.deploy" \
+                        ./scripts/create_database_release_backup.sh
+                    '''
+                }
+            }
+        }
+
+        stage('Apply Versioned Migrations') {
+            steps {
+                dir("${DEPLOY_DIR}") {
+                    sh '''
+                        set -euo pipefail
+                        mkdir -p "$DEPLOY_DIR/.deploy"
+                        exec 9>"$MIGRATION_LOCK"
+                        flock -n 9 || { echo 'Another Jenkins database migration is running.' >&2; exit 1; }
+
+                        set -a
+                        . "$CREDENTIALS_FILE"
+                        set +a
+                        PYTHON_BIN=""
+                        for candidate in ./venv/bin/python ./.venv/bin/python ./env/bin/python python3; do
+                          if command -v "$candidate" >/dev/null 2>&1 || [ -x "$candidate" ]; then
+                            PYTHON_BIN="$candidate"
+                            break
+                          fi
+                        done
+                        [ -n "$PYTHON_BIN" ] || { echo 'Python runtime is unavailable.' >&2; exit 1; }
+                        if [ "$MIGRATION_SCOPE" = 'schema_only' ]; then
+                          "$PYTHON_BIN" ./scripts/run_postgres_migrations.py \
+                            --credentials-file "$CREDENTIALS_FILE" \
+                            --release-manifest "$RELEASE_MANIFEST" \
+                            --schema-only
+                        else
+                          "$PYTHON_BIN" ./scripts/run_postgres_migrations.py \
+                            --credentials-file "$CREDENTIALS_FILE" \
+                            --release-manifest "$RELEASE_MANIFEST"
+                        fi
+
+                        # A second idempotent pass is also the post-release
+                        # checksum and ledger verification gate.
+                        if [ "$MIGRATION_SCOPE" = 'schema_only' ]; then
+                          "$PYTHON_BIN" ./scripts/run_postgres_migrations.py \
+                            --credentials-file "$CREDENTIALS_FILE" \
+                            --release-manifest "$RELEASE_MANIFEST" \
+                            --schema-only
+                        else
+                          "$PYTHON_BIN" ./scripts/run_postgres_migrations.py \
+                            --credentials-file "$CREDENTIALS_FILE" \
+                            --release-manifest "$RELEASE_MANIFEST"
+                        fi
+                    '''
+                }
+            }
+        }
+
+        stage('Restart Only After Migration Success') {
+            when {
+                expression { return params.RESTART_APPLICATION }
+            }
+            steps {
+                dir("${DEPLOY_DIR}") {
+                    sh '''
+                        set -euo pipefail
+                        export BUILD_ID=dontKillMe
+                        export JENKINS_NODE_COOKIE=dontKillMe
+                        AUTO_START_POSTGRES=0 AUTO_INSTALL_PYTHON_DEPS=0 ./stop_daemon_app.sh
+                        AUTO_START_POSTGRES=0 AUTO_INSTALL_PYTHON_DEPS=0 ./start_daemon_app.sh
+                    '''
+                }
+            }
+        }
+
+        stage('Post-Release Health Check') {
+            steps {
+                dir("${DEPLOY_DIR}") {
+                    sh '''
+                        set -euo pipefail
+                        set -a
+                        . "$CREDENTIALS_FILE"
+                        set +a
+                        export PGPASSWORD="$APP_DB_PASSWORD"
+                        psql -w -h "$APP_DB_HOST" -p "$APP_DB_PORT" -U "$APP_DB_USER" -d "$APP_DB_NAME" -v ON_ERROR_STOP=1 -Atqc \
+                          "SELECT migration_name || '|' || migration_scope || '|' || checksum_sha256 FROM schema_migrations ORDER BY migration_name;" \
+                          | tee "$DEPLOY_DIR/.deploy/jenkins-production-migration-ledger-${BUILD_NUMBER}.txt"
+                        if [ "$RESTART_APPLICATION" = 'true' ]; then
+                          curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1:5001/api/site-config >/dev/null
+                        fi
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh '''
+                set +e
+                mkdir -p "$WORKSPACE/database-migration-artifacts"
+                cp "$DEPLOY_DIR"/.deploy/jenkins-production-migration-ledger-*.txt \
+                  "$WORKSPACE/database-migration-artifacts/" 2>/dev/null
+            '''
+            archiveArtifacts artifacts: 'database-migration-artifacts/**', allowEmptyArchive: true
+        }
+        success {
+            echo 'Production 数据库迁移、迁移账本核验和应用健康检查已完成。'
+        }
+        failure {
+            echo 'Production 迁移未完成。若迁移阶段失败，应用不会由本流水线重启；请使用最近的完整回滚备份进行恢复。'
+        }
+    }
+}

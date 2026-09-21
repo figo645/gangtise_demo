@@ -111,10 +111,12 @@ def test_given_product_surfaces_when_templates_load_then_tracker_and_admin_entry
 def test_given_database_migration_when_release_runs_then_analytics_schema_is_versioned():
     migration = (ROOT / "sql/postgres/132_analytics_events.sql").read_text(encoding="utf-8")
     runner = (ROOT / "scripts/apply_postgres_updates.sh").read_text(encoding="utf-8")
+    python_runner = (ROOT / "scripts/run_postgres_migrations.py").read_text(encoding="utf-8")
     bootstrap = (ROOT / "src/domain/core_services.py").read_text(encoding="utf-8")
     assert "CREATE TABLE IF NOT EXISTS analytics_events" in migration
     assert "idx_analytics_events_feature_time" in migration
-    assert "131|132" in runner
+    assert "run_postgres_migrations.py" in runner
+    assert '"131", "132"' in python_runner
     assert 'sql_dir / "132_analytics_events.sql"' in bootstrap
 
 

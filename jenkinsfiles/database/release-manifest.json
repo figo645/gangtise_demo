@@ -1,0 +1,16 @@
+{
+  "release_version": "v1.1.29",
+  "release_date": "2026-09-22",
+  "description": "洞见发布、Open API、消息中心、知识域与租户归属结构升级。",
+  "migrations": [
+    {"name": "137_open_api_insight_tokens.sql", "scope": "schema", "sha256": "e0554feeeeea1d70076fc58a70283525d7952e91902b0270fc19101324e2e6b1"},
+    {"name": "138_tenant_published_insights.sql", "scope": "schema", "sha256": "e5733f1a4d3910b0f6c7ec6f622eea691a12352c1d74ca78a1a451973d3db353"},
+    {"name": "139_message_center_domain.sql", "scope": "schema", "sha256": "909659570e6805f4b17ec06021dc38326a06c6062eb50344c86ce53739b65873"},
+    {"name": "140_knowledge_domain.sql", "scope": "schema", "sha256": "38ef6241403abded1174c837e1b3393a873646c7b359b6559010cb6e1b580cf6"},
+    {"name": "141_app_settings_revision.sql", "scope": "schema", "sha256": "31c67ea36cf730de72795538d9e577ab4631ec883a12441d94f52e0491f6473f"},
+    {"name": "145_reconcile_tenant_registry_references.sql", "scope": "schema", "sha256": "0eb6e53a4e4d93f24f69fd6a083bafe6bb63a44102145224fbf22a5fb81811c7"},
+    {"name": "142_domain_foreign_keys.sql", "scope": "schema", "sha256": "24a0dd9e11427f3b1c0254fbbf58866933c6f5ed7914bc0f248974ec930a7888"},
+    {"name": "143_domain_tenant_ownership.sql", "scope": "schema", "sha256": "0e68178a4d7ad2b8a2c9f7edfbf991e00c52d1da0b3bb14c61b2f231d2318978"},
+    {"name": "144_message_domain_user_identity.sql", "scope": "schema", "sha256": "a0a6ccd1613470100d0036c1a6187235ef48613d73069db69d718194a93d78fd"}
+  ]
+}

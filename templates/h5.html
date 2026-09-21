@@ -5785,7 +5785,7 @@ function syncPublishedReviewStateToH5(tenantSlug, result) {
   const payload = result && typeof result === 'object' ? result : {};
   if (!normalizedSlug) return;
   const nextState = {};
-  if (Array.isArray(payload.snapshots)) nextState.review_snapshots = payload.snapshots.slice(0, 20);
+  if (Array.isArray(payload.snapshots)) nextState.review_snapshots = payload.snapshots.slice(0, 200);
   if (payload.message_center_state && typeof payload.message_center_state === 'object') {
     nextState.message_center_state = payload.message_center_state;
   }
@@ -5798,6 +5798,10 @@ function syncPublishedReviewStateToH5(tenantSlug, result) {
   }
   if (window.ACTIVE_TENANT && String(window.ACTIVE_TENANT.slug || '').trim().toLowerCase() === normalizedSlug) {
     window.ACTIVE_TENANT = { ...window.ACTIVE_TENANT, ...nextState };
+  }
+  const dashboardTenantSlug = String((((currentTenantDashboardPayload || {}).tenant || {}).slug) || '').trim().toLowerCase();
+  if (Array.isArray(payload.snapshots) && dashboardTenantSlug === normalizedSlug) {
+    currentTenantDashboardPayload = { ...currentTenantDashboardPayload, reviews: payload.snapshots.slice(0, 200) };
   }
   DEMO_PROFILE_USERS = DEMO_PROFILE_USERS.map((user) => {
     const tenant = user && user.tenant && typeof user.tenant === 'object' ? user.tenant : {};
@@ -6269,6 +6273,7 @@ async function refreshTenantDashboardRemoteState(options) {
   if (!opts.force && loadedTenantSlug === String(tenantSlug).trim()) {
     if (opts.rerenderFeed) renderFundMacroDashboard();
     if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
+    if (opts.rerenderReviews) renderReviewExperience();
     return { dashboard: currentTenantDashboardPayload, cached: true };
   }
   try {
@@ -6282,6 +6287,7 @@ async function refreshTenantDashboardRemoteState(options) {
     tenantState.draft = tenantFundDashboardRemoteState.draft;
     if (opts.rerenderFeed) renderFundMacroDashboard();
     if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
+    if (opts.rerenderReviews) renderReviewExperience();
     renderWorkbenchOpsStats();
     renderFanStockSectorChart();
     return payload;
@@ -8042,6 +8048,18 @@ function getAllDavUsersForReviews() {
     ...activeTenant,
     ...activeUserTenant,
   };
+  const dashboard = currentTenantDashboardPayload && typeof currentTenantDashboardPayload === 'object'
+    ? currentTenantDashboardPayload
+    : {};
+  const dashboardTenant = dashboard.tenant && typeof dashboard.tenant === 'object' ? dashboard.tenant : {};
+  const dashboardTenantSlug = String(dashboardTenant.slug || '').trim().toLowerCase();
+  const dashboardReviews = Array.isArray(dashboard.reviews) ? dashboard.reviews : null;
+  // Published Insights are a content aggregate. The dashboard serializes its
+  // authoritative, permission-filtered records; review_snapshots is only the
+  // pre-migration compatibility source.
+  if (dashboardReviews && dashboardTenantSlug && dashboardTenantSlug === tenantSlug) {
+    tenant.review_snapshots = dashboardReviews;
+  }
   if (!tenant.slug && !tenant.id) return [];
   return [{
     id: `tenant_dav_${tenant.id || tenant.slug || 'current'}`,
@@ -13310,7 +13328,7 @@ function renderDemoProfile(user) {
   renderDemoUserSwitchList();
   syncTenantScopedAdvisorViews();
   renderFundMacroDashboard();
-  refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
+  refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true, rerenderReviews: true });
   renderH5Commerce(user);
   userWatchlistLoaded = canReuseInitialWatchlist || canReuseCurrentWatchlist;
   userWatchlistLoadError = '';
@@ -20977,6 +20995,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener('focus', () => {
   refreshH5SiteConfig({silent: true});
+  if (hasLoggedInH5User()) {
+    refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});
+  }
 });
 
 window.addEventListener('popstate', () => {
@@ -21007,13 +21028,16 @@ window.addEventListener('popstate', () => {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     refreshH5SiteConfig({silent: true});
+    if (hasLoggedInH5User()) {
+      refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});
+    }
   }
 });
 
 window.addEventListener('storage', (event) => {
   if (event.key === SITE_CONFIG_BROADCAST_KEY) {
     refreshH5SiteConfig({silent: true});
-    refreshTenantDashboardRemoteState({rerenderFeed: true, rerenderWorkbench: true});
+    refreshTenantDashboardRemoteState({force: true, rerenderFeed: true, rerenderWorkbench: true, rerenderReviews: true});
   }
 });
 

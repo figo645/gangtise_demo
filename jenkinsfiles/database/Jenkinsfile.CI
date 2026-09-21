@@ -1,0 +1,127 @@
+pipeline {
+    agent any
+
+    triggers {
+        githubPush()
+    }
+
+    environment {
+        GITHUB_TOKEN = credentials('jenkins_cred_git')
+        REPO_URL = 'https://github.com/figo645/gangtise_demo.git'
+        BRANCH = 'main'
+        WORK_DIR = '/opt/devsource/gangtise_database_jenkins_pipeline'
+        RELEASE_MANIFEST = 'jenkinsfiles/database/release-manifest.json'
+        // Kept aligned with the application pipelines. This job never writes
+        // to DEPLOY_DIR or connects to a production database.
+        DEPLOY_DIR = '/opt/devsource/gangtise_demo'
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '20'))
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    stages {
+        stage('Clean and Checkout') {
+            steps {
+                sh '''
+                    set -euo pipefail
+                    rm -rf "$WORK_DIR"
+                    mkdir -p "$WORK_DIR"
+                    git -c http.version=HTTP/1.1 clone --depth 1 --branch "$BRANCH" \
+                      "https://${GITHUB_TOKEN}@${REPO_URL#https://}" "$WORK_DIR"
+                    cd "$WORK_DIR"
+                    git rev-parse HEAD | tee .migration-source-commit
+                '''
+            }
+        }
+
+        stage('Build Isolated Test Environment') {
+            steps {
+                dir("${WORK_DIR}") {
+                    sh '''
+                        set -euo pipefail
+                        python3 -m venv .venv
+                        .venv/bin/python -m pip install --disable-pip-version-check --upgrade pip
+                        .venv/bin/python -m pip install --disable-pip-version-check -r requirements.txt
+                        .venv/bin/python -m py_compile app.py src/domain/core_services.py src/domain/database_release_services.py
+                    '''
+                }
+            }
+        }
+
+        stage('Validate Immutable Migration Contract') {
+            steps {
+                dir("${WORK_DIR}") {
+                    sh '''
+                        set -euo pipefail
+                        bash -n scripts/apply_postgres_updates.sh
+                        test -x scripts/apply_postgres_updates.sh
+                        test -x scripts/run_postgres_migrations.py
+
+                        .venv/bin/python - <<'PY'
+from pathlib import Path
+import re
+import sys
+
+sql_dir = Path('sql/postgres')
+pattern = re.compile(r'^[0-9]{3}_[A-Za-z0-9][A-Za-z0-9_.-]*\.sql$')
+files = sorted(path for path in sql_dir.glob('*.sql') if path.name != 'README.md')
+invalid = [path.name for path in files if not pattern.fullmatch(path.name)]
+if invalid:
+    raise SystemExit(f'Invalid migration filename(s): {", ".join(invalid)}')
+if not files:
+    raise SystemExit('No numbered PostgreSQL migration files found.')
+if not (sql_dir / '004_schema_migrations.sql').is_file():
+    raise SystemExit('schema_migrations bootstrap migration is missing.')
+print(f'Migration contract valid: {len(files)} numbered SQL files.')
+PY
+
+                        .venv/bin/python ./scripts/run_postgres_migrations.py \
+                          --release-manifest "$RELEASE_MANIFEST" \
+                          --verify-release-manifest
+
+                        {
+                          printf 'source_commit='; cat .migration-source-commit
+                          find sql/postgres -maxdepth 1 -type f -name '[0-9][0-9][0-9]_*.sql' -print0 \
+                            | sort -z \
+                            | xargs -0 shasum -a 256
+                        } > migration-manifest.sha256
+                    '''
+                }
+            }
+        }
+
+        stage('Migration Regression Gate') {
+            steps {
+                dir("${WORK_DIR}") {
+                    sh '''
+                        set -euo pipefail
+                        PYTHONPATH=. .venv/bin/python -m pytest -q \
+                          tests/test_schema_release_sequences.py \
+                          tests/test_database_release_web_bdd.py \
+                          tests/test_database_inventory_resilience.py \
+                          tests/test_domain_design_regression_bdd.py
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh '''
+                set +e
+                mkdir -p "$WORKSPACE/database-migration-artifacts"
+                cp "$WORK_DIR/migration-manifest.sha256" "$WORKSPACE/database-migration-artifacts/" 2>/dev/null
+                cp "$WORK_DIR/.migration-source-commit" "$WORKSPACE/database-migration-artifacts/" 2>/dev/null
+            '''
+            archiveArtifacts artifacts: 'database-migration-artifacts/**', allowEmptyArchive: true
+        }
+        success {
+            echo '数据库迁移 CI 已通过。可由受权限控制的 Database CD 执行 Production 迁移。'
+        }
+    }
+}

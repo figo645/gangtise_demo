@@ -305,6 +305,15 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertEqual(response.get_json()["inventory"]["rows"][0]["category_label"], "用户账户数据")
         inventory.assert_called_once_with("staging")
 
+    def test_schema_inventory_cards_show_category_differences_in_red(self):
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("difference_counts", html)
+        self.assertIn("结构差异表", html)
+        self.assertIn("主数据差异表", html)
+        self.assertIn("结构状态", html)
+        self.assertIn("MDM 主数据状态", html)
+        self.assertIn("color:var(--red)", html)
+
     def test_schema_only_generation_and_release_keep_a_separate_contract(self):
         csrf = self._csrf_token()
         with patch.object(
@@ -482,6 +491,11 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertLess(
             html.index("if(!job.id)throw new Error('database_release_job_id_missing')"),
             html.index("button.textContent='已提交'"),
+        )
+        self.assertIn("release.textContent='已完成'", html)
+        self.assertLess(
+            html.index("if(job.status==='succeeded')"),
+            html.index("release.textContent='已完成'"),
         )
 
     def test_schema_release_target_change_clears_submission_visual_state(self):

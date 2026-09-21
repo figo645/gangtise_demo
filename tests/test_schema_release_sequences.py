@@ -110,3 +110,62 @@ def test_existing_table_serial_default_is_blocked_from_zero_business_data_write_
     assert generated["blockers"] == [
         {"table": "existing_events", "column": "id", "reason": "sequence_default_on_existing_table"}
     ]
+
+
+def test_existing_tenant_scoped_records_reconcile_registry_before_foreign_key():
+    local_connection, target_connection = object(), object()
+    report = {"schema": {"different_tables": ["open_api_tokens"]}}
+    columns = [{"name": "tenant_slug", "type": "text", "not_null": True, "default": "", "identity": "", "serial_sequence": ""}]
+    with patch.object(schema_diff, "_public_tables", return_value=["open_api_tokens"]), patch.object(
+        schema_diff, "_column_specs", return_value=columns
+    ), patch.object(
+        schema_diff,
+        "_table_constraints",
+        side_effect=lambda connection, _table: {
+            "fk_open_api_tokens_tenant": "FOREIGN KEY (tenant_slug) REFERENCES tenant_registry(tenant_slug) ON DELETE RESTRICT"
+        } if connection is local_connection else {},
+    ), patch.object(schema_diff, "_table_indexes", return_value={}):
+        generated = schema_diff._schema_incremental_sql(local_connection, target_connection, report, schema_only=True)
+
+    sql = generated["sql"]
+    assert sql.index("INSERT INTO tenant_registry") < sql.index("ADD CONSTRAINT \"fk_open_api_tokens_tenant\"")
+    assert "tenant_registry_reference_invalid:open_api_tokens" in sql
+    assert generated["actions"] == [
+        {"table": "open_api_tokens", "parent_table": "tenant_registry", "action": "reconcile_missing_tenant_registry_references"},
+        {"table": "open_api_tokens", "constraint": "fk_open_api_tokens_tenant", "action": "add_constraint"},
+    ]
+
+
+class _MogrifyCursor:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def mogrify(self, _statement, _values):
+        return b"('600519.SH', 'Moutai')"
+
+
+class _MogrifyConnection:
+    def cursor(self):
+        return _MogrifyCursor()
+
+
+def test_mdm_data_package_uses_business_key_and_never_copies_serial_id():
+    specs = [
+        {"name": "id", "serial_sequence": "public.security_master_id_seq", "identity": ""},
+        {"name": "security_code", "serial_sequence": "", "identity": ""},
+        {"name": "name", "serial_sequence": "", "identity": ""},
+    ]
+    local_rows = {"[\"600519.SH\"]": {"hash": "local", "values": ("600519.SH", "Moutai")}}
+    with patch.object(schema_diff, "_column_specs", return_value=specs), patch.object(
+        schema_diff, "_primary_key_columns", side_effect=AssertionError("MDM data must not use surrogate primary keys")
+    ), patch.object(
+        schema_diff, "_data_rows", side_effect=[local_rows, {}]
+    ):
+        generated = schema_diff._data_incremental_sql(_MogrifyConnection(), object(), ["security_master"])
+
+    assert 'INSERT INTO "security_master" ("security_code", "name")' in generated["sql"]
+    assert 'ON CONFLICT ("security_code") DO UPDATE SET "name" = EXCLUDED."name"' in generated["sql"]
+    assert '"id"' not in generated["sql"]

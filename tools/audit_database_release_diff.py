@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Read-only local-to-target PostgreSQL release audit.
 
-The report deliberately contains only table metadata, row counts and SHA-256
-content digests. It never exports row values, modifies a database, or creates
-release packages. Use it before writing an immutable schema/master/data SQL
-package for a target environment.
+Schema metadata is compared for every application table. Row-level comparison
+is deliberately limited to MDM-managed master data and uses business-key
+digests; runtime, user, account and environment configuration data is never
+scanned as a release difference. The tool never exports row values, modifies a
+database, or creates release packages.
 """
 
 import argparse
@@ -33,20 +34,21 @@ EXCLUDED_LEDGER_TABLES = {"database_release_packages", "schema_migrations"}
 # These tables belong to the release controller itself. They are allowed to
 # exist only on the target and must not be treated as application drift.
 EXCLUDED_SCHEMA_TABLES = EXCLUDED_LEDGER_TABLES
-MASTER_DATA_TABLES = {
-    "admin_task_configs",
-    "app_settings",
+MDM_MASTER_DATA_TABLES = {
+    "security_master",
     "indicator_definitions",
     "indicator_mapping_rules",
     "indicator_source_defs",
+    "quiz_questions",
 }
-MASTER_DATA_KEYS = {
-    "admin_task_configs": "task_code",
+MDM_MASTER_DATA_KEYS = {
     "indicator_definitions": "indicator_code",
     "indicator_mapping_rules": "rule_code",
     "indicator_source_defs": "source_code",
-    "app_settings": "setting_key",
+    "security_master": "security_code",
+    "quiz_questions": "question_code",
 }
+CONFIGURATION_TABLES = {"admin_task_configs", "app_settings", "tenant_registry", "tenant_subscription_products", "tenant_fan_qr_invites", "open_api_tokens"}
 RUNTIME_SETTING_PREFIXES = (
     "watchlist_intraday_cache:",
     "watchlist_detail_cache:",
@@ -75,6 +77,15 @@ RUNTIME_DATA_TABLES = {
     "watchlist_comments",
     "watchlist_kline_annotations",
 }
+RUNTIME_DATA_TABLES.update({
+    "daily_quiz_sets",
+    "market_snapshot_payloads",
+    "indicator_series",
+    "indicator_kline_points",
+    "indicator_latest_values",
+    "indicator_raw_records",
+    "indicator_load_batches",
+})
 VOLATILE_DATA_COLUMNS = {"created_at", "updated_at", "started_at", "finished_at", "applied_at", "last_tested_at"}
 TABLE_RUNTIME_COLUMNS = {
     "admin_task_configs": {
@@ -181,7 +192,7 @@ def _table_data_digest(connection, table_name, ignore_volatile_columns=False):
 
 def _stable_master_rows(connection, table_name):
     """Return business-key to stable row digest without persisting row values."""
-    key_column = MASTER_DATA_KEYS[table_name]
+    key_column = MDM_MASTER_DATA_KEYS[table_name]
     quoted_table = _quote_identifier(table_name)
     quoted_key = _quote_identifier(key_column)
     with connection.cursor() as cursor:
@@ -199,11 +210,6 @@ def _stable_master_rows(connection, table_name):
         rows = {}
         for key, payload_text in cursor.fetchall():
             normalized_key = str(key or "")
-            if table_name == "app_settings" and (
-                normalized_key in PROTECTED_SETTING_KEYS
-                or normalized_key.startswith(RUNTIME_SETTING_PREFIXES)
-            ):
-                continue
             rows[normalized_key] = hashlib.sha256(str(payload_text).encode("utf-8")).hexdigest()
     return rows
 
@@ -423,6 +429,35 @@ def _constraint_release_phase(definition):
     return "other"
 
 
+def _tenant_registry_reference_repair_statement(table_name, definition):
+    """Return the narrowly-scoped parent-row repair needed before a tenant FK.
+
+    Older deployments can contain valid tenant-scoped records created before
+    ``tenant_registry`` became the canonical aggregate root.  Adding the FK
+    must not delete or rewrite those records.  This statement only creates a
+    missing registry parent for a canonical, non-empty tenant slug.  Invalid
+    historic values remain a hard failure rather than being silently changed.
+    """
+    normalized = re.sub(r'\s+', ' ', str(definition or '')).strip().lower()
+    expected = "foreign key (tenant_slug) references tenant_registry(tenant_slug) on delete restrict"
+    if normalized != expected:
+        return ""
+    child = _quote_identifier(table_name)
+    return (
+        "DO $$ BEGIN "
+        f"IF EXISTS (SELECT 1 FROM {child} "
+        "WHERE tenant_slug IS NULL OR btrim(tenant_slug) = '' "
+        "OR tenant_slug <> lower(btrim(tenant_slug))) THEN "
+        f"RAISE EXCEPTION 'tenant_registry_reference_invalid:{table_name}'; END IF; "
+        "INSERT INTO tenant_registry (tenant_slug, tenant_name, created_at, updated_at) "
+        f"SELECT DISTINCT child.tenant_slug, child.tenant_slug, CURRENT_TIMESTAMP::text, CURRENT_TIMESTAMP::text FROM {child} child "
+        "LEFT JOIN tenant_registry registry ON registry.tenant_slug = child.tenant_slug "
+        "WHERE registry.tenant_slug IS NULL "
+        "ON CONFLICT (tenant_slug) DO NOTHING; "
+        "END $$;"
+    )
+
+
 def _schema_incremental_sql(local_connection, target_connection, report, schema_only=False):
     """Build only additive, idempotent DDL and report unsafe schema changes."""
     local_tables = [name for name in _public_tables(local_connection) if name not in EXCLUDED_SCHEMA_TABLES]
@@ -432,7 +467,8 @@ def _schema_incremental_sql(local_connection, target_connection, report, schema_
     # release. Emit all tables before any constraint, then indexes last.
     # Alphabetical table iteration alone is not a dependency order.
     foundation_statements, key_constraint_statements = [], []
-    foreign_key_statements, other_constraint_statements, index_statements = [], [], []
+    foreign_key_repair_statements, foreign_key_statements = [], []
+    other_constraint_statements, index_statements = [], []
     blockers, actions = [], []
 
     def append_constraint(table_name, name, definition):
@@ -446,6 +482,14 @@ def _schema_incremental_sql(local_connection, target_connection, report, schema_
         if phase == "key":
             key_constraint_statements.append(statement)
         elif phase == "foreign_key":
+            repair_statement = _tenant_registry_reference_repair_statement(table_name, definition)
+            if repair_statement:
+                foreign_key_repair_statements.append(repair_statement)
+                actions.append({
+                    "table": table_name,
+                    "parent_table": "tenant_registry",
+                    "action": "reconcile_missing_tenant_registry_references",
+                })
             foreign_key_statements.append(statement)
         else:
             other_constraint_statements.append(statement)
@@ -525,6 +569,7 @@ def _schema_incremental_sql(local_connection, target_connection, report, schema_
     statements = (
         foundation_statements
         + key_constraint_statements
+        + foreign_key_repair_statements
         + foreign_key_statements
         + other_constraint_statements
         + index_statements
@@ -660,8 +705,22 @@ def _data_rows(connection, table_name, columns, key_columns, include_values=Fals
 def _data_incremental_sql(local_connection, target_connection, table_names):
     statements, details, blockers = [], [], []
     for table_name in sorted(set(table_names or [])):
-        columns = [item["name"] for item in _column_specs(local_connection, table_name)]
-        key_columns = _primary_key_columns(local_connection, table_name)
+        specs = _column_specs(local_connection, table_name)
+        columns = [item["name"] for item in specs]
+        if table_name in MDM_MASTER_DATA_TABLES:
+            # MDM releases use the immutable business identifier, never the
+            # environment-specific surrogate id. This preserves target-side
+            # foreign-key references while still allowing an audited Upsert.
+            key_columns = [MDM_MASTER_DATA_KEYS[table_name]]
+            if key_columns[0] not in columns:
+                blockers.append({"table": table_name, "reason": "missing_mdm_business_key", "key": key_columns[0]})
+                continue
+            columns = [
+                item["name"] for item in specs
+                if item["name"] in key_columns or not (item.get("serial_sequence") or item.get("identity"))
+            ]
+        else:
+            key_columns = _primary_key_columns(local_connection, table_name)
         if not key_columns:
             blockers.append({"table": table_name, "reason": "missing_primary_key"})
             continue
@@ -741,9 +800,9 @@ def audit(local_target, remote_target):
         remote_tables = _public_tables(remote_connection)
         local_set, remote_set = set(local_tables), set(remote_tables)
         common_tables = sorted(local_set & remote_set)
-        schema_differences, data_differences, hash_skipped = [], [], []
+        schema_differences, data_differences = [], []
         raw_master_data_differences, release_master_differences = [], []
-        runtime_data_differences, manual_business_data_differences = [], []
+        excluded_from_mdm_comparison = []
         master_data_details = {}
         table_details = {}
         for table_name in common_tables:
@@ -755,23 +814,20 @@ def audit(local_target, remote_target):
             )
             if not schema_same:
                 schema_differences.append(table_name)
-            local_data = _table_data_digest(local_connection, table_name)
-            remote_data = _table_data_digest(remote_connection, table_name)
-            data_same = local_data["status"] == remote_data["status"] == "hashed" and local_data["row_count"] == remote_data["row_count"] and local_data["hash"] == remote_data["hash"]
-            if "skipped_large_table" in {local_data["status"], remote_data["status"]}:
-                hash_skipped.append(table_name)
-            elif not data_same and table_name not in EXCLUDED_LEDGER_TABLES:
-                data_differences.append(table_name)
-                if table_name in MASTER_DATA_TABLES:
+            if table_name in MDM_MASTER_DATA_TABLES:
+                stable_difference = _stable_master_difference(local_connection, remote_connection, table_name)
+                master_data_details[table_name] = stable_difference
+                data_same = not any(stable_difference.values())
+                if not data_same:
+                    data_differences.append(table_name)
                     raw_master_data_differences.append(table_name)
-                    stable_difference = _stable_master_difference(local_connection, remote_connection, table_name)
-                    master_data_details[table_name] = stable_difference
-                    if any(stable_difference.values()):
-                        release_master_differences.append(table_name)
-                elif table_name in RUNTIME_DATA_TABLES:
-                    runtime_data_differences.append(table_name)
-                else:
-                    manual_business_data_differences.append(table_name)
+                    release_master_differences.append(table_name)
+                local_data = {"status": "mdm_business_key_compared"}
+                remote_data = {"status": "mdm_business_key_compared"}
+            else:
+                excluded_from_mdm_comparison.append(table_name)
+                local_data = {"status": "not_compared_non_mdm"}
+                remote_data = {"status": "not_compared_non_mdm"}
             table_details[table_name] = {
                 "schema_same": schema_same,
                 "local": local_data,
@@ -800,11 +856,13 @@ def audit(local_target, remote_target):
                 "target_only_tables": len(target_only),
                 "schema_difference_tables": len(schema_differences),
                 "data_difference_tables": len(data_differences),
-                "hash_skipped_tables": len(hash_skipped),
+                "hash_skipped_tables": 0,
                 "release_master_data_difference_tables": len(release_master_differences),
                 "raw_master_data_difference_tables": len(raw_master_data_differences),
-                "runtime_data_difference_tables": len(runtime_data_differences),
-                "manual_business_data_difference_tables": len(manual_business_data_differences),
+                "runtime_data_difference_tables": 0,
+                "manual_business_data_difference_tables": 0,
+                "mdm_managed_table_count": len(set(common_tables) & MDM_MASTER_DATA_TABLES),
+                "mdm_excluded_table_count": len(excluded_from_mdm_comparison),
                 "migration_local_only": len(migration_difference["local_only"]),
                 "migration_target_only": len(migration_difference["target_only"]),
                 "migration_checksum_mismatch": len(migration_difference["checksum_mismatch"]),
@@ -812,21 +870,22 @@ def audit(local_target, remote_target):
             "schema": {"local_only_tables": local_only, "target_only_tables": target_only, "different_tables": schema_differences},
             "data": {
                 "different_tables": data_differences,
-                "hash_skipped_tables": hash_skipped,
+                "hash_skipped_tables": [],
                 "release_master_data_candidates": release_master_differences,
                 "raw_master_data_difference_tables": raw_master_data_differences,
                 "master_data_stable_differences": master_data_details,
-                "runtime_data_difference_tables": runtime_data_differences,
-                "manual_business_data_candidates": manual_business_data_differences,
+                "runtime_data_difference_tables": [],
+                "manual_business_data_candidates": [],
+                "excluded_from_mdm_comparison_tables": excluded_from_mdm_comparison,
             },
             "tables": table_details,
             "schema_migration_difference": migration_difference,
             "safe_release_delta": {
                 "schema": schema_differences,
                 "master_data": release_master_differences,
-                "business_data": manual_business_data_differences,
-                "total": len(schema_differences) + len(release_master_differences) + len(manual_business_data_differences),
-                "note": "Only these items may be turned into new versioned release packages. Runtime data and cache differences are intentionally excluded.",
+                "business_data": [],
+                "total": len(schema_differences) + len(release_master_differences),
+                "note": "Only schema differences and MDM-managed master-data differences may be turned into release packages. Runtime, user, account and configuration data is intentionally excluded.",
             },
             "local_release_ledger": _ledger(local_connection, "local"),
             "target_release_ledger": _ledger(remote_connection, remote_target.get("name") or ""),

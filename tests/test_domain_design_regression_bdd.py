@@ -44,9 +44,12 @@ def test_message_domain_tracks_recipient_identity_and_delivery_audit():
 def test_runtime_schema_bootstrap_includes_latest_domain_migration():
     source = (ROOT / "src/domain/core_services.py").read_text(encoding="utf-8")
     script = (ROOT / "scripts/apply_postgres_updates.sh").read_text(encoding="utf-8")
+    python_runner = (ROOT / "scripts/run_postgres_migrations.py").read_text(encoding="utf-8")
     assert 'sql_dir / "143_domain_tenant_ownership.sql"' in source
     assert 'sql_dir / "144_message_domain_user_identity.sql"' in source
-    assert "|144)" in script
+    assert 'sql_dir / "145_reconcile_tenant_registry_references.sql"' in source
+    assert "run_postgres_migrations.py" in script
+    assert '"143", "144", "145"' in python_runner
 
 
 def test_knowledge_and_published_content_do_not_fall_back_when_domain_tables_are_empty():

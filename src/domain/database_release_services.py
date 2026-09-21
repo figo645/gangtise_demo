@@ -36,6 +36,27 @@ PACKAGES_DIR = ROOT / "database_release_packages"
 RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
 USER_DATA_BACKUPS_DIR = ROOT / ".deploy" / "user_data_backups"
 USER_DATA_CLEANUP_MODES = {"account_runtime_data", "all_non_admin_accounts", "all_user_business_data"}
+MDM_MANAGED_MASTER_TABLES = {
+    "security_master",
+    "indicator_definitions",
+    "indicator_mapping_rules",
+    "indicator_source_defs",
+    "quiz_questions",
+}
+MDM_ENVIRONMENT_OWNED_TABLES = {
+    "market_snapshot_payloads",
+    "indicator_series",
+    "indicator_kline_points",
+    "indicator_latest_values",
+    "indicator_raw_records",
+    "indicator_load_batches",
+}
+MDM_CONTENT_RUNTIME_TABLES = {
+    "daily_quiz_sets",
+}
+EXPECTED_TARGET_ONLY_CONTROL_TABLES = {
+    "database_release_packages",
+}
 CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".database_release.env")))
 _config_loaded = False
 _release_lock = threading.Lock()
@@ -466,8 +487,12 @@ def _classify_database_table(table_name):
         return {"key": "user_generated", "label": "用户生成数据", "owner": "洞见内容模块", "policy": "生产草稿默认保留，结构发布绝不覆盖行数据。", "description": "大V洞见草稿正文、可见范围和编辑时间。"}
     if name in {"app_settings", "admin_task_configs", "tenant_registry", "tenant_subscription_products", "tenant_fan_qr_invites", "open_api_tokens"}:
         return {"key": "configuration", "label": "配置数据", "owner": "平台配置与租户管理", "policy": "按环境和租户隔离，生产敏感配置禁止覆盖。", "description": "系统、租户、订阅、后台任务和 Open API 授权配置。"}
-    if name in {"security_master", "indicator_definitions", "indicator_mapping_rules", "indicator_source_defs", "market_snapshot_payloads", "indicator_series", "indicator_kline_points", "indicator_latest_values", "indicator_raw_records", "indicator_load_batches", "daily_quiz_sets", "quiz_questions"}:
-        return {"key": "master_data", "label": "主数据", "owner": "平台数据服务", "policy": "可通过审核后的版本包发布，目标端独有记录不应被删除。", "description": "证券、指标、行情快照和平台统一内容目录。"}
+    if name in MDM_MANAGED_MASTER_TABLES:
+        return {"key": "master_data", "label": "主数据", "owner": "主数据管理（MDM）", "policy": "纳入主数据差异比较；仅允许按业务键新增或审核后 Upsert，目标端独有记录保留。", "description": "受管证券目录、指标定义/映射/来源和题库等标准化参考数据。"}
+    if name in MDM_ENVIRONMENT_OWNED_TABLES:
+        return {"key": "market_runtime_data", "label": "市场运行数据", "owner": "行情与指标数据服务", "policy": "按环境采集和刷新，不纳入 MDM 主数据差异，也不应因自然刷新标红。", "description": "市场快照、时序、K 线、最新值、原始行情和加载批次等高频运行数据。"}
+    if name in MDM_CONTENT_RUNTIME_TABLES:
+        return {"key": "content_runtime_data", "label": "内容运行数据", "owner": "内容服务", "policy": "按日期生成和轮换，不纳入 MDM 主数据差异，也不应因每日刷新标红。", "description": "每日题目编排、展示顺序和随机种子等运行时内容记录。"}
     if name in {"knowledge_embeddings", "review_voice_embeddings"}:
         return {"key": "knowledge_index", "label": "知识索引数据", "owner": "知识与检索模块", "policy": "独立重建或清理，不随结构升级覆盖用户业务数据。", "description": "知识库索引和语音内容索引。"}
     if name in {"access_logs", "admin_task_runs", "indicator_source_tests", "token_usage_logs", "user_async_jobs", "indicator_anomalies", "indicator_clean_jobs", "hermes_interception_audits"}:
@@ -478,11 +503,11 @@ def _classify_database_table(table_name):
 
 
 def get_database_table_inventory(target_name):
-    """List local/target tables and their data ownership policy."""
+    """List governance metadata plus MDM-only data differences."""
     target = get_database_release_target(target_name)
     if not target or target["name"] not in {"staging", "production"}:
         raise ValueError("database_release_target_invalid")
-    from tools.audit_database_release_diff import _connect, _public_tables
+    from tools.audit_database_release_diff import _connect, _public_tables, _stable_master_difference, _table_schema
     from src.domain.core_services import get_local_app_db_target
     local_target = get_local_app_db_target()
     try:
@@ -497,14 +522,59 @@ def get_database_table_inventory(target_name):
         with closing(_connect(target)) as target_connection:
             target_tables = set(_public_tables(target_connection))
     except psycopg2.Error as exc:
-        # The governance list remains useful when a target is temporarily at
-        # capacity. Do not turn a read-only UI query into a generic HTTP 500.
+        # Keep the governance list available during a target outage. Data
+        # columns are marked unavailable instead of being guessed.
         target_tables = set()
         detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
         target_error = f"目标环境暂不可用：{detail}"
+
+    schema_differences = set()
+    mdm_differences = {}
+    if not target_error:
+        try:
+            with closing(_connect(local_target)) as local_connection, closing(_connect(target)) as target_connection:
+                for name in sorted(local_tables & target_tables):
+                    if name not in {"schema_migrations", "database_release_packages"}:
+                        if _table_schema(local_connection, name)["hash"] != _table_schema(target_connection, name)["hash"]:
+                            schema_differences.add(name)
+                    if name in MDM_MANAGED_MASTER_TABLES:
+                        mdm_differences[name] = _stable_master_difference(local_connection, target_connection, name)
+        except psycopg2.Error as exc:
+            detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+            target_error = f"MDM 差异暂不可用：{detail}"
+
+    def data_status(table_name, classification):
+        if target_error:
+            return "目标暂不可用"
+        if classification["key"] in {"market_runtime_data", "content_runtime_data"}:
+            return "运行数据（忽略）"
+        if classification["key"] == "configuration":
+            return "配置数据（白名单）"
+        if classification["key"] == "user_accounts":
+            return "账户数据（保留）"
+        if classification["key"] != "master_data":
+            return "按环境保留"
+        detail = mdm_differences.get(table_name) or {}
+        changed = len(detail.get("changed_shared") or [])
+        local_only = len(detail.get("local_only") or [])
+        target_only = len(detail.get("target_only") or [])
+        return "有差异" if changed or local_only or target_only else "一致"
+
+    def schema_status(table_name):
+        if target_error:
+            return "目标暂不可用"
+        if table_name in EXPECTED_TARGET_ONLY_CONTROL_TABLES and table_name in target_tables - local_tables:
+            return "发布控制表（忽略）"
+        if table_name in local_tables - target_tables:
+            return "仅本地"
+        if table_name in target_tables - local_tables:
+            return "仅目标"
+        return "定义不同" if table_name in schema_differences else "一致"
+
     rows = []
     for name in sorted(local_tables | target_tables):
         classification = _classify_database_table(name)
+        resolved_schema_status = schema_status(name)
         rows.append({
             "table_name": name,
             "category": classification["key"],
@@ -514,17 +584,40 @@ def get_database_table_inventory(target_name):
             "description": classification["description"],
             "local_present": name in local_tables,
             "target_present": name in target_tables,
-            "status": "目标暂不可用" if target_error else ("两边都有" if name in local_tables and name in target_tables else ("仅本地" if name in local_tables else "仅目标")),
+            "status": resolved_schema_status,
+            "schema_status": resolved_schema_status,
+            "data_status": data_status(name, classification),
+            "mdm_difference": mdm_differences.get(name) if classification["key"] == "master_data" else None,
         })
     counts = {}
+    difference_counts = {}
     for row in rows:
         counts[row["category_label"]] = counts.get(row["category_label"], 0) + 1
+        category = row["category_label"]
+        difference_counts.setdefault(category, {"schema": 0, "data": 0})
+        if row["schema_status"] not in {"一致", "目标暂不可用", "发布控制表（忽略）"}:
+            difference_counts[category]["schema"] += 1
+        if row["data_status"] == "有差异":
+            difference_counts[category]["data"] += 1
+    schema_difference_count = sum(1 for row in rows if row["schema_status"] not in {"一致", "目标暂不可用", "发布控制表（忽略）"})
+    mdm_difference_count = sum(1 for row in rows if row["data_status"] == "有差异")
     return {
         "target": target["name"],
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "target_available": not bool(target_error),
         "target_error": target_error,
         "counts": counts,
+        "difference_counts": difference_counts,
+        "difference_summary": {
+            "schema_tables": schema_difference_count if not target_error else 0,
+            "data_tables": mdm_difference_count if not target_error else 0,
+            "data_hash_skipped_tables": 0,
+        },
+        "data_scan": {
+            "performed": not bool(target_error),
+            "method": "仅受管主数据按业务键比对；市场运行、配置、账户及用户内容按环境保留，不纳入差异",
+            "managed_tables": sorted(MDM_MANAGED_MASTER_TABLES & (local_tables | target_tables)),
+        },
         "rows": rows,
     }
 
