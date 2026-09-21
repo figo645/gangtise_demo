@@ -277,7 +277,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     news_items = gen_news_feed(tenant=tenant, watchlist_details=watchlist_details_map)
     message_center_state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
     message_center_stats = build_message_center_stats(message_center_state)
-    published_reviews = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
+    published_reviews = resolve_tenant_review_snapshots(tenant)
     fan_threads = [item for item in message_center_state["threads"] if item.get("type") == "fan_interaction"]
     review_notice_threads = [item for item in message_center_state["threads"] if item.get("type") == "review_notification"]
     broadcast_history = message_center_state["broadcasts"]

@@ -1338,6 +1338,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "period_key": str(raw.get("period_key") or fallback.get("period_key") or "day").strip().lower() or "day",
         "time": published_at or fallback.get("time") or now_ts(),
         "published_at": published_at or fallback.get("published_at") or now_ts(),
+        "published_date": str(raw.get("published_date") or published_at or fallback.get("published_at") or "")[:10],
         "tags": tags or copy.deepcopy(fallback.get("tags") or []),
         "watchlist": watchlist or copy.deepcopy(fallback.get("watchlist") or []),
         "summary": summary,
@@ -1346,6 +1347,9 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "access_mode": access_mode,
         "access_label": access_label,
         "view_count": view_count,
+        "dav_id": str(raw.get("dav_id") or "").strip()[:160],
+        "external_id": str(raw.get("external_id") or "").strip()[:160],
+        "imported_at": str(raw.get("imported_at") or "").strip()[:40],
         "source_mode": source_mode,
         "paragraph_mode": str(raw.get("paragraph_mode") or fallback.get("paragraph_mode") or "manual").strip().lower() or "manual",
         "publisher": str(raw.get("publisher") or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
@@ -1374,12 +1378,21 @@ def normalize_review_snapshot_item(item, tenant, index=0):
 
 def resolve_tenant_review_snapshots(tenant, snapshots=None, include_simulated=False):
     tenant = tenant or get_tenant_by_slug()
+    # An explicit list is retained for callers that render an in-memory legacy
+    # payload. Live tenant reads use the independent content table instead.
+    if snapshots is None:
+        try:
+            return list_tenant_published_insights(tenant.get("slug"), include_simulated=include_simulated)
+        except Exception as exc:
+            if not _published_insights_storage_unavailable(exc):
+                raise
+            app.logger.warning("Published Insights table unavailable; using legacy JSON: %s", exc)
     items = snapshots if isinstance(snapshots, list) else tenant.get("review_snapshots")
     # An explicit empty list is a valid state: a DAV may have deleted every
     # published review. Only a missing/non-list value uses demo defaults.
     source_items = items if isinstance(items, list) else default_tenant_review_snapshots(tenant)
     normalized = []
-    for index, item in enumerate(source_items[:20]):
+    for index, item in enumerate(source_items):
         normalized.append(normalize_review_snapshot_item(item, tenant, index=index))
     return normalized
 
@@ -1458,11 +1471,7 @@ def summarize_message_preview(content, limit=72):
 
 def _broadcast_snapshot_lookup(tenant):
     """Index published AI broadcasts for repairing legacy DM messages."""
-    snapshots = resolve_tenant_review_snapshots(
-        tenant or {},
-        (tenant or {}).get("review_snapshots"),
-        include_simulated=True,
-    )
+    snapshots = resolve_tenant_review_snapshots(tenant or {}, include_simulated=True)
     lookup = {}
     for snapshot in snapshots:
         if str(snapshot.get("content_kind") or "").strip().lower() != "ai_broadcast":
@@ -1601,6 +1610,7 @@ def normalize_message_thread_item(item, tenant, index=0, broadcast_lookup=None):
         "time": str(raw.get("time") or fallback.get("time") or "").strip() or now_ts(),
         "content": str(raw.get("content") or fallback.get("content") or "").strip(),
         "status": str(raw.get("status") or fallback.get("status") or "").strip() or "待处理",
+        "user_id": int(raw.get("user_id")) if str(raw.get("user_id") or "").strip().isdigit() else None,
         "user_profile_id": str(raw.get("user_profile_id") or "").strip(),
         "user_name": str(raw.get("user_name") or fallback.get("user_name") or raw.get("name") or "").strip(),
         "user_avatar": str(raw.get("user_avatar") or fallback.get("user_avatar") or "👤").strip() or "👤",
@@ -1623,8 +1633,12 @@ def normalize_message_broadcast_item(item, tenant, index=0):
     raw = item if isinstance(item, dict) else {}
     defaults = default_tenant_message_center_state(tenant)["broadcasts"]
     fallback = defaults[min(index, len(defaults) - 1)]
+    raw_id = raw.get("id") or fallback.get("id") or (index + 1)
+    # Imported broadcasts may use a UUID or provider identifier. Preserve it
+    # instead of coercing every domain identifier to an integer.
+    broadcast_id = int(raw_id) if str(raw_id).strip().isdigit() else str(raw_id).strip()
     return {
-        "id": int(raw.get("id") or fallback.get("id") or (index + 1)),
+        "id": broadcast_id,
         "content": str(raw.get("content") or fallback.get("content") or "").strip(),
         "time": str(raw.get("time") or fallback.get("time") or "").strip() or now_ts(),
         "reach": max(0, int(raw.get("reach") or fallback.get("reach") or 0)),
@@ -1641,6 +1655,14 @@ def normalize_message_broadcast_item(item, tenant, index=0):
 
 def resolve_tenant_message_center_state(tenant, state=None, include_simulated=False):
     tenant = tenant or get_tenant_by_slug()
+    try:
+        stored = _load_tenant_message_center_state_from_db(tenant.get("slug"), include_simulated=include_simulated)
+        if stored.get("storage_available"):
+            return stored["state"]
+    except Exception as exc:
+        if not _message_center_storage_unavailable(exc):
+            raise
+        app.logger.warning("Message Center tables unavailable; using legacy JSON: %s", exc)
     defaults = default_tenant_message_center_state(tenant)
     raw = state if isinstance(state, dict) else tenant.get("message_center_state")
     source = raw if isinstance(raw, dict) else {}
@@ -1658,6 +1680,197 @@ def resolve_tenant_message_center_state(tenant, state=None, include_simulated=Fa
         "threads": threads,
         "broadcasts": broadcasts,
     }
+
+
+def _message_center_storage_unavailable(exc):
+    if is_db_unavailable_error(exc):
+        return True
+    if isinstance(exc, RuntimeError) and "application context" in str(exc).lower():
+        return True
+    if getattr(exc, "pgcode", "") == "42P01":
+        return True
+    detail = str(exc or "").lower()
+    return (
+        any(name in detail and "does not exist" in detail for name in ("tenant_message_threads", "tenant_messages", "tenant_broadcasts"))
+        # Release order safety: code can retain JSON compatibility until the
+        # recipient-account column from migration 144 is present.
+        or ('column "user_id" does not exist' in detail)
+    )
+
+
+def _load_tenant_message_center_state_from_db(tenant_slug, include_simulated=False):
+    normalized = str(tenant_slug or "").strip().lower()
+    db = get_db()
+    thread_rows = db.execute(
+        """SELECT tenant_slug, thread_id, thread_type, name, user_id, user_profile_id, user_name,
+                  user_avatar, tier, status, last_msg, kol_unread, user_unread,
+                  last_sender, last_message_type, vip_only, is_simulated, simulation_label,
+                  updated_at, metadata_json
+           FROM tenant_message_threads WHERE tenant_slug = ?
+           ORDER BY updated_at DESC, id DESC""",
+        (normalized,),
+    ).fetchall()
+    if not include_simulated:
+        thread_rows = [row for row in thread_rows if not bool(row.get("is_simulated"))]
+    message_rows = db.execute(
+        """SELECT thread_id, message_key, sender, content, message_time, message_type,
+                  broadcast_kind, visual_theme, insight_id, price, preview, metadata_json
+           FROM tenant_messages WHERE tenant_slug = ? ORDER BY created_at ASC, id ASC""",
+        (normalized,),
+    ).fetchall()
+    messages_by_thread = {}
+    for row in message_rows:
+        messages_by_thread.setdefault(str(row.get("thread_id") or ""), []).append({
+            "id": row.get("message_key"),
+            "sender": row.get("sender") or "user",
+            "content": row.get("content") or "",
+            "time": row.get("message_time") or "",
+            "type": row.get("message_type") or "text",
+            "broadcast_kind": row.get("broadcast_kind") or "",
+            "visual_theme": row.get("visual_theme") or "",
+            "insight_id": row.get("insight_id") or "",
+            "price": row.get("price") or 0,
+            "preview": row.get("preview") or "",
+        })
+    tenant = get_tenant_by_slug(normalized)
+    threads = []
+    for index, row in enumerate(thread_rows):
+        raw = {
+            "id": row.get("thread_id"), "type": row.get("thread_type"), "name": row.get("name"),
+            "user_id": row.get("user_id"), "user_profile_id": row.get("user_profile_id"), "user_name": row.get("user_name"),
+            "user_avatar": row.get("user_avatar"), "tier": row.get("tier"), "status": row.get("status"),
+            "last_msg": row.get("last_msg"), "kol_unread": row.get("kol_unread"),
+            "user_unread": row.get("user_unread"), "last_sender": row.get("last_sender"),
+            "last_message_type": row.get("last_message_type"), "vip_only": row.get("vip_only"),
+            "is_simulated": row.get("is_simulated"), "simulation_label": row.get("simulation_label"),
+            "updated_at": row.get("updated_at"), "messages": messages_by_thread.get(str(row.get("thread_id") or ""), []),
+        }
+        threads.append(normalize_message_thread_item(raw, tenant, index=index))
+    broadcast_rows = db.execute(
+        """SELECT broadcast_id, content, broadcast_time, reach, open_rate, target,
+                  broadcast_type, broadcast_kind, visual_theme, insight_id,
+                  is_simulated, simulation_label
+           FROM tenant_broadcasts WHERE tenant_slug = ? ORDER BY broadcast_time DESC, id DESC""",
+        (normalized,),
+    ).fetchall()
+    if not include_simulated:
+        broadcast_rows = [row for row in broadcast_rows if not bool(row.get("is_simulated"))]
+    broadcasts = [normalize_message_broadcast_item({
+        "id": row.get("broadcast_id"), "content": row.get("content"), "time": row.get("broadcast_time"),
+        "reach": row.get("reach"), "open_rate": row.get("open_rate"), "target": row.get("target"),
+        "type": row.get("broadcast_type"), "broadcast_kind": row.get("broadcast_kind"),
+        "visual_theme": row.get("visual_theme"), "insight_id": row.get("insight_id"),
+        "is_simulated": row.get("is_simulated"), "simulation_label": row.get("simulation_label"),
+    }, tenant, index=index) for index, row in enumerate(broadcast_rows)]
+    legacy_summary = str((tenant.get("message_center_state") or {}).get("summary") or "").strip()
+    return {
+        # A migrated but empty table is authoritative. Falling back to the
+        # legacy JSON here would resurrect content that a user has deleted.
+        "storage_available": True,
+        "has_rows": bool(thread_rows or broadcasts),
+        "state": {"summary": legacy_summary, "threads": threads, "broadcasts": broadcasts},
+    }
+
+
+def _persist_tenant_message_center_state(tenant_slug, state):
+    normalized = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(normalized)
+    db = get_db()
+    raw_threads = state.get("threads") if isinstance(state, dict) and isinstance(state.get("threads"), list) else []
+    thread_ids = set()
+    for index, item in enumerate(raw_threads):
+        thread = normalize_message_thread_item(item, tenant, index=index)
+        thread_id = str(thread["id"])
+        thread_ids.add(thread_id)
+        db.execute(
+            """INSERT INTO tenant_message_threads
+               (tenant_slug, thread_id, thread_type, name, user_id, user_profile_id, user_name, user_avatar,
+                tier, status, last_msg, kol_unread, user_unread, last_sender, last_message_type,
+                vip_only, is_simulated, simulation_label, updated_at, metadata_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?::jsonb)
+               ON CONFLICT (tenant_slug, thread_id) DO UPDATE SET
+                 thread_type=EXCLUDED.thread_type, name=EXCLUDED.name, user_id=EXCLUDED.user_id, user_profile_id=EXCLUDED.user_profile_id,
+                 user_name=EXCLUDED.user_name, user_avatar=EXCLUDED.user_avatar, tier=EXCLUDED.tier,
+                 status=EXCLUDED.status, last_msg=EXCLUDED.last_msg, kol_unread=EXCLUDED.kol_unread,
+                 user_unread=EXCLUDED.user_unread, last_sender=EXCLUDED.last_sender,
+                 last_message_type=EXCLUDED.last_message_type, vip_only=EXCLUDED.vip_only,
+                 is_simulated=EXCLUDED.is_simulated, simulation_label=EXCLUDED.simulation_label,
+                 updated_at=CURRENT_TIMESTAMP, metadata_json=EXCLUDED.metadata_json""",
+            (normalized, thread["id"], thread["type"], thread["name"], thread["user_id"], thread["user_profile_id"], thread["user_name"],
+             thread["user_avatar"], thread["tier"], thread["status"], thread["last_msg"], thread["kol_unread"],
+             thread["user_unread"], thread["last_sender"], thread["last_message_type"], thread["vip_only"],
+             thread["is_simulated"], thread["simulation_label"], json.dumps(item, ensure_ascii=False)),
+        )
+        message_keys = set()
+        for message_index, message in enumerate(thread.get("messages") or []):
+            normalized_message = normalize_message_thread_message_item(message, message_index=message_index, tenant=tenant)
+            message_key = str(normalized_message["id"])
+            message_keys.add(message_key)
+            db.execute(
+                """INSERT INTO tenant_messages
+                   (tenant_slug, thread_id, message_key, sender, content, message_time, message_type,
+                    broadcast_kind, visual_theme, insight_id, price, preview, metadata_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                   ON CONFLICT (tenant_slug, thread_id, message_key) DO UPDATE SET
+                     sender=EXCLUDED.sender, content=EXCLUDED.content, message_time=EXCLUDED.message_time,
+                     message_type=EXCLUDED.message_type, broadcast_kind=EXCLUDED.broadcast_kind,
+                     visual_theme=EXCLUDED.visual_theme, insight_id=EXCLUDED.insight_id,
+                     price=EXCLUDED.price, preview=EXCLUDED.preview, metadata_json=EXCLUDED.metadata_json""",
+                (normalized, thread["id"], str(normalized_message["id"]), normalized_message["sender"],
+                 normalized_message["content"], normalized_message["time"], normalized_message["type"],
+                 normalized_message["broadcast_kind"], normalized_message["visual_theme"], normalized_message["insight_id"],
+                 normalized_message["price"], normalized_message["preview"], json.dumps(message, ensure_ascii=False)),
+            )
+        if message_keys:
+            placeholders = ", ".join("?" for _ in message_keys)
+            db.execute(
+                f"DELETE FROM tenant_messages WHERE tenant_slug = ? AND thread_id = ? AND message_key NOT IN ({placeholders})",
+                (normalized, thread_id, *sorted(message_keys)),
+            )
+        else:
+            db.execute(
+                "DELETE FROM tenant_messages WHERE tenant_slug = ? AND thread_id = ?",
+                (normalized, thread_id),
+            )
+    if thread_ids:
+        placeholders = ", ".join("?" for _ in thread_ids)
+        db.execute(
+            f"DELETE FROM tenant_message_threads WHERE tenant_slug = ? AND thread_id NOT IN ({placeholders})",
+            (normalized, *sorted(thread_ids)),
+        )
+    else:
+        db.execute("DELETE FROM tenant_message_threads WHERE tenant_slug = ?", (normalized,))
+    raw_broadcasts = state.get("broadcasts") if isinstance(state, dict) and isinstance(state.get("broadcasts"), list) else []
+    broadcast_ids = set()
+    for index, item in enumerate(raw_broadcasts):
+        broadcast = normalize_message_broadcast_item(item, tenant, index=index)
+        broadcast_id = str(broadcast["id"])
+        broadcast_ids.add(broadcast_id)
+        db.execute(
+            """INSERT INTO tenant_broadcasts
+               (tenant_slug, broadcast_id, content, broadcast_time, reach, open_rate, target,
+                broadcast_type, broadcast_kind, visual_theme, insight_id, is_simulated, simulation_label, metadata_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+               ON CONFLICT (tenant_slug, broadcast_id) DO UPDATE SET
+                 content=EXCLUDED.content, broadcast_time=EXCLUDED.broadcast_time, reach=EXCLUDED.reach,
+                 open_rate=EXCLUDED.open_rate, target=EXCLUDED.target, broadcast_type=EXCLUDED.broadcast_type,
+                 broadcast_kind=EXCLUDED.broadcast_kind, visual_theme=EXCLUDED.visual_theme,
+                 insight_id=EXCLUDED.insight_id, is_simulated=EXCLUDED.is_simulated,
+                 simulation_label=EXCLUDED.simulation_label""",
+            (normalized, str(broadcast["id"]), broadcast["content"], broadcast["time"], broadcast["reach"],
+             broadcast["open_rate"], broadcast["target"], broadcast["type"], broadcast["broadcast_kind"],
+             broadcast["visual_theme"], broadcast["insight_id"], broadcast["is_simulated"],
+             broadcast["simulation_label"], json.dumps(item, ensure_ascii=False)),
+        )
+    if broadcast_ids:
+        placeholders = ", ".join("?" for _ in broadcast_ids)
+        db.execute(
+            f"DELETE FROM tenant_broadcasts WHERE tenant_slug = ? AND broadcast_id NOT IN ({placeholders})",
+            (normalized, *sorted(broadcast_ids)),
+        )
+    else:
+        db.execute("DELETE FROM tenant_broadcasts WHERE tenant_slug = ?", (normalized,))
+    db.commit()
 
 
 def _save_tenant_state_field(tenant_slug, field_name, value):
@@ -1680,6 +1893,175 @@ def update_tenant_review_snapshots(tenant_slug, snapshots):
     return _save_tenant_state_field(tenant_slug, "review_snapshots", normalized)
 
 
+def _published_insights_storage_unavailable(exc):
+    """Only use JSON compatibility when the new table has not been migrated."""
+    if is_db_unavailable_error(exc):
+        return True
+    if isinstance(exc, RuntimeError) and "application context" in str(exc).lower():
+        return True
+    if getattr(exc, "pgcode", "") == "42P01":
+        return True
+    detail = str(exc or "").lower()
+    return "tenant_published_insights" in detail and "does not exist" in detail
+
+
+def _decode_published_insight_payload(value):
+    if isinstance(value, dict):
+        return copy.deepcopy(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except (TypeError, ValueError):
+            return {}
+    return {}
+
+
+def _published_insight_row_to_snapshot(row, tenant, index=0):
+    payload = _decode_published_insight_payload((row or {}).get("payload_json"))
+    payload.update({
+        "id": str((row or {}).get("insight_id") or payload.get("id") or "").strip(),
+        "title": str((row or {}).get("title") or payload.get("title") or "").strip(),
+        "content_text": str((row or {}).get("content_text") or payload.get("content_text") or "").strip(),
+        "content_html": str((row or {}).get("content_html") or payload.get("content_html") or "").strip(),
+        "access_mode": str((row or {}).get("access_mode") or payload.get("access_mode") or "public").strip(),
+        "source_mode": str((row or {}).get("source_mode") or payload.get("source_mode") or "manual").strip(),
+        "published_at": str((row or {}).get("published_at") or payload.get("published_at") or "").strip(),
+        "time": str((row or {}).get("published_at") or payload.get("time") or "").strip(),
+        "view_count": max(0, int((row or {}).get("view_count") or 0)),
+        "published_date": str((row or {}).get("published_date") or "")[:10],
+        "external_id": str((row or {}).get("external_id") or "").strip(),
+        "dav_id": str((row or {}).get("dav_id") or "").strip(),
+        "imported_at": str((row or {}).get("imported_at") or "").strip(),
+    })
+    return normalize_review_snapshot_item(payload, tenant, index=index)
+
+
+def list_tenant_published_insights(tenant_slug, limit=200, offset=0, query="", include_simulated=False):
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    safe_limit = max(1, min(int(limit or 200), 1000))
+    safe_offset = max(0, int(offset or 0))
+    search = str(query or "").strip()
+    sql = """
+        SELECT insight_id, dav_id, external_id, title, content_text, content_html,
+               access_mode, source_mode, published_date, published_at, imported_at,
+               view_count, payload_json
+        FROM tenant_published_insights
+        WHERE tenant_slug = ?
+    """
+    params = [normalized_tenant_slug]
+    if search:
+        sql += " AND (title ILIKE ? OR content_text ILIKE ?)"
+        pattern = f"%{search[:200]}%"
+        params.extend([pattern, pattern])
+    sql += " ORDER BY published_date DESC, published_at DESC, imported_at DESC, id DESC LIMIT ? OFFSET ?"
+    params.extend([safe_limit, safe_offset])
+    rows = get_db().execute(sql, tuple(params)).fetchall()
+    return [
+        _published_insight_row_to_snapshot(row, tenant, index=index)
+        for index, row in enumerate(rows)
+        if include_simulated or not bool(_decode_published_insight_payload(row.get("payload_json")).get("is_simulated"))
+    ]
+
+
+def get_tenant_published_insight(tenant_slug, review_id):
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    normalized_review_id = str(review_id or "").strip()
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    row = get_db().execute(
+        """SELECT insight_id, dav_id, external_id, title, content_text, content_html,
+                  access_mode, source_mode, published_date, published_at, imported_at,
+                  view_count, payload_json
+             FROM tenant_published_insights WHERE tenant_slug = ? AND insight_id = ?""",
+        (normalized_tenant_slug, normalized_review_id),
+    ).fetchone()
+    if not row:
+        return None
+    return _published_insight_row_to_snapshot(row, tenant)
+
+
+def _published_insight_business_date(value):
+    text = str(value or "").strip()
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date().isoformat()
+    except (TypeError, ValueError):
+        raise ValueError("published_date_invalid")
+
+
+def save_tenant_published_insight(tenant_slug, snapshot, published_date=None, external_id="", dav_id=""):
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    normalized = normalize_review_snapshot_item(snapshot, tenant)
+    insight_id = str(normalized.get("id") or "").strip()
+    if not insight_id:
+        raise ValueError("insight_id_required")
+    normalized_external_id = str(external_id or normalized.get("external_id") or "").strip()[:160]
+    if published_date is None:
+        date_source = str(normalized.get("published_at") or normalized.get("time") or now_ts())[:10]
+        try:
+            normalized_published_date = _published_insight_business_date(date_source)
+        except ValueError:
+            normalized_published_date = datetime.now().date().isoformat()
+    else:
+        normalized_published_date = _published_insight_business_date(published_date)
+    normalized_published_at = str(normalized.get("published_at") or normalized.get("time") or "").strip()
+    if not normalized_published_at:
+        normalized_published_at = f"{normalized_published_date} 00:00:00"
+    if published_date is not None and normalized.get("source_mode") == "open_api":
+        normalized_published_at = f"{normalized_published_date} 00:00:00"
+    normalized["published_date"] = normalized_published_date
+    normalized["published_at"] = normalized_published_at
+    normalized["time"] = normalized_published_at
+    normalized["external_id"] = normalized_external_id
+    normalized["dav_id"] = str(dav_id or normalized.get("dav_id") or "").strip()[:160]
+    db = get_db()
+    if normalized_external_id:
+        existing = db.execute(
+            """SELECT insight_id, dav_id, external_id, title, content_text, content_html,
+                      access_mode, source_mode, published_date, published_at, imported_at,
+                      view_count, payload_json
+                 FROM tenant_published_insights WHERE tenant_slug = ? AND external_id = ?""",
+            (normalized_tenant_slug, normalized_external_id),
+        ).fetchone()
+        if existing:
+            return _published_insight_row_to_snapshot(existing, tenant)
+    db.execute(
+        """
+        INSERT INTO tenant_published_insights (
+            tenant_slug, insight_id, dav_id, external_id, title, content_text, content_html,
+            access_mode, source_mode, published_date, published_at, view_count, payload_json, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT (tenant_slug, insight_id) DO UPDATE SET
+            dav_id = EXCLUDED.dav_id,
+            title = EXCLUDED.title,
+            content_text = EXCLUDED.content_text,
+            content_html = EXCLUDED.content_html,
+            access_mode = EXCLUDED.access_mode,
+            source_mode = EXCLUDED.source_mode,
+            published_date = EXCLUDED.published_date,
+            published_at = EXCLUDED.published_at,
+            view_count = EXCLUDED.view_count,
+            payload_json = EXCLUDED.payload_json,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            normalized_tenant_slug, insight_id, normalized["dav_id"], normalized_external_id,
+            normalized["title"], normalized["content_text"], normalized["content_html"],
+            normalized["access_mode"], normalized["source_mode"], normalized_published_date,
+            normalized_published_at, int(normalized.get("view_count") or 0), Json(normalized),
+        ),
+    )
+    db.commit()
+    return get_tenant_published_insight(normalized_tenant_slug, insight_id) or normalized
+
+
 def delete_tenant_review_snapshot(tenant_slug, review_id):
     """Delete one published review while retaining message/audit history."""
     normalized_tenant_slug = str(tenant_slug or "").strip().lower()
@@ -1691,50 +2073,85 @@ def delete_tenant_review_snapshot(tenant_slug, review_id):
     tenant = get_tenant_by_slug(normalized_tenant_slug)
     if not tenant or tenant.get("slug") != normalized_tenant_slug:
         raise ValueError("tenant_not_found")
+    try:
+        deleted = get_db().execute(
+            "DELETE FROM tenant_published_insights WHERE tenant_slug = ? AND insight_id = ? RETURNING insight_id",
+            (normalized_tenant_slug, normalized_review_id),
+        ).fetchone()
+        if not deleted:
+            raise ValueError("review_not_found")
+        get_db().commit()
+        return {
+            "review_id": normalized_review_id,
+            "snapshots": list_tenant_published_insights(normalized_tenant_slug, include_simulated=True),
+        }
+    except Exception as exc:
+        if not _published_insights_storage_unavailable(exc):
+            raise
+    # A pre-migration deployment can still remove legacy JSON content. This
+    # branch disappears naturally once migration 138 is present.
     raw_snapshots = tenant.get("review_snapshots")
-    snapshots = resolve_tenant_review_snapshots(
-        tenant,
-        snapshots=raw_snapshots if isinstance(raw_snapshots, list) else None,
-        include_simulated=True,
-    )
-    remaining = [
-        item for item in snapshots
-        if str(item.get("id") or "").strip() != normalized_review_id
-    ]
+    snapshots = resolve_tenant_review_snapshots(tenant, snapshots=raw_snapshots if isinstance(raw_snapshots, list) else None, include_simulated=True)
+    remaining = [item for item in snapshots if str(item.get("id") or "").strip() != normalized_review_id]
     if len(remaining) == len(snapshots):
         raise ValueError("review_not_found")
     saved = update_tenant_review_snapshots(normalized_tenant_slug, remaining)
     latest_tenant = get_tenant_by_slug(normalized_tenant_slug, saved) if saved else tenant
-    return {
-        "review_id": normalized_review_id,
-        "snapshots": resolve_tenant_review_snapshots(
-            latest_tenant,
-            snapshots=latest_tenant.get("review_snapshots"),
-            include_simulated=True,
-        ),
-    }
+    return {"review_id": normalized_review_id, "snapshots": resolve_tenant_review_snapshots(latest_tenant, snapshots=latest_tenant.get("review_snapshots"), include_simulated=True)}
 
 
 def update_tenant_message_center_state(tenant_slug, state):
     tenant = get_tenant_by_slug(tenant_slug)
     raw_state = copy.deepcopy(state) if isinstance(state, dict) else {}
-    normalized = resolve_tenant_message_center_state(tenant, state=raw_state, include_simulated=True)
-    return _save_tenant_state_field(tenant_slug, "message_center_state", normalized)
+    defaults = default_tenant_message_center_state(tenant)
+    raw_threads = raw_state.get("threads") if isinstance(raw_state.get("threads"), list) else defaults["threads"]
+    raw_broadcasts = raw_state.get("broadcasts") if isinstance(raw_state.get("broadcasts"), list) else defaults["broadcasts"]
+    normalized = {
+        "summary": str(raw_state.get("summary") or defaults["summary"]).strip() or defaults["summary"],
+        "threads": [normalize_message_thread_item(item, tenant, index=index) for index, item in enumerate(raw_threads)],
+        "broadcasts": [normalize_message_broadcast_item(item, tenant, index=index) for index, item in enumerate(raw_broadcasts)],
+    }
+    try:
+        _persist_tenant_message_center_state(tenant_slug, normalized)
+        # Return a compatibility config object for callers that immediately
+        # resolve the tenant again; no message content is written to it.
+        site_config = get_site_config()
+        next_config = copy.deepcopy(site_config)
+        next_config["tenants"] = get_tenant_configs(site_config)
+        return next_config
+    except Exception as exc:
+        if not _message_center_storage_unavailable(exc):
+            raise
+        return _save_tenant_state_field(tenant_slug, "message_center_state", normalized)
 
 
 def append_review_snapshot(tenant_slug, snapshot):
     tenant = get_tenant_by_slug(tenant_slug)
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    try:
+        save_tenant_published_insight(
+            normalized_tenant_slug,
+            snapshot,
+            published_date=(snapshot or {}).get("published_date"),
+            external_id=(snapshot or {}).get("external_id"),
+            dav_id=(snapshot or {}).get("dav_id"),
+        )
+        return list_tenant_published_insights(normalized_tenant_slug, include_simulated=True)
+    except Exception as exc:
+        if not _published_insights_storage_unavailable(exc):
+            raise
     current = resolve_tenant_review_snapshots(tenant, snapshots=tenant.get("review_snapshots"), include_simulated=True)
     next_items = [normalize_review_snapshot_item(snapshot, tenant, index=0)] + current
     deduped = []
     seen_ids = set()
     for index, item in enumerate(next_items):
         item_id = str(item.get("id") or f"{tenant_slug}-review-{index + 1}").strip()
-        if item_id in seen_ids:
-            continue
-        seen_ids.add(item_id)
-        deduped.append(normalize_review_snapshot_item(item, tenant, index=index))
-    saved = update_tenant_review_snapshots(tenant_slug, deduped[:20])
+        if item_id not in seen_ids:
+            seen_ids.add(item_id)
+            deduped.append(normalize_review_snapshot_item(item, tenant, index=index))
+    saved = update_tenant_review_snapshots(tenant_slug, deduped)
     latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
     return resolve_tenant_review_snapshots(latest_tenant, snapshots=latest_tenant.get("review_snapshots"))
 
@@ -1848,29 +2265,30 @@ def increment_tenant_review_snapshot_view_count(tenant_slug, review_id):
     tenant = get_tenant_by_slug(normalized_tenant_slug)
     if not tenant or tenant.get("slug") != normalized_tenant_slug:
         raise ValueError("tenant_not_found")
-    snapshots = resolve_tenant_review_snapshots(
-        tenant,
-        snapshots=tenant.get("review_snapshots"),
-        include_simulated=True,
-    )
-    matched = None
-    for item in snapshots:
-        if str(item.get("id") or "").strip() == normalized_review_id:
-            item["view_count"] = max(0, int(item.get("view_count") or 0)) + 1
-            matched = item
-            break
+    try:
+        row = get_db().execute(
+            """UPDATE tenant_published_insights
+               SET view_count = view_count + 1, updated_at = CURRENT_TIMESTAMP
+               WHERE tenant_slug = ? AND insight_id = ?
+               RETURNING insight_id, dav_id, external_id, title, content_text, content_html,
+                         access_mode, source_mode, published_date, published_at, imported_at,
+                         view_count, payload_json""",
+            (normalized_tenant_slug, normalized_review_id),
+        ).fetchone()
+        if not row:
+            raise ValueError("review_not_found")
+        get_db().commit()
+        return _published_insight_row_to_snapshot(row, tenant)
+    except Exception as exc:
+        if not _published_insights_storage_unavailable(exc):
+            raise
+    snapshots = resolve_tenant_review_snapshots(tenant, snapshots=tenant.get("review_snapshots"), include_simulated=True)
+    matched = next((item for item in snapshots if str(item.get("id") or "").strip() == normalized_review_id), None)
     if matched is None:
         raise ValueError("review_not_found")
-    saved = update_tenant_review_snapshots(normalized_tenant_slug, snapshots)
-    latest_tenant = get_tenant_by_slug(normalized_tenant_slug, saved) if saved else tenant
-    latest_snapshots = resolve_tenant_review_snapshots(
-        latest_tenant,
-        snapshots=latest_tenant.get("review_snapshots"),
-    )
-    return next(
-        (item for item in latest_snapshots if str(item.get("id") or "").strip() == normalized_review_id),
-        matched,
-    )
+    matched["view_count"] = max(0, int(matched.get("view_count") or 0)) + 1
+    update_tenant_review_snapshots(normalized_tenant_slug, snapshots)
+    return matched
 
 
 def append_message_thread(tenant_slug, thread_item):
@@ -2044,6 +2462,7 @@ def build_broadcast_thread_for_user(tenant, user_profile, broadcast_item):
         "id": build_fan_thread_id(tenant.get("slug"), username),
         "type": "fan_interaction",
         "name": username,
+        "user_id": (user_profile or {}).get("id"),
         "time": "刚刚",
         "content": content,
         "status": "已触达",
@@ -2117,7 +2536,41 @@ def push_broadcast_to_fan_threads(tenant_slug, broadcast_item):
         if thread:
             threads.insert(0, thread)
     _, latest_state = save_tenant_message_threads(resolved_slug, state, threads)
+    _record_tenant_broadcast_deliveries(resolved_slug, broadcast_item, latest_state["threads"], user_map)
     return latest_state
+
+
+def _record_tenant_broadcast_deliveries(tenant_slug, broadcast_item, threads, recipient_users):
+    """Persist one delivery per recipient after the broadcast aggregate is saved."""
+    broadcast_id = str((broadcast_item or {}).get("id") or "").strip()
+    if not broadcast_id:
+        return
+    thread_ids = {
+        str(item.get("user_profile_id") or "").strip(): str(item.get("id") or "").strip()
+        for item in (threads or [])
+        if str(item.get("type") or "").strip() == "fan_interaction"
+    }
+    try:
+        db = get_db()
+        for profile_id, user in recipient_users.items():
+            normalized_profile = str(profile_id or "").strip()
+            if not normalized_profile:
+                continue
+            db.execute(
+                """INSERT INTO tenant_broadcast_deliveries
+                   (tenant_slug, broadcast_id, user_profile_id, user_id, thread_id, delivery_status)
+                   VALUES (?, ?, ?, ?, ?, 'delivered')
+                   ON CONFLICT (tenant_slug, broadcast_id, user_profile_id) DO UPDATE SET
+                     user_id = EXCLUDED.user_id,
+                     thread_id = EXCLUDED.thread_id,
+                     delivery_status = EXCLUDED.delivery_status,
+                     delivered_at = CURRENT_TIMESTAMP""",
+                (tenant_slug, broadcast_id, normalized_profile, user.get("id"), thread_ids.get(normalized_profile, "")),
+            )
+        db.commit()
+    except Exception as exc:
+        if not _message_center_storage_unavailable(exc):
+            raise
 
 
 def build_fan_thread_id(tenant_slug, username):
@@ -2135,6 +2588,7 @@ def build_message_thread_for_user(user_profile, tenant, first_message=""):
         "id": build_fan_thread_id(tenant.get("slug"), username),
         "type": "fan_interaction",
         "name": username,
+        "user_id": (user_profile or {}).get("id"),
         "time": "刚刚" if first_message else "--",
         "content": str(first_message or "").strip(),
         "status": "待回复" if first_message else "待处理",
@@ -2165,7 +2619,9 @@ def save_tenant_message_threads(tenant_slug, state, threads):
     normalized_slug = str(tenant_slug or "").strip().lower() or get_default_tenant_slug()
     saved = update_tenant_message_center_state(normalized_slug, {
         "summary": state["summary"],
-        "threads": threads[:60],
+        # The repository receives the complete aggregate. UI list limits must
+        # not turn into data-loss limits when the aggregate is persisted.
+        "threads": threads,
         "broadcasts": state["broadcasts"],
     })
     latest_tenant = get_tenant_by_slug(normalized_slug, saved) if saved else get_tenant_by_slug(normalized_slug)
@@ -2468,7 +2924,101 @@ def normalize_knowledge_hub_config(source, tenant, include_simulated=False):
 
 
 def resolve_tenant_knowledge_hub(tenant, config=None):
+    try:
+        documents = list_tenant_knowledge_documents(tenant.get("slug"), limit=200)
+        # Once migration 140 exists, an empty document table is a valid
+        # business state. Do not resurrect legacy JSON after all documents
+        # have been removed.
+        return {
+            "summary": str((config or tenant.get("knowledge_hub_config") or {}).get("summary") or "知识库支持语音、文件、URL 和纯文本四种入口。"),
+            "items": documents,
+        }
+    except Exception as exc:
+        if not _knowledge_documents_storage_unavailable(exc):
+            raise
     return normalize_knowledge_hub_config(config if isinstance(config, dict) else tenant.get("knowledge_hub_config"), tenant)
+
+
+def _knowledge_documents_storage_unavailable(exc):
+    if is_db_unavailable_error(exc):
+        return True
+    if isinstance(exc, RuntimeError) and "application context" in str(exc).lower():
+        return True
+    if getattr(exc, "pgcode", "") == "42P01":
+        return True
+    detail = str(exc or "").lower()
+    return "tenant_knowledge_documents" in detail and "does not exist" in detail
+
+
+def _knowledge_document_row_to_item(row):
+    raw = row.get("document_json") if isinstance(row.get("document_json"), dict) else {}
+    item = copy.deepcopy(raw)
+    item.update({
+        "id": str(row.get("document_id") or item.get("id") or "").strip(),
+        "type": str(row.get("document_type") or item.get("type") or "manual").strip(),
+        "title": str(row.get("title") or item.get("title") or "").strip(),
+        "summary": str(row.get("summary") or item.get("summary") or "").strip(),
+        "body": str(row.get("content_text") or item.get("body") or item.get("raw_input") or "").strip(),
+        "raw_input": str(item.get("raw_input") or row.get("content_text") or "").strip(),
+        "raw_html": str(row.get("content_html") or item.get("raw_html") or "").strip(),
+        "source": str(row.get("source") or item.get("source") or "").strip(),
+        "source_detail": str(row.get("source_detail") or item.get("source_detail") or "").strip(),
+        "status": str(row.get("status") or item.get("status") or "").strip(),
+        "updated_at": normalize_datetime_text(row.get("updated_at") or item.get("updated_at") or ""),
+    })
+    return item
+
+
+def list_tenant_knowledge_documents(tenant_slug, limit=200, query=""):
+    normalized = str(tenant_slug or "").strip().lower()
+    if not get_tenant_by_slug(normalized):
+        raise ValueError("tenant_not_found")
+    safe_limit = max(1, min(int(limit or 200), 1000))
+    sql = """SELECT document_id, document_type, title, summary, content_text, content_html,
+                     source, source_detail, status, updated_at, document_json
+              FROM tenant_knowledge_documents WHERE tenant_slug = ?"""
+    params = [normalized]
+    if str(query or "").strip():
+        sql += " AND (title ILIKE ? OR summary ILIKE ? OR content_text ILIKE ?)"
+        pattern = f"%{str(query).strip()[:200]}%"
+        params.extend([pattern, pattern, pattern])
+    sql += " ORDER BY updated_at DESC, id DESC LIMIT ?"
+    params.append(safe_limit)
+    rows = get_db().execute(sql, tuple(params)).fetchall()
+    return [_knowledge_document_row_to_item(row) for row in rows]
+
+
+def save_tenant_knowledge_document(tenant_slug, item):
+    normalized = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(normalized)
+    if not tenant:
+        raise ValueError("tenant_not_found")
+    raw = item if isinstance(item, dict) else {}
+    document_id = str(raw.get("id") or raw.get("knowledge_id") or "").strip()
+    if not document_id:
+        raise ValueError("knowledge_id_required")
+    document_type = str(raw.get("type") or "manual").strip().lower() or "manual"
+    title = str(raw.get("title") or "").strip()
+    summary = str(raw.get("summary") or "").strip()
+    content_text = str(raw.get("body") or raw.get("raw_input") or raw.get("content_text") or "").strip()
+    now = now_ts()
+    get_db().execute(
+        """INSERT INTO tenant_knowledge_documents
+           (tenant_slug, document_id, document_type, title, summary, content_text, content_html,
+            source, source_detail, status, updated_at, document_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+           ON CONFLICT (tenant_slug, document_id) DO UPDATE SET
+             document_type=EXCLUDED.document_type, title=EXCLUDED.title, summary=EXCLUDED.summary,
+             content_text=EXCLUDED.content_text, content_html=EXCLUDED.content_html,
+             source=EXCLUDED.source, source_detail=EXCLUDED.source_detail, status=EXCLUDED.status,
+             updated_at=EXCLUDED.updated_at, document_json=EXCLUDED.document_json""",
+        (normalized, document_id, document_type, title, summary, content_text,
+         str(raw.get("raw_html") or raw.get("content_html") or "").strip(), str(raw.get("source") or "").strip(),
+         str(raw.get("source_detail") or "").strip(), str(raw.get("status") or "").strip(), now,
+         json.dumps(raw, ensure_ascii=False)),
+    )
+    get_db().commit()
+    return next((item for item in list_tenant_knowledge_documents(normalized, limit=1000) if str(item.get("id")) == document_id), raw)
 
 
 def update_tenant_knowledge_hub_config(tenant_slug, knowledge_hub_config):
@@ -4491,12 +5041,43 @@ def get_platform_brand(site_config=None):
 
 def get_tenant_configs(site_config=None):
     config = site_config or get_site_config()
-    return normalize_tenant_configs(config.get("tenants"))
+    tenants = normalize_tenant_configs(config.get("tenants"))
+    try:
+        rows = get_db().execute("SELECT tenant_slug, tenant_name FROM tenant_registry").fetchall()
+        registry = {str(row.get("tenant_slug") or "").strip().lower(): row for row in rows}
+        for tenant in tenants:
+            row = registry.get(str(tenant.get("slug") or "").strip().lower())
+            if row and str(row.get("tenant_name") or "").strip():
+                tenant["name"] = str(row["tenant_name"]).strip()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc) and not (isinstance(exc, RuntimeError) and "application context" in str(exc).lower()) and getattr(exc, "pgcode", "") != "42P01" and "tenant_registry" not in str(exc).lower():
+            raise
+    return tenants
 
 
 def get_default_tenant_slug(site_config=None):
     config = site_config or get_site_config()
     return str(config.get("default_tenant_slug", "") or "").strip() or DEFAULT_TENANTS[0]["slug"]
+
+
+def _sync_tenant_registry_row(tenant_slug, tenant_name=""):
+    normalized = str(tenant_slug or "").strip().lower()
+    if not normalized:
+        return
+    try:
+        db = get_db()
+        db.execute(
+            """INSERT INTO tenant_registry (tenant_slug, tenant_name, created_at, updated_at)
+               VALUES (?, ?, CURRENT_TIMESTAMP::text, CURRENT_TIMESTAMP::text)
+               ON CONFLICT (tenant_slug) DO UPDATE SET
+                 tenant_name = CASE WHEN EXCLUDED.tenant_name <> '' THEN EXCLUDED.tenant_name ELSE tenant_registry.tenant_name END,
+                 updated_at = CURRENT_TIMESTAMP::text""",
+            (normalized, str(tenant_name or "").strip()),
+        )
+        db.commit()
+    except Exception as exc:
+        if getattr(exc, "pgcode", "") != "42P01" and "tenant_registry" not in str(exc).lower():
+            raise
 
 
 def is_feature_enabled(feature_name, site_config=None):
@@ -5983,6 +6564,7 @@ def provision_dav_tenant(username):
     next_config["tenants"] = tenants
     saved = save_site_config(next_config)
     tenant = get_tenant_by_slug(slug, saved)
+    _sync_tenant_registry_row(slug, tenant.get("name") or tenant.get("advisor") or normalized_username)
     return str(tenant.get("slug") or "").strip().lower()
 
 
@@ -6007,6 +6589,7 @@ def _rename_dav_tenant_owner(tenant_slug, previous_username, next_username):
     next_config = dict(site_config)
     next_config["tenants"] = tenants
     save_site_config(next_config)
+    _sync_tenant_registry_row(normalized_tenant, str(next_username or "").strip())
     db = get_db()
     db.execute(
         "UPDATE users SET advisor_name = ?, updated_at = ? WHERE role = ? AND tenant_slug = ?",
@@ -8456,6 +9039,8 @@ def init_db():
         execute_sql_file(conn, sql_dir / "111_finalize_unused_admin_task_cleanup.sql")
         execute_sql_file(conn, sql_dir / "112_remove_recreated_unused_admin_tasks.sql")
         execute_sql_file(conn, sql_dir / "113_fan_commerce_and_qr_import.sql")
+        execute_sql_file(conn, sql_dir / "114_tenant_insight_drafts.sql")
+        execute_sql_file(conn, sql_dir / "115_normalize_tenant_user_relations.sql")
         execute_sql_file(conn, sql_dir / "116_disable_unused_admin_tasks.sql")
         execute_sql_file(conn, sql_dir / "117_remove_smart_indicator_refresh_task.sql")
         execute_sql_file(conn, sql_dir / "118_rename_akshare_market_task.sql")
@@ -8468,12 +9053,20 @@ def init_db():
         execute_sql_file(conn, sql_dir / "128_refresh_quiz_question_options.sql")
         execute_sql_file(conn, sql_dir / "129_allow_quiz_retries.sql")
         execute_sql_file(conn, sql_dir / "130_register_daily_finance_broadcast.sql")
+        execute_sql_file(conn, sql_dir / "131_review_rich_content_html.sql")
         execute_sql_file(conn, sql_dir / "132_analytics_events.sql")
         execute_sql_file(conn, sql_dir / "133_repair_market_snapshot_schedule.sql")
         execute_sql_file(conn, sql_dir / "134_hourly_shared_market_and_news_sync.sql")
         execute_sql_file(conn, sql_dir / "135_use_gangtise_market_snapshots.sql")
         execute_sql_file(conn, sql_dir / "136_market_snapshot_intraday_on_demand.sql")
         execute_sql_file(conn, sql_dir / "137_open_api_insight_tokens.sql")
+        execute_sql_file(conn, sql_dir / "138_tenant_published_insights.sql")
+        execute_sql_file(conn, sql_dir / "139_message_center_domain.sql")
+        execute_sql_file(conn, sql_dir / "140_knowledge_domain.sql")
+        execute_sql_file(conn, sql_dir / "141_app_settings_revision.sql")
+        execute_sql_file(conn, sql_dir / "142_domain_foreign_keys.sql")
+        execute_sql_file(conn, sql_dir / "143_domain_tenant_ownership.sql")
+        execute_sql_file(conn, sql_dir / "144_message_domain_user_identity.sql")
 
 
 def init_db_safe():
@@ -8977,7 +9570,7 @@ def execute_user_async_job(job):
         )
         if payload.get("snapshot_sync_applied"):
             tenant = get_tenant_by_slug(tenant_slug)
-            snapshots = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
+            snapshots = resolve_tenant_review_snapshots(tenant)
             message_state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
             snapshot_id = str(payload.get("snapshot_id") or "").strip()
             snapshot = next((item for item in snapshots if str(item.get("id") or "").strip() == snapshot_id), None)
@@ -9984,10 +10577,20 @@ def get_site_config():
     config = copy.deepcopy(DEFAULT_SITE_CONFIG)
     try:
         db = get_db()
-        row = db.execute(
-            "SELECT setting_value FROM app_settings WHERE setting_key = ?",
-            (SITE_CONFIG_KEY,),
-        ).fetchone()
+        try:
+            row = db.execute(
+                "SELECT setting_value, revision FROM app_settings WHERE setting_key = ?",
+                (SITE_CONFIG_KEY,),
+            ).fetchone()
+            g.site_config_revision = int((row or {}).get("revision") or 1) if row else 0
+        except Exception as exc:
+            if getattr(exc, "pgcode", "") != "42703" and "revision" not in str(exc).lower():
+                raise
+            row = db.execute(
+                "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+                (SITE_CONFIG_KEY,),
+            ).fetchone()
+            g.site_config_revision = 0
         if row and row["setting_value"]:
             try:
                 stored = json.loads(row["setting_value"])
@@ -10021,22 +10624,42 @@ def save_site_config(config):
         save_llm_api_credentials_patch(raw_registry.get("models"), prune_missing=False)
     merged = normalize_site_config(config)
     db = get_db()
-    db.execute(
-        """
-        INSERT INTO app_settings (setting_key, setting_value, updated_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(setting_key) DO UPDATE SET
-            setting_value = excluded.setting_value,
-            updated_at = excluded.updated_at
-        """,
-        (
-            SITE_CONFIG_KEY,
-            json.dumps(merged, ensure_ascii=False),
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        ),
-    )
+    serialized = json.dumps(merged, ensure_ascii=False)
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    expected_revision = int(g.get("site_config_revision") or 0)
+    try:
+        if expected_revision > 0:
+            result = db.execute(
+                """UPDATE app_settings SET setting_value = ?, updated_at = ?, revision = revision + 1
+                   WHERE setting_key = ? AND revision = ?""",
+                (serialized, updated_at, SITE_CONFIG_KEY, expected_revision),
+            )
+            if result.rowcount != 1:
+                db.rollback()
+                raise RuntimeError("site_config_concurrent_update")
+        else:
+            db.execute(
+                """INSERT INTO app_settings (setting_key, setting_value, updated_at, revision)
+                   VALUES (?, ?, ?, 1)
+                   ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at""",
+                (SITE_CONFIG_KEY, serialized, updated_at),
+            )
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        # Older deployments without migration 141 retain the old write path;
+        # the numbered migration upgrades them before concurrent writes matter.
+        if "revision" not in str(exc).lower() and getattr(exc, "pgcode", "") != "42703":
+            raise
+        db.rollback()
+        db.execute(
+            """INSERT INTO app_settings (setting_key, setting_value, updated_at)
+               VALUES (?, ?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at""",
+            (SITE_CONFIG_KEY, serialized, updated_at),
+        )
     db.commit()
     g.site_config = merged
+    g.site_config_revision = expected_revision + 1 if expected_revision > 0 else 1
     return merged
 
 

@@ -456,6 +456,14 @@ def _classify_database_table(table_name):
         return {"key": "release_control", "label": "发布控制数据", "owner": "5051 发布控制面", "policy": "仅由发布流程维护，不参与业务数据覆盖。", "description": "迁移文件 checksum、发布状态和执行记录。"}
     if name == "users":
         return {"key": "user_accounts", "label": "用户账户数据", "owner": "账户与权限模块", "policy": "生产账户默认保留，禁止本地覆盖。", "description": "用户账户、角色、租户归属和登录状态。"}
+    if name == "tenant_published_insights":
+        return {"key": "user_generated", "label": "用户生成数据", "owner": "洞见内容模块", "policy": "生产内容默认保留，结构发布绝不覆盖行数据。", "description": "大V已发布洞见的正文、发布日、可见范围、阅读量和外部导入幂等标识。"}
+    if name in {"tenant_message_threads", "tenant_messages", "tenant_broadcasts", "tenant_broadcast_deliveries"}:
+        return {"key": "user_generated", "label": "用户生成数据", "owner": "站内信与粉丝互动", "policy": "生产互动记录默认保留，发布流程只升级结构，不覆盖消息行数据。", "description": "大V与粉丝的线程、消息、群发记录及触达记录。"}
+    if name == "tenant_knowledge_documents":
+        return {"key": "user_generated", "label": "用户生成数据", "owner": "知识与检索模块", "policy": "生产知识正文默认保留，向量索引可独立重建。", "description": "知识源正文、来源、处理状态和文档版本元数据；向量表仅作检索索引。"}
+    if name == "tenant_insight_drafts":
+        return {"key": "user_generated", "label": "用户生成数据", "owner": "洞见内容模块", "policy": "生产草稿默认保留，结构发布绝不覆盖行数据。", "description": "大V洞见草稿正文、可见范围和编辑时间。"}
     if name in {"app_settings", "admin_task_configs", "tenant_registry", "tenant_subscription_products", "tenant_fan_qr_invites", "open_api_tokens"}:
         return {"key": "configuration", "label": "配置数据", "owner": "平台配置与租户管理", "policy": "按环境和租户隔离，生产敏感配置禁止覆盖。", "description": "系统、租户、订阅、后台任务和 Open API 授权配置。"}
     if name in {"security_master", "indicator_definitions", "indicator_mapping_rules", "indicator_source_defs", "market_snapshot_payloads", "indicator_series", "indicator_kline_points", "indicator_latest_values", "indicator_raw_records", "indicator_load_batches", "daily_quiz_sets", "quiz_questions"}:

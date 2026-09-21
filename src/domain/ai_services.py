@@ -2465,8 +2465,6 @@ def save_manual_knowledge_entry(
             "graph_profile": graph_profile,
         },
     )
-    current_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config"))
-    items = copy.deepcopy(current_hub.get("items") or [])
     entry = {
         "id": next_id,
         "type": normalized_type,
@@ -2507,20 +2505,27 @@ def save_manual_knowledge_entry(
         synced_at=entry.get("synced_at"),
         failed_at=entry.get("failed_at"),
     )
-    replaced = False
-    for index, item in enumerate(items):
-        if str(item.get("id") or "") == next_id:
-            items[index] = entry
-            replaced = True
-            break
-    if not replaced:
-        items.insert(0, entry)
-    saved = update_tenant_knowledge_hub_config(tenant_slug, {
-        "summary": current_hub.get("summary") or "",
-        "items": items,
-    })
-    latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
-    latest_hub = resolve_tenant_knowledge_hub(latest_tenant, latest_tenant.get("knowledge_hub_config"))
+    try:
+        save_tenant_knowledge_document(tenant_slug, entry)
+        latest_tenant = get_tenant_by_slug(tenant_slug)
+        latest_hub = resolve_tenant_knowledge_hub(latest_tenant)
+    except Exception as exc:
+        if not _knowledge_documents_storage_unavailable(exc):
+            raise
+        # Compatibility path for a pre-140 deployment.
+        current_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config"))
+        items = copy.deepcopy(current_hub.get("items") or [])
+        replaced = False
+        for index, item in enumerate(items):
+            if str(item.get("id") or "") == next_id:
+                items[index] = entry
+                replaced = True
+                break
+        if not replaced:
+            items.insert(0, entry)
+        saved = update_tenant_knowledge_hub_config(tenant_slug, {"summary": current_hub.get("summary") or "", "items": items})
+        latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
+        latest_hub = resolve_tenant_knowledge_hub(latest_tenant, latest_tenant.get("knowledge_hub_config"))
     return {
         "entry": entry,
         "knowledge_hub": latest_hub,
@@ -5446,7 +5451,7 @@ def build_kol_hermes_capability_growth(tenant_slug):
         """,
         (tenant_key,),
     ).fetchall()
-    reviews = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
+    reviews = resolve_tenant_review_snapshots(tenant)
     knowledge_available = True
     knowledge_items = []
     try:
@@ -11539,6 +11544,10 @@ def persist_review_publish_snapshot(
     user_input_section=None,
     watchlist_analysis_section=None,
     access_mode="public",
+    published_date=None,
+    external_id="",
+    dav_id="",
+    notify_followers=True,
 ):
     tenant = get_tenant_by_slug(tenant_slug)
     if not tenant or tenant.get("slug") != tenant_slug:
@@ -11586,13 +11595,22 @@ def persist_review_publish_snapshot(
         "web_match_count": 0,
         "llm_model": {},
     }
+    published_timestamp = now_ts()
+    normalized_published_date = str(published_date or published_timestamp[:10]).strip()
+    if published_date is not None:
+        try:
+            normalized_published_date = datetime.strptime(normalized_published_date, "%Y-%m-%d").date().isoformat()
+        except (TypeError, ValueError):
+            raise ValueError("published_date_invalid")
+        published_timestamp = f"{normalized_published_date} 00:00:00"
     snapshot = {
         "id": f"{tenant_slug}-review-{int(time.time() * 1000)}",
         "title": title[:80],
         "period": period_label,
         "period_key": period_key,
-        "time": now_ts(),
-        "published_at": now_ts(),
+        "time": published_timestamp,
+        "published_at": published_timestamp,
+        "published_date": normalized_published_date,
         "tags": [str(tag).strip() for tag in (prompt_tags if isinstance(prompt_tags, list) else []) if str(tag).strip()][:6] or (["自定义文案"] if paragraph_mode == "manual" else ["智能文案"]),
         "watchlist": [],
         "summary": summary or title[:80],
@@ -11602,6 +11620,8 @@ def persist_review_publish_snapshot(
         "access_label": "订阅专享" if normalized_access_mode == "subscriber" else "常规笔记",
         "view_count": 0,
         "source_mode": str(source_mode or "manual").strip().lower() or "manual",
+        "external_id": str(external_id or "").strip()[:160],
+        "dav_id": str(dav_id or "").strip()[:160],
         "paragraph_mode": str(paragraph_mode or "manual").strip().lower() or "manual",
         "publisher": str(speaker_name or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
         "snapshot_type": "published_review",
@@ -11618,6 +11638,25 @@ def persist_review_publish_snapshot(
         "simulation_label": "",
     }
     snapshots = append_review_snapshot(tenant_slug, snapshot)
+    # An external_id can make this call an idempotent retry. Return the stored
+    # original instead of a newly generated in-memory ID in that case.
+    stored_snapshot = next(
+        (
+            item for item in snapshots
+            if (snapshot["external_id"] and str(item.get("external_id") or "") == snapshot["external_id"])
+            or (not snapshot["external_id"] and str(item.get("id") or "") == snapshot["id"])
+        ),
+        None,
+    )
+    is_idempotent_retry = bool(stored_snapshot and str(stored_snapshot.get("id") or "") != str(snapshot.get("id") or ""))
+    if stored_snapshot:
+        snapshot = stored_snapshot
+    if is_idempotent_retry or not notify_followers:
+        return {
+            "snapshot": snapshot,
+            "snapshots": snapshots,
+            "message_center_state": resolve_tenant_message_center_state(tenant, tenant.get("message_center_state")),
+        }
     review_message = {
         "id": f"{tenant_slug}-review-message-{int(time.time() * 1000)}",
         "type": "review_notification",

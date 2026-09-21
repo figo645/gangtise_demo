@@ -5857,8 +5857,8 @@
 
       <!-- ===== OPEN API ===== -->
       <div id="section-open-api" style="display:none">
-        <div class="section-header">
-          <div><div class="section-title">Open API · 洞见笔记发布</div><div class="section-subtitle">外部系统可用租户专属 Bearer Token 直接发布标题与原文正文。该接口不调用大模型、不做智能优化，发布后与工作台的洞见笔记使用同一内容链路。</div></div>
+          <div class="section-header">
+          <div><div class="section-title">Open API · 洞见笔记发布</div><div class="section-subtitle">外部系统可用租户专属 Bearer Token 直接发布标题、原文正文和真实发布日期。该接口不调用大模型、不做智能优化，发布后与工作台的洞见笔记使用同一内容链路。</div></div>
           <span class="tag tag-gold">Bearer Auth</span>
         </div>
         <div class="sync-note-grid" style="margin-bottom:20px">
@@ -5894,9 +5894,10 @@ curl -X POST "https://your-domain/api/open/v1/insights" \
     "dav_id": "DAV_ID_FROM_PREVIOUS_RESPONSE",
     "title": "9月市场观察",
     "content_text": "这里是直接发布的洞见正文。",
+    "published_date": "2026-09-21",
     "access_mode": "public"
   }'</pre>
-            <div style="font-size:12px;color:#8899aa;line-height:1.8"><b style="color:#F8F6F0">调用顺序与鉴权</b><br>先调用 <code>GET /api/open/v1/davs</code> 获取 <code>dav_id</code>，再传给发布接口。<br><code>Authorization</code>：必填，<code>Bearer YOUR_TOKEN</code>。<br><code>dav_id</code>：必填，必须是上一步返回且属于当前 Token 的大V。<br><code>title</code>：必填，最多 80 字。<br><code>content_text</code>：必填，最多 20,000 字。也兼容 <code>content</code>。<br><code>access_mode</code>：可选，<code>public</code> 或 <code>subscriber</code>。<br><br><b style="color:#F8F6F0">响应与边界</b><br>成功返回 <code>201</code>，包含洞见 ID、大V ID、租户、标题、发布范围和发布时间。认证失败返回 <code>401</code>；字段错误返回 <code>400</code>；越权大V返回 <code>403</code>。请求体传入的提示词、富文本或模型参数均不会被使用。</div>
+            <div style="font-size:12px;color:#8899aa;line-height:1.8"><b style="color:#F8F6F0">调用顺序与鉴权</b><br>先调用 <code>GET /api/open/v1/davs</code> 获取 <code>dav_id</code>，再传给发布接口。<br><code>Authorization</code>：必填，<code>Bearer YOUR_TOKEN</code>。<br><code>dav_id</code>：必填，必须是上一步返回且属于当前 Token 的大V。<br><code>title</code>：必填，最多 80 字。<br><code>content_text</code>：必填，最多 20,000 字。也兼容 <code>content</code>。<br><code>published_date</code>：必填，严格 <code>YYYY-MM-DD</code>，不能晚于今天；历史导入按此日期排序。<br><code>access_mode</code>：可选，<code>public</code> 或 <code>subscriber</code>。<br><code>external_id</code>：可选，外部唯一编号；重复提交不会重复创建。<br><br><b style="color:#F8F6F0">响应与边界</b><br>成功返回 <code>201</code>，包含洞见 ID、大V ID、租户、标题、发布范围、业务发布日期和入库后的发布时间。历史导入默认不触达粉丝；仅当天内容可显式传 <code>notify_followers: true</code>。认证失败返回 <code>401</code>；字段错误返回 <code>400</code>；越权大V返回 <code>403</code>。请求体传入的提示词、富文本或模型参数均不会被使用。</div>
           </div>
         </div>
       </div><!-- end section-open-api -->
@@ -6858,6 +6859,7 @@ curl -X POST "${origin}/api/open/v1/insights" \\
     "dav_id": "DAV_ID_FROM_PREVIOUS_RESPONSE",
     "title": "9月市场观察",
     "content_text": "这里是直接发布的洞见正文。",
+    "published_date": "2026-09-21",
     "access_mode": "public"
   }'`;
   }

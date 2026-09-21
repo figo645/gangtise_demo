@@ -66,6 +66,7 @@ class OpenApiInsightsBddTest(unittest.TestCase):
                 "id": "laowang-review-1",
                 "title": "市场观察",
                 "access_mode": "public",
+                "published_date": "2026-09-19",
                 "published_at": "2026-09-19 10:00:00",
             }
         }
@@ -77,7 +78,7 @@ class OpenApiInsightsBddTest(unittest.TestCase):
             response = self.client.post(
                 "/api/open/v1/insights",
                 headers={"Authorization": "Bearer gti_live_test"},
-                json={"dav_id": "tenant_laowang", "title": "市场观察", "content_text": "未经优化的原文正文", "prompt": "不要使用", "model": "v4"},
+                json={"dav_id": "tenant_laowang", "title": "市场观察", "content_text": "未经优化的原文正文", "published_date": "2026-09-19", "external_id": "legacy-note-19", "prompt": "不要使用", "model": "v4"},
             )
 
         self.assertEqual(response.status_code, 201)
@@ -91,8 +92,42 @@ class OpenApiInsightsBddTest(unittest.TestCase):
         self.assertEqual(kwargs["paragraph_mode"], "manual")
         self.assertEqual(kwargs["prompt_tags"], [])
         self.assertEqual(kwargs["access_mode"], "public")
+        self.assertEqual(kwargs["published_date"], "2026-09-19")
+        self.assertEqual(kwargs["external_id"], "legacy-note-19")
+        self.assertEqual(kwargs["dav_id"], "tenant_laowang")
+        self.assertFalse(kwargs["notify_followers"])
         self.assertNotIn("prompt", kwargs)
         self.assertNotIn("model", kwargs)
+
+    def test_given_open_api_when_business_date_is_missing_invalid_or_future_then_request_is_rejected(self):
+        principal = {"token_id": "oat_1", "tenant_slug": "laowang", "token_name": "内容中台"}
+        dav = {"dav_id": "tenant_laowang", "tenant_slug": "laowang", "dav_name": "财经老王", "tenant_name": "老王投研"}
+        payload = {"dav_id": "tenant_laowang", "title": "标题", "content_text": "正文"}
+        with patch.object(api_core, "authenticate_open_api_insight_token", return_value=principal), patch.object(
+            api_core, "get_open_api_dav_identity", return_value=dav
+        ), patch.object(api_core, "persist_review_publish_snapshot") as publish:
+            missing = self.client.post("/api/open/v1/insights", headers={"Authorization": "Bearer test"}, json=payload)
+            malformed = self.client.post("/api/open/v1/insights", headers={"Authorization": "Bearer test"}, json={**payload, "published_date": "2026/09/19"})
+            future = self.client.post("/api/open/v1/insights", headers={"Authorization": "Bearer test"}, json={**payload, "published_date": "2999-01-01"})
+
+        self.assertEqual(missing.get_json()["error"], "open_api_published_date_required")
+        self.assertEqual(malformed.get_json()["error"], "open_api_published_date_invalid")
+        self.assertEqual(future.get_json()["error"], "open_api_published_date_future")
+        publish.assert_not_called()
+
+    def test_given_historical_open_api_import_when_notification_is_requested_then_it_is_rejected(self):
+        principal = {"token_id": "oat_1", "tenant_slug": "laowang", "token_name": "内容中台"}
+        dav = {"dav_id": "tenant_laowang", "tenant_slug": "laowang", "dav_name": "财经老王", "tenant_name": "老王投研"}
+        with patch.object(api_core, "authenticate_open_api_insight_token", return_value=principal), patch.object(
+            api_core, "get_open_api_dav_identity", return_value=dav
+        ), patch.object(api_core, "persist_review_publish_snapshot") as publish:
+            response = self.client.post(
+                "/api/open/v1/insights", headers={"Authorization": "Bearer test"},
+                json={"dav_id": "tenant_laowang", "title": "历史", "content_text": "正文", "published_date": "2026-09-19", "notify_followers": True},
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "open_api_historical_insight_notification_forbidden")
+        publish.assert_not_called()
 
     def test_given_authorized_open_api_when_tenant_or_fields_are_invalid_then_publish_is_not_called(self):
         principal = {"token_id": "oat_1", "tenant_slug": "laowang", "token_name": "内容中台"}
@@ -215,3 +250,29 @@ class OpenApiInsightsBddTest(unittest.TestCase):
         self.assertIn("function revokeAdminOpenApiToken", admin_html)
         self.assertIn("&#128065; 查看", admin_html)
         self.assertIn("/api/admin/open-api/tokens", admin_html)
+
+    def test_given_published_insights_storage_when_checked_then_it_is_independent_and_backfills_legacy_json(self):
+        migration = (PROJECT_ROOT / "sql/postgres/138_tenant_published_insights.sql").read_text(encoding="utf-8")
+        self.assertIn("CREATE TABLE IF NOT EXISTS tenant_published_insights", migration)
+        self.assertIn("external_id", migration)
+        self.assertIn("published_date DATE NOT NULL", migration)
+        self.assertIn("jsonb_array_elements", migration)
+        self.assertIn("review_snapshots", migration)
+
+    def test_given_domain_storage_migrations_when_checked_then_messages_knowledge_and_config_lock_are_separated(self):
+        message_sql = (PROJECT_ROOT / "sql/postgres/139_message_center_domain.sql").read_text(encoding="utf-8")
+        knowledge_sql = (PROJECT_ROOT / "sql/postgres/140_knowledge_domain.sql").read_text(encoding="utf-8")
+        revision_sql = (PROJECT_ROOT / "sql/postgres/141_app_settings_revision.sql").read_text(encoding="utf-8")
+        relation_sql = (PROJECT_ROOT / "sql/postgres/142_domain_foreign_keys.sql").read_text(encoding="utf-8")
+        core = (PROJECT_ROOT / "src/domain/core_services.py").read_text(encoding="utf-8")
+        self.assertIn("CREATE TABLE IF NOT EXISTS tenant_message_threads", message_sql)
+        self.assertIn("CREATE TABLE IF NOT EXISTS tenant_messages", message_sql)
+        self.assertIn("CREATE TABLE IF NOT EXISTS tenant_broadcasts", message_sql)
+        self.assertIn("CREATE TABLE IF NOT EXISTS tenant_broadcast_deliveries", message_sql)
+        self.assertIn("CREATE TABLE IF NOT EXISTS tenant_knowledge_documents", knowledge_sql)
+        self.assertIn("ADD COLUMN IF NOT EXISTS revision", revision_sql)
+        self.assertIn("_persist_tenant_message_center_state", core)
+        self.assertIn("save_tenant_knowledge_document", core)
+        self.assertIn("site_config_concurrent_update", core)
+        self.assertIn("fk_messages_thread", relation_sql)
+        self.assertIn("fk_knowledge_documents_tenant", relation_sql)

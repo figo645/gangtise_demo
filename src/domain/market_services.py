@@ -4311,7 +4311,7 @@ def sync_daily_finance_broadcast(force=False, tenant_slug=""):
             skipped_disabled.append(tenant_slug)
             continue
         insight_id = _daily_broadcast_id(report_kind, report_date, tenant_slug)
-        existing = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"), include_simulated=True)
+        existing = resolve_tenant_review_snapshots(tenant, include_simulated=True)
         if any(str(item.get("id") or "") == insight_id for item in existing):
             skipped.append(tenant_slug)
             continue

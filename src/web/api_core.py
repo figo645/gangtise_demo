@@ -55,6 +55,19 @@ def _open_api_authenticated_principal():
     return None, (response, 401)
 
 
+def _open_api_published_date(value):
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError("open_api_published_date_required")
+    try:
+        parsed = datetime.strptime(text, "%Y-%m-%d").date()
+    except (TypeError, ValueError) as exc:
+        raise ValueError("open_api_published_date_invalid") from exc
+    if parsed > datetime.now().date():
+        raise ValueError("open_api_published_date_future")
+    return parsed.isoformat()
+
+
 @app.route("/api/open/v1/davs")
 def api_open_v1_list_davs():
     """Return the DAV identity available to the current tenant-scoped token."""
@@ -101,6 +114,16 @@ def api_open_v1_publish_insight():
     if access_mode not in {"public", "subscriber"}:
         return jsonify({"ok": False, "error": "open_api_insight_access_mode_invalid"}), 400
     try:
+        published_date = _open_api_published_date(body.get("published_date"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    external_id = str(body.get("external_id") or "").strip()
+    if len(external_id) > 160:
+        return jsonify({"ok": False, "error": "open_api_insight_external_id_too_long"}), 400
+    notify_followers = _is_truthy_flag(body.get("notify_followers"))
+    if notify_followers and published_date != datetime.now().date().isoformat():
+        return jsonify({"ok": False, "error": "open_api_historical_insight_notification_forbidden"}), 400
+    try:
         result = persist_review_publish_snapshot(
             tenant_slug=principal["tenant_slug"],
             text=content.strip(),
@@ -114,6 +137,10 @@ def api_open_v1_publish_insight():
             prompt_tags=[],
             review_summary="",
             access_mode=access_mode,
+            published_date=published_date,
+            external_id=external_id,
+            dav_id=dav["dav_id"],
+            notify_followers=notify_followers,
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -126,6 +153,7 @@ def api_open_v1_publish_insight():
             "tenant_slug": principal["tenant_slug"],
             "title": snapshot.get("title"),
             "access_mode": snapshot.get("access_mode"),
+            "published_date": snapshot.get("published_date"),
             "published_at": snapshot.get("published_at"),
         },
     }), 201
