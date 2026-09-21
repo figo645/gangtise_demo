@@ -11682,25 +11682,50 @@ def persist_review_publish_snapshot(
         "is_simulated": False,
         "simulation_label": "",
     }
-    message_state = append_message_thread(tenant_slug, review_message)
-    review_broadcast = {
-        "id": int(time.time() * 1000),
-        "content": f"【最新洞见已发布】{title}\n已同步到洞见，当前纳入样本：{'、'.join(snapshot['watchlist']) if snapshot['watchlist'] else '未指定'}。\n现在可以直接去“洞见”页查看完整内容。",
-        "time": now_ts(),
-        "reach": max(1, len(list_users(role='investor', tenant_slug=tenant_slug))),
-        "open_rate": random.randint(35, 78),
-        "target": "review",
-        "type": "broadcast",
-        "is_simulated": False,
-        "simulation_label": "",
-    }
-    message_state = append_broadcast_history(tenant_slug, review_broadcast)
-    message_state = push_broadcast_to_fan_threads(tenant_slug, review_broadcast)
-    return {
+    # The insight has already been persisted above. Notification fan-out is a
+    # secondary side effect and must not turn a successful publish into a 500
+    # when one message/broadcast store is temporarily unavailable.
+    notification_errors = []
+    try:
+        message_state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    except Exception as exc:
+        notification_errors.append("message_center_state")
+        message_state = tenant.get("message_center_state") or {"threads": [], "broadcasts": []}
+        app.logger.warning("Review published but message center state could not be loaded tenant=%s error=%s", tenant_slug, str(exc)[:240])
+    try:
+        message_state = append_message_thread(tenant_slug, review_message)
+    except Exception as exc:
+        notification_errors.append("message_thread")
+        app.logger.warning("Review published but message thread notification failed tenant=%s error=%s", tenant_slug, str(exc)[:240])
+    try:
+        review_broadcast = {
+            "id": int(time.time() * 1000),
+            "content": f"【最新洞见已发布】{title}\n已同步到洞见，当前纳入样本：{'、'.join(snapshot['watchlist']) if snapshot['watchlist'] else '未指定'}。\n现在可以直接去“洞见”页查看完整内容。",
+            "time": now_ts(),
+            "reach": max(1, len(list_users(role='investor', tenant_slug=tenant_slug))),
+            "open_rate": random.randint(35, 78),
+            "target": "review",
+            "type": "broadcast",
+            "is_simulated": False,
+            "simulation_label": "",
+        }
+        message_state = append_broadcast_history(tenant_slug, review_broadcast)
+    except Exception as exc:
+        notification_errors.append("broadcast_history")
+        app.logger.warning("Review published but broadcast history notification failed tenant=%s error=%s", tenant_slug, str(exc)[:240])
+    try:
+        message_state = push_broadcast_to_fan_threads(tenant_slug, review_broadcast)
+    except Exception as exc:
+        notification_errors.append("fan_threads")
+        app.logger.warning("Review published but fan thread notification failed tenant=%s error=%s", tenant_slug, str(exc)[:240])
+    result = {
         "snapshot": snapshot,
         "snapshots": snapshots,
         "message_center_state": message_state,
     }
+    if notification_errors:
+        result["publish_warnings"] = notification_errors
+    return result
 
 
 def process_review_manual_text(text, tenant_slug="", review_period="", entry_point="", speaker_name=""):

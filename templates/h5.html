@@ -183,7 +183,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 /* Compose modal */
 .modal-overlay { position:fixed; inset:0; background:rgba(13,27,42,0.85); z-index:1000; display:none; align-items:flex-end; justify-content:center; backdrop-filter:blur(4px); }
 .modal-overlay.show { display:flex; }
-.modal-sheet { background:var(--navy-mid); border-radius:20px 20px 0 0; padding:20px 16px 32px; width:100%; max-width:390px; border-top:1px solid rgba(200,169,110,0.2); }
+.modal-sheet { background:var(--navy-mid); border-radius:20px 20px 0 0; padding:20px 16px 32px; width:100%; max-width:390px; box-sizing:border-box; border-top:1px solid rgba(200,169,110,0.2); }
 .modal-handle { width:36px; height:4px; background:rgba(200,169,110,0.3); border-radius:2px; margin:0 auto 16px; }
 .modal-close-row { display:flex; justify-content:flex-end; margin:-4px 0 10px; }
 .modal-close-btn {
@@ -9858,8 +9858,8 @@ function renderReviewDraftLibraryOverview() {
         <span class="review-access-label public">${previewDrafts.length} 篇</span>
       </div>
       ${previewDrafts.length ? `<div style="display:grid;gap:7px;margin-top:10px">${previewDrafts.map((draft) => `
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;background:#FFFFFF;border:1px solid rgba(47,116,192,0.10);border-radius:9px">
-          <div style="min-width:0"><div style="font-size:12px;color:var(--text-main);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(draft.title || '未命名洞见草稿')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px">更新于 ${escapeHtml(draft.updated_at || '--')}</div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden;padding:9px 10px;background:#FFFFFF;border:1px solid rgba(47,116,192,0.10);border-radius:9px">
+          <div style="flex:1 1 auto;width:0;min-width:0;overflow:hidden"><div style="font-size:12px;color:var(--text-main);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(draft.title || '未命名洞见草稿')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">更新于 ${escapeHtml(draft.updated_at || '--')}</div></div>
         </div>
       `).join('')}</div>` : '<div style="font-size:11px;color:var(--gray-400);margin-top:10px">当前还没有草稿。可以在小金智能体回答下方点击“加入洞见笔记草稿”，或在编辑器中保存。</div>'}
       <button class="btn-outline" type="button" style="width:100%;margin-top:10px;padding:7px 10px;font-size:11px" onclick="openInsightDraftLibrary()">${drafts.length ? '查看全部草稿' : '打开草稿箱'}</button>
@@ -11133,7 +11133,12 @@ function publishReviewDraft() {
     loadDmConversations();
     if (currentDmKol) loadDmMessages(currentDmKol.id);
     renderReviewExperience();
-    showToast((publishResult && publishResult.message) || '洞见已发布');
+    const publishWarnings = Array.isArray(publishResult && publishResult.publish_warnings)
+      ? publishResult.publish_warnings
+      : [];
+    showToast(publishWarnings.length
+      ? '洞见已发布，部分通知暂未完成，请稍后重试'
+      : ((publishResult && publishResult.message) || '洞见已发布'));
   }).catch((error) => {
     reviewPublishSubmitting = false;
     renderReviewTriggerModal(user);
@@ -18966,7 +18971,16 @@ async function loadDmConversations() {
   } catch (e) {}
   const activeUser = getSafeActiveDemoUser();
   const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
-  dmConversationsCache = isDavDmMode() ? [] : [getInvestorDmConversation()];
+  // Use the just-published tenant state as an immediate local fallback while
+  // the message-center request is loading. This prevents a successful insight
+  // publish from briefly rendering an empty inbox when the API is slow or
+  // temporarily unavailable.
+  const localMessageState = (activeUser && activeUser.tenant && activeUser.tenant.message_center_state)
+    || (window.ACTIVE_TENANT && window.ACTIVE_TENANT.message_center_state);
+  const localThreads = localMessageState && Array.isArray(localMessageState.threads)
+    ? localMessageState.threads
+    : [];
+  dmConversationsCache = isDavDmMode() ? localThreads : [getInvestorDmConversation()];
   dmCenterState = dmCenterState || { stats: {} };
   try {
     renderDmConversations(dmConversationsCache);
@@ -18981,9 +18995,11 @@ async function loadDmConversations() {
     const data = await resp.json();
     if (!resp.ok || data.success === false) throw new Error(data.error || 'dm_center_load_failed');
     applyDmCenterPayload(data);
-    dmConversationsCache = Array.isArray(data.threads)
-      ? data.threads
-      : (isDavDmMode() ? [] : [getInvestorDmConversation()]);
+    const remoteThreads = Array.isArray(data.threads) ? data.threads : [];
+    dmConversationsCache = remoteThreads.length || !localThreads.length
+      ? remoteThreads
+      : localThreads;
+    if (!isDavDmMode() && !dmConversationsCache.length) dmConversationsCache = [getInvestorDmConversation()];
     try {
       renderDmConversations(dmConversationsCache);
     } catch (error) {

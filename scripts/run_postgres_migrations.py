@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -75,6 +76,18 @@ def _migration_files(sql_dir: Path) -> list[Path]:
     if not files:
         raise ValueError(f"No numbered SQL migrations found in {sql_dir}")
     return files
+
+
+def _validate_migration_catalog(sql_dir: Path) -> list[Path]:
+    """Reject non-versioned SQL files before a CI/CD release can use them."""
+    pattern = re.compile(r"^[0-9]{3}_[A-Za-z0-9][A-Za-z0-9_.-]*\.sql$")
+    files = sorted(path for path in sql_dir.glob("*.sql") if path.name != "README.md")
+    invalid = [path.name for path in files if not pattern.fullmatch(path.name)]
+    if invalid:
+        raise ValueError("migration_filename_invalid:" + ",".join(invalid))
+    if not (sql_dir / "004_schema_migrations.sql").is_file():
+        raise ValueError("schema_migrations_bootstrap_missing")
+    return _migration_files(sql_dir)
 
 
 def _checksum(path: Path) -> str:
@@ -211,7 +224,7 @@ def run_migrations(sql_dir: Path, schema_only: bool, release_manifest: dict | No
             raise RuntimeError("postgres_migration_lock_unavailable")
 
         _ensure_ledger(connection)
-        files = _migration_files(sql_dir)
+        files = _validate_migration_catalog(sql_dir)
         if release_manifest:
             paths_by_name = {path.name: path for path in files}
             # The versioned manifest can intentionally order a metadata repair
@@ -294,7 +307,8 @@ def main() -> int:
             raise ValueError("release_manifest_required")
         release_manifest = _load_release_manifest(Path(args.release_manifest), sql_dir, args.schema_only) if args.release_manifest else None
         if args.verify_release_manifest:
-            print(f"Release manifest file contract valid: {release_manifest['release_version']}")
+            files = _validate_migration_catalog(sql_dir)
+            print(f"Release manifest file contract valid: {release_manifest['release_version']} ({len(files)} SQL files)")
             return 0
         run_migrations(sql_dir, args.schema_only, release_manifest)
     except (OSError, ValueError, psycopg2.Error, RuntimeError) as exc:

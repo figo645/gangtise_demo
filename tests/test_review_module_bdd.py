@@ -68,6 +68,8 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("function renderReviewExperience()", html)
         self.assertIn("function publishReviewDraft()", html)
         self.assertIn("function syncPublishedReviewStateToH5(tenantSlug, result)", html)
+        self.assertIn("const localMessageState = (activeUser && activeUser.tenant && activeUser.tenant.message_center_state)", html)
+        self.assertIn("dmConversationsCache = isDavDmMode() ? localThreads : [getInvestorDmConversation()]", html)
 
     def test_given_h5_stock_search_when_no_candidate_then_raw_stock_name_is_not_submitted(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
@@ -2884,6 +2886,35 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(persist_snapshot.call_args.kwargs["review_title"], "手动输入的复盘主题")
         create_job.assert_not_called()
 
+    def test_given_persisted_review_when_notification_warning_is_returned_then_route_still_reports_success(self):
+        snapshot_result = {
+            "snapshot": {"id": "review-notification-warning", "title": "通知延迟"},
+            "snapshots": [{"id": "review-notification-warning", "title": "通知延迟"}],
+            "message_center_state": {"threads": [], "broadcasts": []},
+            "publish_warnings": ["message_thread", "broadcast_history", "fan_threads"],
+        }
+        with mock.patch(
+            "src.web.api_core.persist_review_publish_snapshot",
+            return_value=snapshot_result,
+        ) as persist_snapshot:
+            response = self.client.post(
+                "/api/review/publish",
+                json={
+                    "tenant_slug": self.tenant_slug,
+                    "period": "day",
+                    "review_title": "通知延迟",
+                    "text": "正文已经写入洞见主记录。",
+                    "speaker_name": "BDD Tester",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["snapshot"]["id"], "review-notification-warning")
+        self.assertEqual(payload["publish_warnings"], ["message_thread", "broadcast_history", "fan_threads"])
+        persist_snapshot.assert_called_once()
+
     def test_given_publish_text_when_embedding_queue_unavailable_then_review_is_still_published(self):
         snapshot_result = {
             "snapshot": {"id": "review-2", "title": "日复盘：同步发布"},
@@ -2912,6 +2943,31 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(payload["snapshot"]["id"], "review-2")
         self.assertFalse(payload["embedding_generated"])
         create_job.assert_not_called()
+
+    def test_given_review_persisted_when_notification_fanout_fails_then_publish_still_succeeds(self):
+        snapshot = {
+            "id": "review-notification-warning",
+            "title": "日复盘：通知延迟",
+            "content_text": "正文已入库",
+            "published_at": "2026-09-22 10:00:00",
+            "published_date": "2026-09-22",
+        }
+        tenant = {"slug": self.tenant_slug, "advisor": "BDD Tester", "message_center_state": {"threads": [], "broadcasts": []}}
+        with mock.patch.object(ai_services, "get_tenant_by_slug", return_value=tenant), \
+            mock.patch.object(ai_services, "append_review_snapshot", return_value=[snapshot]), \
+            mock.patch.object(ai_services, "append_message_thread", side_effect=RuntimeError("message store unavailable")), \
+            mock.patch.object(ai_services, "append_broadcast_history", side_effect=RuntimeError("broadcast store unavailable")), \
+            mock.patch.object(ai_services, "push_broadcast_to_fan_threads", side_effect=RuntimeError("fan thread store unavailable")), \
+            mock.patch.object(ai_services, "list_users", return_value=[]):
+            result = ai_services.persist_review_publish_snapshot(
+                tenant_slug=self.tenant_slug,
+                text="正文已入库",
+                review_title="通知延迟",
+                speaker_name="BDD Tester",
+            )
+
+        self.assertTrue(result["snapshot"]["id"].startswith(f"{self.tenant_slug}-review-"))
+        self.assertEqual(result["publish_warnings"], ["message_thread", "broadcast_history", "fan_threads"])
 
     def test_given_publish_text_when_processing_then_transcription_engine_is_forwarded_without_embedding(self):
         with mock.patch("src.domain.ai_services.build_text_embedding") as build_embedding, mock.patch(

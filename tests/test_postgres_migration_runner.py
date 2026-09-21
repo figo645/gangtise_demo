@@ -29,6 +29,7 @@ def test_runner_uses_postgres_lock_transaction_and_checksum_ledger():
     assert "connection.commit()" in source
     assert "hashlib.sha256" in source
     assert "INSERT INTO schema_migrations" in source
+    assert "def _validate_migration_catalog" in source
 
 
 def test_current_release_manifest_includes_the_domain_and_open_api_migrations():

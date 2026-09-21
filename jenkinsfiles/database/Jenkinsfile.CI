@@ -61,24 +61,6 @@ pipeline {
                         test -x scripts/apply_postgres_updates.sh
                         test -x scripts/run_postgres_migrations.py
 
-                        .venv/bin/python - <<'PY'
-from pathlib import Path
-import re
-import sys
-
-sql_dir = Path('sql/postgres')
-pattern = re.compile(r'^[0-9]{3}_[A-Za-z0-9][A-Za-z0-9_.-]*\.sql$')
-files = sorted(path for path in sql_dir.glob('*.sql') if path.name != 'README.md')
-invalid = [path.name for path in files if not pattern.fullmatch(path.name)]
-if invalid:
-    raise SystemExit(f'Invalid migration filename(s): {", ".join(invalid)}')
-if not files:
-    raise SystemExit('No numbered PostgreSQL migration files found.')
-if not (sql_dir / '004_schema_migrations.sql').is_file():
-    raise SystemExit('schema_migrations bootstrap migration is missing.')
-print(f'Migration contract valid: {len(files)} numbered SQL files.')
-PY
-
                         .venv/bin/python ./scripts/run_postgres_migrations.py \
                           --release-manifest "$RELEASE_MANIFEST" \
                           --verify-release-manifest
