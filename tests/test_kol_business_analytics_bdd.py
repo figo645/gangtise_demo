@@ -269,7 +269,7 @@ class KolBusinessAnalyticsBddTest(unittest.TestCase):
         template = (PROJECT_ROOT / "templates" / "kol_workbench.html").read_text(encoding="utf-8")
         asset = PROJECT_ROOT / "static" / "echarts.min.js"
 
-        self.assertIn('<script src="/static/echarts.min.js"></script>', template)
+        self.assertIn('<script defer src="/static/echarts.min.js"></script>', template)
         self.assertNotIn("cdn.jsdelivr.net/npm/echarts", template)
         self.assertTrue(asset.exists())
         self.assertGreater(asset.stat().st_size, 500_000)

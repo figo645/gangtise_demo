@@ -376,7 +376,7 @@ function rankNews(input) {
 
     def test_news_lake_refreshes_from_active_sources_when_forced(self):
         source = {"code": "gov_cn_policy", "name": "中国政府网", "category": "政策", "source_group": "政策要闻"}
-        source_item = {"event_id": "n1", "title": "来源新闻", "url": "https://example.com/n1", "published_at": "2026-09-15"}
+        source_item = {"event_id": "n1", "title": "来源新闻", "url": "https://example.com/n1", "published_at": datetime.now().strftime("%Y-%m-%d")}
         with patch.object(market_services, "_load_news_lake_cache", return_value=None), patch.object(
             market_services, "_load_active_news_source_whitelist", return_value=[source]
         ), patch.object(

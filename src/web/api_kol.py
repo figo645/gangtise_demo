@@ -7,6 +7,7 @@ from src.domain.core_services import (
     force_admin_task_stop,
     request_admin_task_stop,
     restart_admin_task,
+    set_tenant_published_insight_pin,
 )
 from src.domain.market_services import request_market_snapshot_selection_refresh
 
@@ -1073,6 +1074,42 @@ def api_tenant_dashboard(tenant_slug):
     return jsonify({"success": True, "dashboard": payload, "fund_dashboard_state": payload.get("fund_dashboard_state")})
 
 
+@app.route("/api/tenant/<tenant_slug>/published-insights")
+def api_list_tenant_published_insights(tenant_slug):
+    """Serve the full Insight directory without enlarging the dashboard payload."""
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != str(tenant_slug or "").strip().lower():
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    try:
+        limit = max(1, min(int(request.args.get("limit", 30)), 100))
+        offset = int(request.args.get("offset", 0))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "published_insights_pagination_invalid"}), 400
+    try:
+        viewer = get_current_authenticated_user()
+        page = list_tenant_published_insights_page(
+            tenant["slug"],
+            limit=limit,
+            offset=offset,
+            query=request.args.get("q", ""),
+            search_terms=request.args.getlist("alias"),
+            search_paid_content=fan_can_view_paid_content(tenant["slug"], viewer),
+        )
+        # Keep the list contract identical to the dashboard: subscription-only
+        # bodies never leave the server for viewers without an entitlement.
+        page["items"] = protect_tenant_review_snapshots(
+            tenant["slug"], page["items"], viewer
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "published_insights_storage_unavailable"}), 503
+        app.logger.exception("Failed to list published Insights tenant=%s", tenant_slug)
+        return jsonify({"ok": False, "error": "published_insights_list_failed"}), 500
+    return jsonify({"ok": True, **page})
+
+
 @app.route("/api/tenant/<tenant_slug>/reviews/<review_id>/view", methods=["POST"])
 def api_record_tenant_review_view(tenant_slug, review_id):
     try:
@@ -1115,6 +1152,35 @@ def api_delete_tenant_review(tenant_slug, review_id):
         "message": "洞见已删除",
         "review_id": result["review_id"],
         "snapshots": result["snapshots"],
+    })
+
+
+@app.route("/api/tenant/<tenant_slug>/reviews/<review_id>/pin", methods=["POST"])
+def api_pin_tenant_review(tenant_slug, review_id):
+    """Explicitly pin or unpin a published Insight; publication never pins implicitly."""
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    if not has_role_capability(role, "dav"):
+        return jsonify({"ok": False, "error": "dav_required"}), 403
+    requested_tenant = str(tenant_slug or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if not has_role_capability(role, "admin") and current_tenant != requested_tenant:
+        return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload.get("pinned"), bool):
+        return jsonify({"ok": False, "error": "pinned_required"}), 400
+    try:
+        result = set_tenant_published_insight_pin(requested_tenant, review_id, payload["pinned"])
+    except ValueError as exc:
+        status = 404 if str(exc) in {"tenant_not_found", "review_not_found"} else 400
+        return jsonify({"ok": False, "error": str(exc)}), status
+    except Exception:
+        app.logger.exception("Failed to update tenant review pin")
+        return jsonify({"ok": False, "error": "review_pin_update_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "message": "洞见已置顶" if result["pinned"] else "洞见已取消置顶",
+        **result,
     })
 
 

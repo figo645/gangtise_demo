@@ -40,11 +40,14 @@ class FanDavRelationshipRegressionBddTest(unittest.TestCase):
     def setUp(self):
         app_entry.app.config.update(TESTING=True)
         self.client = app_entry.app.test_client()
+        self._app_context = app_entry.app.app_context()
+        self._app_context.push()
         self.authenticated = patch.object(web_hooks, "is_authenticated", return_value=True)
         self.authenticated.start()
 
     def tearDown(self):
         self.authenticated.stop()
+        self._app_context.pop()
 
     def test_given_new_dav_when_provisioned_then_a_dedicated_tenant_is_created(self):
         config = {"tenants": [copy.deepcopy(TENANTS[0])], "default_tenant_slug": "laowang"}
@@ -64,6 +67,8 @@ class FanDavRelationshipRegressionBddTest(unittest.TestCase):
             core_services, "get_tenant_configs", side_effect=lambda source=None: copy.deepcopy((source or config)["tenants"])
         ), patch.object(core_services, "save_site_config", side_effect=save_config), patch.object(
             core_services, "get_tenant_by_slug", side_effect=find_tenant
+        ), patch.object(
+            core_services, "_sync_tenant_registry_row"
         ):
             slug = core_services.provision_dav_tenant("duoge")
 

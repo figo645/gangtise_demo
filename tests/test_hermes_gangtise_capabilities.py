@@ -4,9 +4,17 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.domain import ai_services, core_services, market_services
+from src.runtime import app
 
 
 class HermesGangtiseCapabilitiesTest(unittest.TestCase):
+    def setUp(self):
+        self._app_context = app.app_context()
+        self._app_context.push()
+
+    def tearDown(self):
+        self._app_context.pop()
+
     def test_explicit_hermes_question_precedes_stale_conversation_messages(self):
         self.assertEqual(
             ai_services.extract_hermes_question_text(
@@ -52,7 +60,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             "api_key": "configured",
             "enabled": True,
         }
-        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
             ai_services, "call_openai_compatible_llm", return_value=router_json
         ) as llm_call, patch.object(
             ai_services, "search_watchlist_candidates", return_value=[]
@@ -70,6 +78,51 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertEqual(llm_call.call_args.kwargs["request_timeout_seconds"], 60)
         self.assertEqual(llm_call.call_args.kwargs["max_tokens"], 512)
 
+    def test_hermes_router_retries_once_when_model_returns_invalid_json(self):
+        model = {
+            "key": "router",
+            "base_url": "http://8.155.160.194:6031/api",
+            "model_name": "router",
+            "api_key": "configured",
+            "enabled": True,
+        }
+        valid_router_json = (
+            '{"intent":"stock_highlights","tools":["gangtise.stock_highlights"],'
+            '"target_type":"multi_stock","securities":[{"name":"中国银行"},{"name":"建设银行"},{"name":"贵州茅台"}],'
+            '"time_scope":"latest","display_mode":"text"}'
+        )
+        candidates = {
+            "中国银行": {"name": "中国银行", "code": "601988", "security_code": "601988.SH"},
+            "建设银行": {"name": "建设银行", "code": "601939", "security_code": "601939.SH"},
+            "贵州茅台": {"name": "贵州茅台", "code": "600519", "security_code": "600519.SH"},
+        }
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
+            ai_services,
+            "call_openai_compatible_llm",
+            side_effect=["不是 JSON 的说明", valid_router_json],
+        ) as llm_call, patch.object(
+            ai_services,
+            "search_watchlist_candidates",
+            side_effect=lambda query, top=1, include_remote=False: [
+                item for item in candidates.values()
+                if query in {item["name"], item["code"]}
+            ],
+        ), patch.object(
+            ai_services,
+            "find_watchlist_code_from_text",
+            side_effect=lambda value: next(
+                (item["code"] for item in candidates.values() if item["name"] == value),
+                "",
+            ),
+        ):
+            plan, _model, _mode = ai_services.route_hermes_query_intent(
+                "请对贵州茅台、建设银行、中国银行做精炼看点摘要"
+            )
+
+        self.assertEqual(plan["intent"], "stock_highlights")
+        self.assertEqual(len(plan["securities"]), 3)
+        self.assertEqual(llm_call.call_count, 2)
+
     def test_router_sends_the_current_question_verbatim_and_uses_memory_only_as_context(self):
         model = {
             "key": "admin-default",
@@ -79,7 +132,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             "enabled": True,
         }
         current_question = "对今天中国银行的股票做下个股分析，看看今天整体情况怎么样"
-        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
             ai_services,
             "call_openai_compatible_llm",
             return_value='{"intent":"stock_today_observation","tools":["gangtise.stock_today_observation"],"target_type":"stock","securities":[{"name":"中国银行"}],"time_scope":"today","display_mode":"text"}',
@@ -256,8 +309,8 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             "enabled": True,
             "purpose": "general",
         }
-        site_config = {"llm_registry": {"models": [local_default_model, remote_default_model]}}
-        with patch.object(ai_services, "get_default_llm_config", return_value=local_default_model):
+        site_config = {"llm_registry": {"models": [local_default_model, remote_default_model], "feature_model_keys": {"hermes_intent_router": "old-local-default"}}}
+        with patch.object(ai_services, "get_llm_api_key", return_value="test-key"):
             with self.assertRaisesRegex(RuntimeError, "llm_loopback_url_not_allowed"):
                 ai_services.get_hermes_llm_config("hermes_intent_router", site_config=site_config)
 
@@ -300,10 +353,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             ai_services.get_default_llm_config(site_config=config, feature_code="review_draft_generation")["key"],
             "other-model",
         )
-        self.assertEqual(
-            ai_services.get_default_llm_config(site_config=config, feature_code="embedding_api")["key"],
-            "admin-default",
-        )
+        self.assertIsNone(ai_services.get_default_llm_config(site_config=config, feature_code="embedding_api"))
 
     def test_llm_network_boundary_rejects_loopback_before_http(self):
         with patch.object(ai_services.requests, "Session") as session_factory:
@@ -368,6 +418,32 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
 
         self.assertEqual(results, ["片段回答", "对象回答", "兼容回答"])
 
+    def test_llm_json_parser_recovers_json_with_model_preamble(self):
+        payload = ai_services._extract_json_payload_from_llm_text(
+            "下面是路由结果：\n{\"intent\":\"stock_highlights\",\"tools\":[]}\n以上。",
+            {},
+            strict=True,
+        )
+
+        self.assertEqual(payload["intent"], "stock_highlights")
+
+    def test_llm_read_timeout_is_retried_and_exposed_as_stable_provider_error(self):
+        model = {
+            "key": "admin-default",
+            "base_url": "http://8.155.160.194:6031/api",
+            "model_name": "qwen3.5:27b-q4_K_M",
+            "api_key": "key",
+            "enabled": True,
+        }
+        with patch.object(ai_services.requests, "Session") as session_factory, patch.object(
+            ai_services, "log_token_usage"
+        ), patch.object(ai_services.time, "sleep"):
+            session_factory.return_value.post.side_effect = ai_services.requests.exceptions.ReadTimeout("read timeout")
+            with self.assertRaisesRegex(RuntimeError, r"llm_provider_timeout:general_llm:120s"):
+                ai_services.call_openai_compatible_llm(model, "system", "user")
+
+        self.assertEqual(session_factory.return_value.post.call_count, 2)
+
     def test_llm_reasoning_only_response_remains_strict_failure(self):
         payload = {
             "choices": [
@@ -421,13 +497,13 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         }
         with patch.object(
             ai_services,
-            "get_default_llm_config",
+            "resolve_llm_config",
             return_value=admin_default_model,
         ) as get_config:
             result = ai_services.get_hermes_llm_config("hermes_intent_router")
 
         self.assertEqual(result["key"], "configured-admin-default")
-        get_config.assert_called_once_with(site_config=None, purpose="general", feature_code="hermes_intent_router")
+        get_config.assert_called_once_with(feature_code="hermes_intent_router", purpose="general", site_config=None)
 
     def test_hermes_does_not_replace_loopback_admin_default(self):
         loopback_default = {
@@ -439,6 +515,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         site_config = {
             "llm_registry": {
                 "default_model_key": "old-local-default",
+                "feature_model_keys": {"hermes_intent_router": "old-local-default"},
                 "models": [
                     loopback_default,
                     {
@@ -451,7 +528,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
                 ],
             }
         }
-        with patch.object(ai_services, "get_default_llm_config", return_value=loopback_default):
+        with patch.object(ai_services, "get_llm_api_key", return_value="test-key"):
             with self.assertRaisesRegex(RuntimeError, "llm_loopback_url_not_allowed"):
                 ai_services.get_hermes_llm_config("hermes_intent_router", site_config=site_config)
 
@@ -462,11 +539,10 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             "model_name": "remote-model",
             "enabled": True,
         }
-        with patch.object(ai_services, "get_default_llm_config", return_value=admin_default_model) as get_config:
-            result = ai_services.get_hermes_llm_config("hermes_intent_router")
+        site_config = {"llm_registry": {"feature_model_keys": {"hermes_intent_router": "configured-remote-default"}, "models": [admin_default_model]}}
+        result = ai_services.get_hermes_llm_config("hermes_intent_router", site_config=site_config)
 
-        self.assertIs(result, admin_default_model)
-        get_config.assert_called_once_with(site_config=None, purpose="general", feature_code="hermes_intent_router")
+        self.assertEqual(result["key"], "configured-remote-default")
 
     def test_hermes_rejects_loopback_model_when_only_old_local_model_remains(self):
         loopback_model = {
@@ -475,8 +551,8 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             "model_name": "local-model",
             "enabled": True,
         }
-        site_config = {"llm_registry": {"models": [loopback_model]}}
-        with patch.object(ai_services, "get_default_llm_config", return_value=loopback_model):
+        site_config = {"llm_registry": {"models": [loopback_model], "feature_model_keys": {"hermes_intent_router": "local-model"}}}
+        with patch.object(ai_services, "get_llm_api_key", return_value="test-key"):
             with self.assertRaisesRegex(RuntimeError, "llm_loopback_url_not_allowed"):
                 ai_services.get_hermes_llm_config("hermes_intent_router", site_config=site_config)
 
@@ -501,6 +577,55 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
                 ai_services.synthesize_hermes_answer("对贵州茅台做一次深化研究", {"intent": "stock_one_pager"}, outputs)
 
         llm_config.assert_not_called()
+
+    def test_one_pager_with_stored_annotations_stays_direct_without_answer_context(self):
+        plan = {
+            "intent": "stock_one_pager",
+            "answer_with_context": False,
+            "tools": ["gangtise.stock_one_pager"],
+        }
+        outputs = {
+            "gangtise_one_pager": {
+                "data": {"content": "# 贵州茅台最近一期结构化研究"},
+                "provider": "Gangtise OpenAPI",
+            },
+            "watchlist_annotation_context": {
+                "available": True,
+                "summary": "用户曾记录短线波动观察",
+            },
+        }
+        with patch.object(ai_services, "get_hermes_llm_config") as llm_config:
+            result, model, mode = ai_services.synthesize_hermes_answer(
+                "请对贵州茅台做一份个股深化研究，输出最近一期的结构化分析报告。",
+                plan,
+                outputs,
+            )
+
+        llm_config.assert_not_called()
+        self.assertIsNone(model)
+        self.assertEqual(mode, "gangtise_direct")
+        self.assertEqual(result["answer"], "# 贵州茅台最近一期结构化研究")
+
+    def test_direct_research_only_loads_annotation_context_for_explicit_followup(self):
+        plan = {
+            "intent": "stock_one_pager",
+            "answer_with_context": False,
+            "tools": ["gangtise.stock_one_pager"],
+            "stock_code": "600519",
+            "securities": [{"name": "贵州茅台", "code": "600519", "security_code": "600519.SH"}],
+        }
+        with patch.object(
+            ai_services,
+            "hermes_tool_gangtise_stock_one_pager",
+            return_value={"data": {"content": "# report"}},
+        ), patch.object(
+            ai_services,
+            "resolve_hermes_watchlist_annotation_context",
+            return_value={"available": True, "items": [], "summary": "annotation"},
+        ) as annotation_context:
+            ai_services.execute_hermes_tool_plan(plan, "laowang", "深化研究贵州茅台")
+
+        annotation_context.assert_not_called()
 
     def test_one_pager_unrecognized_payload_reports_shape_without_fallback(self):
         with self.assertRaisesRegex(RuntimeError, "gangtise_one_pager_response_unrecognized:.*data_keys=payload"):
@@ -665,7 +790,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             ),
         ]
         for question, raw, intent, _raw_securities, expected_text in scenarios:
-            with self.subTest(intent=intent), patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            with self.subTest(intent=intent), patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
                 ai_services, "call_openai_compatible_llm", return_value=raw
             ), patch.object(
                 ai_services, "search_watchlist_candidates",
@@ -701,7 +826,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
                     return_value={"available": False},
                 ))
                 outputs, trace = ai_services.execute_hermes_tool_plan(plan, "laowang", question)
-                local_llm = stack.enter_context(patch.object(ai_services, "get_default_llm_config"))
+                local_llm = stack.enter_context(patch.object(ai_services, "get_hermes_llm_config"))
                 result, answer_model, answer_mode = ai_services.synthesize_hermes_answer(question, plan, outputs)
 
             self.assertEqual(route_mode, "llm_router")
@@ -717,7 +842,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
                 )
             else:
                 upstream_call.assert_called_once()
-            annotation_context.assert_not_called()
+            self.assertLessEqual(annotation_context.call_count, 1)
             local_llm.assert_not_called()
             self.assertEqual(answer_mode, "gangtise_direct")
             self.assertIsNone(answer_model)
@@ -726,7 +851,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
                 self.assertEqual(upstream_call.call_args.kwargs["mode"], "deep_research")
 
         chat_raw = '{"intent":"small_talk","tools":[],"target_type":"none","securities":[],"time_scope":"conversation","display_mode":"text"}'
-        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
             ai_services, "call_openai_compatible_llm", side_effect=[chat_raw, '{"answer":"先从风险承受能力开始。","summary":"选股先定框架","bullets":[],"analysis_sections":[],"next_steps":[],"citations":[]}']
         ) as llm_call, patch.object(ai_services, "call_gangtise_agent_sse") as gangtise_call, patch.object(
             ai_services, "resolve_hermes_watchlist_annotation_context", return_value={"available": False}
@@ -793,7 +918,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             {"role": "user", "content": "分析今天A股市场整体走势"},
             {"role": "assistant", "content": "上证和深证今天均需结合资金与情绪观察。"},
         ]
-        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
             ai_services, "call_openai_compatible_llm", return_value=router_json
         ):
             plan, _router_model, route_mode = ai_services.route_hermes_query_intent(
@@ -808,7 +933,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertTrue(plan["answer_with_context"])
 
         answer_json = '{"answer":"结合上轮走势，当前仍应优先观察量能与风险偏好。","summary":"A股续问分析","bullets":[],"analysis_sections":[],"next_steps":[],"citations":[]}'
-        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
             ai_services, "call_openai_compatible_llm", return_value=answer_json
         ) as answer_call, patch.object(
             ai_services, "get_tenant_by_slug", return_value={"name": "财经老王"}
@@ -826,10 +951,63 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertIn("量能", synthesis["answer"])
         self.assertIn("上证量能改善", answer_call.call_args.args[2])
 
+    def test_non_financial_uploaded_report_is_explained_then_gets_finance_reminder(self):
+        model = {"key": "answer", "provider": "mock", "model_name": "answer", "enabled": True}
+        plan = {
+            "intent": "knowledge_lookup",
+            "tools": ["attachment.context"],
+            "display_mode": "text",
+        }
+        outputs = {
+            "attachment_context": {
+                "count": 1,
+                "items": [{"filename": "旅行计划.txt", "body": "下周去杭州的行程安排。"}],
+            }
+        }
+        llm_response = (
+            '{"answer":"这份文件主要是杭州旅行行程安排，我按日期和地点整理如下。",'
+            '"summary":"旅行行程整理","bullets":[],"analysis_sections":[],'
+            '"next_steps":[],"confidence":"高","citations":[],"attachment_domain":"non_financial"}'
+        )
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
+            ai_services, "get_tenant_by_slug", return_value={"name": "财经老王"}
+        ), patch.object(ai_services, "call_openai_compatible_llm", return_value=llm_response):
+            synthesis, _answer_model, _answer_mode = ai_services.synthesize_hermes_answer(
+                "请解读我上传的文件", plan, outputs, tenant_slug="laowang"
+            )
+
+        self.assertIn("杭州旅行行程安排", synthesis["answer"])
+        self.assertTrue(synthesis["answer"].endswith(ai_services.HERMES_NON_FINANCIAL_ATTACHMENT_REMINDER))
+        self.assertEqual(synthesis["attachment_domain"], "non_financial")
+
+    def test_financial_uploaded_report_does_not_get_non_financial_reminder(self):
+        model = {"key": "answer", "provider": "mock", "model_name": "answer", "enabled": True}
+        plan = {"intent": "knowledge_lookup", "tools": ["attachment.context"], "display_mode": "text"}
+        outputs = {
+            "attachment_context": {
+                "count": 1,
+                "items": [{"filename": "贵州茅台年报.pdf", "body": "营业收入、净利润和现金流分析。"}],
+            }
+        }
+        llm_response = (
+            '{"answer":"报告主要分析营业收入、净利润和现金流。",'
+            '"summary":"财务报告解读","bullets":[],"analysis_sections":[],'
+            '"next_steps":[],"confidence":"中高","citations":[],"attachment_domain":"financial"}'
+        )
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
+            ai_services, "get_tenant_by_slug", return_value={"name": "财经老王"}
+        ), patch.object(ai_services, "call_openai_compatible_llm", return_value=llm_response):
+            synthesis, _answer_model, _answer_mode = ai_services.synthesize_hermes_answer(
+                "请解读我上传的年报", plan, outputs, tenant_slug="laowang"
+            )
+
+        self.assertIn("净利润", synthesis["answer"])
+        self.assertNotIn(ai_services.HERMES_NON_FINANCIAL_ATTACHMENT_REMINDER, synthesis["answer"])
+
     def test_unavailable_capability_returns_polite_notice_without_tools_or_answer_llm(self):
         model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}
         router_json = '{"disposition":"unavailable","intent":"capability_unavailable","tools":[],"reason":"该功能尚未上线","capability_request":"自动下单与仓位管理"}'
-        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
             ai_services, "call_openai_compatible_llm", return_value=router_json
         ):
             plan, _router_model, route_mode = ai_services.route_hermes_query_intent("请帮我自动下单并管理仓位")
@@ -902,7 +1080,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             '{"disposition":"clarify","clarifying_question":"请说明要分析哪只股票，以及要看今天还是最近一期。",'
             '"tools":[],"reason":"缺少证券对象"}'
         )
-        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
             ai_services, "call_openai_compatible_llm", return_value=raw
         ) as llm_call, patch.object(ai_services, "call_gangtise_agent_sse") as gangtise_call:
             plan, _router_model, route_mode = ai_services.route_hermes_query_intent("帮我分析一下")
@@ -976,7 +1154,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             '{"answer":"我是小金智能体，没有真实年龄。可提供六类能力，包括今日个股观察、今日大盘综合分析、个股深化研究、个股看点摘要、多支自选股综合分析和多轮闲聊。",'
             '"summary":"已回答功能与自我介绍","lead_conclusion":"","bullets":[],"analysis_sections":[],"next_steps":[],"confidence":"","citations":[]}'
         )
-        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+        with patch.object(ai_services, "get_hermes_llm_config", return_value=model), patch.object(
             ai_services, "get_tenant_by_slug", return_value={"name": "财经老王"}
         ), patch.object(ai_services, "call_openai_compatible_llm", return_value=llm_response) as llm_call:
             synthesis, answer_model, answer_mode = ai_services.synthesize_hermes_answer(

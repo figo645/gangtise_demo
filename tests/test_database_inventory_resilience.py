@@ -79,3 +79,44 @@ def test_inventory_compares_only_mdm_master_data_and_ignores_runtime_tables():
     assert by_name["database_release_packages"]["schema_status"] == "发布控制表（忽略）"
     assert inventory["difference_summary"]["data_tables"] == 1
     assert inventory["difference_summary"]["schema_tables"] == 0
+
+
+def test_inventory_can_compare_staging_to_production_without_local_database():
+    source_connections = [FakeConnection(), FakeConnection()]
+    target_connections = [FakeConnection(), FakeConnection()]
+    source = {"name": "staging", "db_host": "staging", "db_port": 5432, "db_name": "dashboard", "db_user": "postgres", "db_password": "secret"}
+    target = {"name": "production", "db_host": "production", "db_port": 5432, "db_name": "dashboard", "db_user": "postgres", "db_password": "secret"}
+    source_tables = ["security_master", "users"]
+    target_tables = ["security_master", "users", "database_release_packages"]
+
+    with patch.object(
+        database_release_services,
+        "get_database_release_target",
+        side_effect=lambda name: source if name == "staging" else target,
+    ), patch.object(
+        audit_database_release_diff,
+        "_connect",
+        side_effect=[source_connections[0], target_connections[0], source_connections[1], target_connections[1]],
+    ), patch.object(
+        audit_database_release_diff,
+        "_public_tables",
+        side_effect=lambda connection: source_tables if connection in source_connections else target_tables,
+    ), patch.object(
+        audit_database_release_diff,
+        "_table_schema",
+        return_value={"hash": "same"},
+    ), patch.object(
+        audit_database_release_diff,
+        "_stable_master_difference",
+        return_value={"local_only": [], "target_only": [], "changed_shared": []},
+    ), patch(
+        "src.domain.core_services.get_local_app_db_target",
+        side_effect=AssertionError("remote comparison must not open the local database"),
+    ):
+        inventory = database_release_services.get_database_table_inventory("production", source_name="staging")
+
+    assert inventory["source"] == "staging"
+    assert inventory["source_label"] == "Staging"
+    assert inventory["target"] == "production"
+    assert inventory["target_label"] == "Production"
+    assert inventory["rows"][-1]["table_name"] == "users"

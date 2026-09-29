@@ -71,6 +71,27 @@ class FanCommerceBddTest(unittest.TestCase):
         self.assertEqual(safe["tenants"][0]["review_snapshots"][0]["content_text"], "")
         self.assertEqual(config["tenants"][0]["review_snapshots"][0]["content_text"], "secret")
 
+    def test_given_h5_bootstrap_when_config_contains_content_and_model_credentials_then_only_public_metadata_is_serialized(self):
+        config = {
+            "brand": {"name": "洞见智研"},
+            "tenants": [{
+                "id": "tenant_1", "slug": "laowang", "name": "老王投研", "advisor": "财经老王",
+                "review_snapshots": [{"content_text": "不应首屏内联"}],
+                "message_center_state": {"threads": [{"messages": [{"content": "不应首屏内联"}]}]},
+            }],
+            "auth_settings": {"wechat": {"app_id": "wx_public", "app_secret": "must-not-leak"}},
+            "llm_registry": {"default_model_key": "v4", "models": [{"key": "v4", "api_key": "must-not-leak", "base_url": "https://private", "enabled": True}]},
+        }
+
+        payload = commerce_services.build_h5_bootstrap_site_config(config, {"role": "dav"})
+
+        self.assertEqual(payload["tenants"], [{"id": "tenant_1", "slug": "laowang", "name": "老王投研", "advisor": "财经老王"}])
+        self.assertNotIn("review_snapshots", payload["tenants"][0])
+        self.assertNotIn("message_center_state", payload["tenants"][0])
+        self.assertNotIn("app_secret", payload["auth_settings"]["wechat"])
+        self.assertNotIn("api_key", payload["llm_registry"]["models"][0])
+        self.assertNotIn("base_url", payload["llm_registry"]["models"][0])
+
 
 if __name__ == "__main__":
     unittest.main()

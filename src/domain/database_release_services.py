@@ -502,17 +502,29 @@ def _classify_database_table(table_name):
     return {"key": "user_generated", "label": "用户生成数据", "owner": "用户与内容业务", "policy": "生产数据默认保留，禁止本地结构发布覆盖行数据。", "description": "粉丝互动、智能体会话、自选股、评论、标注、洞见、订阅等用户产生的内容。"}
 
 
-def get_database_table_inventory(target_name):
-    """List governance metadata plus MDM-only data differences."""
+def get_database_table_inventory(target_name, source_name=None):
+    """List governance metadata plus MDM-only data differences for a pair.
+
+    ``source_name`` is optional for backward compatibility.  When omitted,
+    the application database remains the comparison source, as it was before
+    the inventory page supported remote-to-remote comparisons.
+    """
     target = get_database_release_target(target_name)
-    if not target or target["name"] not in {"staging", "production"}:
+    normalized_target = str(target_name or "").strip().lower()
+    normalized_source = str(source_name or "").strip().lower()
+    if not target or normalized_target not in {"staging", "production"}:
         raise ValueError("database_release_target_invalid")
     from tools.audit_database_release_diff import _connect, _public_tables, _stable_master_difference, _table_schema
     from src.domain.core_services import get_local_app_db_target
-    local_target = get_local_app_db_target()
+    source_is_local_compatibility_mode = not normalized_source
+    source = get_local_app_db_target() if source_is_local_compatibility_mode else get_database_release_target(normalized_source)
+    if not source or normalized_source == normalized_target:
+        raise ValueError("database_release_comparison_pair_invalid")
+    source_label = "本地开发库" if source_is_local_compatibility_mode else ("Staging" if normalized_source == "staging" else "Production")
+    target_label = "Staging" if normalized_target == "staging" else "Production"
     try:
-        with closing(_connect(local_target)) as local_connection:
-            local_tables = set(_public_tables(local_connection))
+        with closing(_connect(source)) as source_connection:
+            source_tables = set(_public_tables(source_connection))
     except psycopg2.Error as exc:
         detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
         raise RuntimeError(f"database_release_inventory_source_unavailable: {detail}") from exc
@@ -532,13 +544,13 @@ def get_database_table_inventory(target_name):
     mdm_differences = {}
     if not target_error:
         try:
-            with closing(_connect(local_target)) as local_connection, closing(_connect(target)) as target_connection:
-                for name in sorted(local_tables & target_tables):
+            with closing(_connect(source)) as source_connection, closing(_connect(target)) as target_connection:
+                for name in sorted(source_tables & target_tables):
                     if name not in {"schema_migrations", "database_release_packages"}:
-                        if _table_schema(local_connection, name)["hash"] != _table_schema(target_connection, name)["hash"]:
+                        if _table_schema(source_connection, name)["hash"] != _table_schema(target_connection, name)["hash"]:
                             schema_differences.add(name)
                     if name in MDM_MANAGED_MASTER_TABLES:
-                        mdm_differences[name] = _stable_master_difference(local_connection, target_connection, name)
+                        mdm_differences[name] = _stable_master_difference(source_connection, target_connection, name)
         except psycopg2.Error as exc:
             detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
             target_error = f"MDM 差异暂不可用：{detail}"
@@ -563,16 +575,16 @@ def get_database_table_inventory(target_name):
     def schema_status(table_name):
         if target_error:
             return "目标暂不可用"
-        if table_name in EXPECTED_TARGET_ONLY_CONTROL_TABLES and table_name in target_tables - local_tables:
+        if table_name in EXPECTED_TARGET_ONLY_CONTROL_TABLES and table_name in target_tables - source_tables:
             return "发布控制表（忽略）"
-        if table_name in local_tables - target_tables:
-            return "仅本地"
-        if table_name in target_tables - local_tables:
-            return "仅目标"
+        if table_name in source_tables - target_tables:
+            return "仅来源端"
+        if table_name in target_tables - source_tables:
+            return "仅目标端"
         return "定义不同" if table_name in schema_differences else "一致"
 
     rows = []
-    for name in sorted(local_tables | target_tables):
+    for name in sorted(source_tables | target_tables):
         classification = _classify_database_table(name)
         resolved_schema_status = schema_status(name)
         rows.append({
@@ -582,8 +594,9 @@ def get_database_table_inventory(target_name):
             "owner": classification["owner"],
             "policy": classification["policy"],
             "description": classification["description"],
-            "local_present": name in local_tables,
+            "local_present": name in source_tables,
             "target_present": name in target_tables,
+            "source_present": name in source_tables,
             "status": resolved_schema_status,
             "schema_status": resolved_schema_status,
             "data_status": data_status(name, classification),
@@ -602,7 +615,10 @@ def get_database_table_inventory(target_name):
     schema_difference_count = sum(1 for row in rows if row["schema_status"] not in {"一致", "目标暂不可用", "发布控制表（忽略）"})
     mdm_difference_count = sum(1 for row in rows if row["data_status"] == "有差异")
     return {
+        "source": normalized_source or "local",
+        "source_label": source_label,
         "target": target["name"],
+        "target_label": target_label,
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "target_available": not bool(target_error),
         "target_error": target_error,
@@ -616,7 +632,7 @@ def get_database_table_inventory(target_name):
         "data_scan": {
             "performed": not bool(target_error),
             "method": "仅受管主数据按业务键比对；市场运行、配置、账户及用户内容按环境保留，不纳入差异",
-            "managed_tables": sorted(MDM_MANAGED_MASTER_TABLES & (local_tables | target_tables)),
+            "managed_tables": sorted(MDM_MANAGED_MASTER_TABLES & (source_tables | target_tables)),
         },
         "rows": rows,
     }

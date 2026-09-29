@@ -42,4 +42,4 @@ def test_duplicate_role_process_exits_without_loading_application(tmp_path):
 
 def test_web_worker_default_is_memory_conservative():
     source = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
-    assert 'os.environ.get("WEB_WORKERS", "2")' in source
+    assert 'os.environ.get("WEB_WORKERS", "1")' in source

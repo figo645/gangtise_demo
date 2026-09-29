@@ -191,7 +191,7 @@ def compose_review_draft_with_llm(*args, **kwargs):
 
 
 def analyze_review_watchlist_with_llm(*args, **kwargs):
-    raise RuntimeError("review_watchlist_analysis_disabled")
+    return _ai_services_module().analyze_review_watchlist_with_llm(*args, **kwargs)
 
 
 def compose_review_structured_preview(*args, **kwargs):
@@ -464,6 +464,8 @@ def normalize_hermes_settings_config(source=None):
         "dav_access_enabled": bool(raw.get("dav_access_enabled", defaults.get("dav_access_enabled", True))),
         "internet_answer_enabled": False,
         "thinking_process_enabled": bool(raw.get("thinking_process_enabled", defaults.get("thinking_process_enabled", True))),
+        "answer_timeout_seconds": max(20, min(int(raw.get("answer_timeout_seconds") or defaults.get("answer_timeout_seconds", 60)), 180)),
+        "transient_retry_count": max(0, min(int(raw.get("transient_retry_count") or defaults.get("transient_retry_count", 1)), 2)),
         "default_response_style": str(raw.get("default_response_style") or defaults.get("default_response_style") or "structured").strip() or "structured",
         "chart_types_enabled": chart_types_enabled,
         "route_priority": route_priority,
@@ -1346,6 +1348,8 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "content_html": content_html,
         "access_mode": access_mode,
         "access_label": access_label,
+        "is_pinned": bool(raw.get("is_pinned")),
+        "pinned_at": str(raw.get("pinned_at") or "").strip()[:40],
         "view_count": view_count,
         "dav_id": str(raw.get("dav_id") or "").strip()[:160],
         "external_id": str(raw.get("external_id") or "").strip()[:160],
@@ -1902,7 +1906,11 @@ def _published_insights_storage_unavailable(exc):
     if getattr(exc, "pgcode", "") == "42P01":
         return True
     detail = str(exc or "").lower()
-    return "tenant_published_insights" in detail and "does not exist" in detail
+    return (
+        ("tenant_published_insights" in detail and "does not exist" in detail)
+        or ("is_pinned" in detail and "does not exist" in detail)
+        or ("pinned_at" in detail and "does not exist" in detail)
+    )
 
 
 def _decode_published_insight_payload(value):
@@ -1933,38 +1941,128 @@ def _published_insight_row_to_snapshot(row, tenant, index=0):
         "external_id": str((row or {}).get("external_id") or "").strip(),
         "dav_id": str((row or {}).get("dav_id") or "").strip(),
         "imported_at": str((row or {}).get("imported_at") or "").strip(),
+        "is_pinned": bool((row or {}).get("is_pinned") or False),
+        "pinned_at": str((row or {}).get("pinned_at") or "").strip(),
     })
     return normalize_review_snapshot_item(payload, tenant, index=index)
 
 
-def list_tenant_published_insights(tenant_slug, limit=200, offset=0, query="", include_simulated=False):
+def _published_insight_search_terms(query="", search_terms=None):
+    """Return bounded, de-duplicated search terms for the Insight directory."""
+    candidates = [query]
+    if isinstance(search_terms, (list, tuple, set)):
+        candidates.extend(search_terms)
+    terms = []
+    seen = set()
+    for candidate in candidates:
+        text = str(candidate or "").strip()
+        key = text.casefold()
+        if text and key not in seen:
+            seen.add(key)
+            terms.append(text[:200])
+        if len(terms) >= 9:
+            break
+    return terms
+
+
+def _tenant_published_insights_query_parts(
+    tenant_slug, query="", search_terms=None, include_simulated=False, search_paid_content=True
+):
+    """Build the shared tenant-scoped predicate used by list and count queries."""
+    predicates = ["tenant_slug = ?"]
+    params = [str(tenant_slug or "").strip().lower()]
+    if not include_simulated:
+        # JSONB is written by this service, so a string comparison is safer
+        # than a boolean cast when historical payloads contain malformed data.
+        predicates.append("LOWER(COALESCE(payload_json ->> 'is_simulated', 'false')) <> 'true'")
+    term_predicates = []
+    for term in _published_insight_search_terms(query, search_terms):
+        pattern = f"%{term}%"
+        if search_paid_content:
+            term_predicates.append("(title ILIKE ? OR content_text ILIKE ? OR payload_json::text ILIKE ?)")
+            params.extend([pattern, pattern, pattern])
+        else:
+            # Subscriber-only bodies are deliberately stripped from the list
+            # response. Do not let a body-only keyword reveal that such text
+            # exists; title, tags, and watchlist remain visible metadata.
+            term_predicates.append("""
+                ((access_mode <> 'subscriber' AND (title ILIKE ? OR content_text ILIKE ? OR payload_json::text ILIKE ?))
+                 OR (access_mode = 'subscriber' AND
+                     (title ILIKE ? OR COALESCE(payload_json -> 'tags', '[]'::jsonb)::text ILIKE ?
+                      OR COALESCE(payload_json -> 'watchlist', '[]'::jsonb)::text ILIKE ?)))
+            """)
+            params.extend([pattern, pattern, pattern, pattern, pattern, pattern])
+    if term_predicates:
+        predicates.append("(" + " OR ".join(term_predicates) + ")")
+    return " AND ".join(predicates), params
+
+
+def list_tenant_published_insights_page(
+    tenant_slug, limit=30, offset=0, query="", search_terms=None, include_simulated=False, search_paid_content=True,
+    include_total=True,
+):
+    """Read one searchable page from the published Insight aggregate.
+
+    The dashboard only carries a small bootstrap slice. This query is the
+    authoritative reader for the directory so older content stays discoverable.
+    """
     normalized_tenant_slug = str(tenant_slug or "").strip().lower()
     tenant = get_tenant_by_slug(normalized_tenant_slug)
     if not tenant or str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
         raise ValueError("tenant_not_found")
-    safe_limit = max(1, min(int(limit or 200), 1000))
+    # API callers cap their own page size; internal readers retain the former
+    # 1,000-row compatibility ceiling for maintenance and export flows.
+    safe_limit = max(1, min(int(limit or 30), 1000))
     safe_offset = max(0, int(offset or 0))
-    search = str(query or "").strip()
-    sql = """
+    where_sql, params = _tenant_published_insights_query_parts(
+        normalized_tenant_slug,
+        query=query,
+        search_terms=search_terms,
+        include_simulated=include_simulated,
+        search_paid_content=search_paid_content,
+    )
+    total = None
+    if include_total:
+        total_row = get_db().execute(
+            f"SELECT COUNT(*) AS total FROM tenant_published_insights WHERE {where_sql}",
+            tuple(params),
+        ).fetchone() or {}
+        total = max(0, int(total_row.get("total") or 0))
+    sql = f"""
         SELECT insight_id, dav_id, external_id, title, content_text, content_html,
                access_mode, source_mode, published_date, published_at, imported_at,
-               view_count, payload_json
+               view_count, is_pinned, pinned_at, payload_json
         FROM tenant_published_insights
-        WHERE tenant_slug = ?
+        WHERE {where_sql}
     """
-    params = [normalized_tenant_slug]
-    if search:
-        sql += " AND (title ILIKE ? OR content_text ILIKE ?)"
-        pattern = f"%{search[:200]}%"
-        params.extend([pattern, pattern])
-    sql += " ORDER BY published_date DESC, published_at DESC, imported_at DESC, id DESC LIMIT ? OFFSET ?"
-    params.extend([safe_limit, safe_offset])
-    rows = get_db().execute(sql, tuple(params)).fetchall()
-    return [
+    sql += " ORDER BY is_pinned DESC, pinned_at DESC NULLS LAST, published_date DESC, published_at DESC, imported_at DESC, id DESC LIMIT ? OFFSET ?"
+    rows = get_db().execute(sql, tuple(params + [safe_limit, safe_offset])).fetchall()
+    items = [
         _published_insight_row_to_snapshot(row, tenant, index=index)
         for index, row in enumerate(rows)
-        if include_simulated or not bool(_decode_published_insight_payload(row.get("payload_json")).get("is_simulated"))
     ]
+    has_more = safe_offset + len(items) < total if total is not None else len(items) == safe_limit
+    return {
+        "items": items,
+        "total": total,
+        "offset": safe_offset,
+        "limit": safe_limit,
+        "has_more": has_more,
+        "next_offset": safe_offset + len(items) if has_more else None,
+    }
+
+
+def list_tenant_published_insights(tenant_slug, limit=200, offset=0, query="", include_simulated=False):
+    """Compatibility wrapper for existing callers that need one list."""
+    page = list_tenant_published_insights_page(
+        tenant_slug,
+        limit=max(1, min(int(limit or 200), 1000)),
+        offset=offset,
+        query=query,
+        include_simulated=include_simulated,
+        include_total=False,
+    )
+    return page["items"]
 
 
 def get_tenant_published_insight(tenant_slug, review_id):
@@ -1976,7 +2074,7 @@ def get_tenant_published_insight(tenant_slug, review_id):
     row = get_db().execute(
         """SELECT insight_id, dav_id, external_id, title, content_text, content_html,
                   access_mode, source_mode, published_date, published_at, imported_at,
-                  view_count, payload_json
+                  view_count, is_pinned, pinned_at, payload_json
              FROM tenant_published_insights WHERE tenant_slug = ? AND insight_id = ?""",
         (normalized_tenant_slug, normalized_review_id),
     ).fetchone()
@@ -2026,7 +2124,7 @@ def save_tenant_published_insight(tenant_slug, snapshot, published_date=None, ex
         existing = db.execute(
             """SELECT insight_id, dav_id, external_id, title, content_text, content_html,
                       access_mode, source_mode, published_date, published_at, imported_at,
-                      view_count, payload_json
+                      view_count, is_pinned, pinned_at, payload_json
                  FROM tenant_published_insights WHERE tenant_slug = ? AND external_id = ?""",
             (normalized_tenant_slug, normalized_external_id),
         ).fetchone()
@@ -2060,6 +2158,51 @@ def save_tenant_published_insight(tenant_slug, snapshot, published_date=None, ex
     )
     db.commit()
     return get_tenant_published_insight(normalized_tenant_slug, insight_id) or normalized
+
+
+def set_tenant_published_insight_pin(tenant_slug, review_id, pinned):
+    """Apply an explicit editorial pin without changing publication time."""
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    normalized_review_id = str(review_id or "").strip()
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    normalized_pinned = bool(pinned)
+    try:
+        row = get_db().execute(
+            """UPDATE tenant_published_insights
+               SET is_pinned = ?, pinned_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE tenant_slug = ? AND insight_id = ?
+               RETURNING insight_id, dav_id, external_id, title, content_text, content_html,
+                         access_mode, source_mode, published_date, published_at, imported_at,
+                         view_count, is_pinned, pinned_at, payload_json""",
+            (normalized_pinned, normalized_pinned, normalized_tenant_slug, normalized_review_id),
+        ).fetchone()
+        if not row:
+            raise ValueError("review_not_found")
+        get_db().commit()
+        return {
+            "review_id": normalized_review_id,
+            "pinned": normalized_pinned,
+            "snapshot": _published_insight_row_to_snapshot(row, tenant),
+            "snapshots": list_tenant_published_insights(normalized_tenant_slug, include_simulated=True),
+        }
+    except Exception as exc:
+        if not _published_insights_storage_unavailable(exc):
+            raise
+    snapshots = resolve_tenant_review_snapshots(tenant, snapshots=tenant.get("review_snapshots"), include_simulated=True)
+    matched = next((item for item in snapshots if str(item.get("id") or "").strip() == normalized_review_id), None)
+    if matched is None:
+        raise ValueError("review_not_found")
+    matched["is_pinned"] = normalized_pinned
+    matched["pinned_at"] = now_ts() if normalized_pinned else ""
+    snapshots.sort(key=lambda item: (
+        bool(item.get("is_pinned")), str(item.get("pinned_at") or ""),
+        str(item.get("published_at") or item.get("time") or ""),
+    ), reverse=True)
+    update_tenant_review_snapshots(normalized_tenant_slug, snapshots)
+    return {"review_id": normalized_review_id, "pinned": normalized_pinned, "snapshot": matched, "snapshots": snapshots}
 
 
 def delete_tenant_review_snapshot(tenant_slug, review_id):
@@ -2151,6 +2294,10 @@ def append_review_snapshot(tenant_slug, snapshot):
         if item_id not in seen_ids:
             seen_ids.add(item_id)
             deduped.append(normalize_review_snapshot_item(item, tenant, index=index))
+    deduped.sort(key=lambda item: (
+        bool(item.get("is_pinned")), str(item.get("pinned_at") or ""),
+        str(item.get("published_at") or item.get("time") or ""),
+    ), reverse=True)
     saved = update_tenant_review_snapshots(tenant_slug, deduped)
     latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
     return resolve_tenant_review_snapshots(latest_tenant, snapshots=latest_tenant.get("review_snapshots"))
@@ -2272,7 +2419,7 @@ def increment_tenant_review_snapshot_view_count(tenant_slug, review_id):
                WHERE tenant_slug = ? AND insight_id = ?
                RETURNING insight_id, dav_id, external_id, title, content_text, content_html,
                          access_mode, source_mode, published_date, published_at, imported_at,
-                         view_count, payload_json""",
+                         view_count, is_pinned, pinned_at, payload_json""",
             (normalized_tenant_slug, normalized_review_id),
         ).fetchone()
         if not row:
@@ -5041,6 +5188,12 @@ def get_platform_brand(site_config=None):
 
 def get_tenant_configs(site_config=None):
     config = site_config or get_site_config()
+    try:
+        cached = g.get("tenant_configs")
+    except RuntimeError:
+        cached = None
+    if cached is not None:
+        return copy.deepcopy(cached)
     tenants = normalize_tenant_configs(config.get("tenants"))
     try:
         rows = get_db().execute("SELECT tenant_slug, tenant_name FROM tenant_registry").fetchall()
@@ -5052,6 +5205,13 @@ def get_tenant_configs(site_config=None):
     except Exception as exc:
         if not is_db_unavailable_error(exc) and not (isinstance(exc, RuntimeError) and "application context" in str(exc).lower()) and getattr(exc, "pgcode", "") != "42P01" and "tenant_registry" not in str(exc).lower():
             raise
+    # A page render and its context processor both resolve tenants. Keep the
+    # result request-scoped so that one response does not issue the same
+    # tenant_registry query multiple times.
+    try:
+        g.tenant_configs = copy.deepcopy(tenants)
+    except RuntimeError:
+        pass
     return tenants
 
 
@@ -8364,7 +8524,7 @@ def extract_timestamp_from_fields(fields, fallback=""):
 
 
 def load_db_runtime_config():
-    defaults = {"use_staging": False}
+    defaults = {"target": "local", "use_staging": False}
     try:
         if not DB_RUNTIME_CONFIG_PATH.exists():
             return dict(defaults)
@@ -8373,15 +8533,23 @@ def load_db_runtime_config():
         return dict(defaults)
     if not isinstance(payload, dict):
         return dict(defaults)
-    return {
-        "use_staging": bool(payload.get("use_staging", False)),
-        "updated_at": str(payload.get("updated_at") or "").strip(),
-    }
+    target = str(payload.get("target") or "").strip().lower()
+    if target not in {"local", "staging", "production"}:
+        target = "staging" if bool(payload.get("use_staging", False)) else "local"
+    return {"target": target, "use_staging": target == "staging", "updated_at": str(payload.get("updated_at") or "").strip()}
 
 
-def save_db_runtime_config(use_staging):
+def save_db_runtime_config(target):
+    normalized = str(target or "").strip().lower()
+    if isinstance(target, bool):
+        normalized = "staging" if target else "local"
+    if normalized not in {"local", "staging", "production"}:
+        raise ValueError("db_runtime_target_invalid")
     payload = {
-        "use_staging": bool(use_staging),
+        "target": normalized,
+        # Keep the old field for deployments that still read the two-state
+        # configuration file.
+        "use_staging": normalized == "staging",
         "updated_at": now_ts(),
     }
     DB_RUNTIME_CONFIG_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -8390,24 +8558,23 @@ def save_db_runtime_config(use_staging):
 
 def get_runtime_db_target():
     runtime = load_db_runtime_config()
-    use_staging = bool(runtime.get("use_staging"))
-    if use_staging:
-        app_db = {
-            "host": APP_DB_HOST,
-            "port": APP_DB_PORT,
-            "dbname": APP_DB_NAME,
-            "user": APP_DB_USER,
-            "password": APP_DB_PASSWORD,
-            "label": "staging",
+    configured_target = str(os.environ.get("GANGTISE_DB_TARGET") or os.environ.get("APP_DB_TARGET") or "").strip().lower()
+    target_name = configured_target if configured_target in {"local", "staging", "production"} else str(runtime.get("target") or "local")
+
+    def remote_target(name):
+        prefix = name.upper()
+        return {
+            "host": os.environ.get(f"DATABASE_RELEASE_{prefix}_DB_HOST") or ("129.211.65.53" if name == "staging" else "47.105.48.193"),
+            "port": int(os.environ.get(f"DATABASE_RELEASE_{prefix}_DB_PORT", "5432")),
+            "dbname": os.environ.get(f"DATABASE_RELEASE_{prefix}_DB_NAME", "sprint_dashboard"),
+            "user": os.environ.get(f"DATABASE_RELEASE_{prefix}_DB_USER", "postgres"),
+            "password": os.environ.get(f"DATABASE_RELEASE_{prefix}_DB_PASSWORD", "your_password"),
+            "label": name,
         }
-        vector_db = {
-            "host": VECTOR_DB_HOST,
-            "port": VECTOR_DB_PORT,
-            "dbname": VECTOR_DB_NAME,
-            "user": VECTOR_DB_USER,
-            "password": VECTOR_DB_PASSWORD,
-            "label": "staging",
-        }
+
+    if target_name in {"staging", "production"}:
+        app_db = remote_target(target_name)
+        vector_db = dict(app_db)
     else:
         app_db = {
             "host": LOCAL_POSTGRES_HOST,
@@ -8425,9 +8592,11 @@ def get_runtime_db_target():
             "password": LOCAL_VECTOR_DB_PASSWORD,
             "label": "local",
         }
+    use_staging = target_name == "staging"
     return {
+        "target": target_name,
         "use_staging": use_staging,
-        "mode": "staging" if use_staging else "local",
+        "mode": target_name,
         "updated_at": runtime.get("updated_at") or "",
         "app": app_db,
         "vector": vector_db,
@@ -8474,6 +8643,7 @@ def build_admin_site_config_payload(site_config=None):
     payload["llm_registry"] = strip_llm_registry_api_keys(payload.get("llm_registry"), include_status=True)
     runtime_target = get_runtime_db_target()
     payload["db_runtime"] = {
+        "target": runtime_target.get("target", runtime_target.get("mode", "local")),
         "use_staging": runtime_target.get("use_staging", False),
         "mode": runtime_target.get("mode", "local"),
         "updated_at": runtime_target.get("updated_at", ""),
@@ -9068,6 +9238,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "143_domain_tenant_ownership.sql")
         execute_sql_file(conn, sql_dir / "144_message_domain_user_identity.sql")
         execute_sql_file(conn, sql_dir / "145_reconcile_tenant_registry_references.sql")
+        execute_sql_file(conn, sql_dir / "146_tenant_published_insight_pinning.sql")
 
 
 def init_db_safe():
@@ -9139,6 +9310,19 @@ def get_db():
     if "db" not in g:
         g.db = PgCompatConnection(get_app_db_connection())
     return g.db
+
+
+@app.teardown_appcontext
+def _close_core_db_context(exc):
+    """Return request/worker-scoped pooled connections after every context.
+
+    Web imports also register a compatible hook, but Worker and Scheduler are
+    deliberately lightweight entry points and do not import the web hooks.
+    Keeping the lifecycle hook beside ``get_db`` prevents sidecar pool leaks.
+    """
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
 
 
 def ensure_default_admin_tasks():
@@ -10381,6 +10565,63 @@ def _complete_user_async_job(job_code, success, summary="", result=None, error_m
         )
 
 
+def _is_retryable_user_async_job_error(error):
+    """Identify transient provider failures without retrying validation errors."""
+    message = str(error or "").strip().lower()
+    if not message:
+        return False
+    if any(marker in message for marker in (
+        "llm_api_key_missing",
+        "llm_model_",
+        "invalid_llm_",
+        "_empty_answer",
+        "_empty_response",
+        "unsupported_",
+    )):
+        return False
+    return any(marker in message for marker in (
+        "llm_provider_timeout",
+        "llm_provider_connection_failed",
+        "read timed out",
+        "connection reset",
+        "connection aborted",
+        "temporarily unavailable",
+        "llm_request_failed:502",
+        "llm_request_failed:503",
+        "llm_request_failed:504",
+    ))
+
+
+def _requeue_user_async_job_after_transient_failure(job_code, error):
+    current_job = get_user_async_job(job_code) or {}
+    if str(current_job.get("status") or "").strip().lower() != "running":
+        return False
+    retry_count = int(current_job.get("retry_count") or 0)
+    max_retries = max(0, min(int(os.environ.get("USER_ASYNC_JOB_MAX_PROVIDER_RETRIES", "1")), 2))
+    if retry_count >= max_retries:
+        return False
+    next_retry = retry_count + 1
+    update_user_async_job(
+        job_code,
+        status="pending",
+        progress_stage="queued",
+        progress_percent=0,
+        summary=f"模型服务暂时响应超时，正在自动重试（{next_retry}/{max_retries}）",
+        error_message="",
+        started_at="",
+        finished_at="",
+        retry_count=next_retry,
+    )
+    app.logger.warning(
+        "Requeued async job after transient LLM failure job=%s retry=%s/%s error=%s",
+        job_code,
+        next_retry,
+        max_retries,
+        str(error)[:240],
+    )
+    return True
+
+
 def _user_async_job_loop(worker_name="user-async-jobs-1"):
     while True:
         job = None
@@ -10417,13 +10658,14 @@ def _user_async_job_loop(worker_name="user-async-jobs-1"):
                 _user_async_job_runtime["last_error_at"] = now_ts()
                 _user_async_job_runtime["last_error_message"] = str(exc)
             if current_job_code:
-                _complete_user_async_job(
-                    current_job_code,
-                    False,
-                    summary="任务执行失败",
-                    result={"error_type": type(exc).__name__},
-                    error_message=str(exc),
-                )
+                if not (_is_retryable_user_async_job_error(exc) and _requeue_user_async_job_after_transient_failure(current_job_code, exc)):
+                    _complete_user_async_job(
+                        current_job_code,
+                        False,
+                        summary="任务执行失败",
+                        result={"error_type": type(exc).__name__},
+                        error_message=str(exc),
+                    )
             elif is_db_unavailable_error(exc):
                 app.logger.warning("User async job loop database unavailable, retrying: %s", exc)
                 time.sleep(USER_ASYNC_JOB_POLL_INTERVAL_SECONDS)

@@ -218,9 +218,16 @@ def h5():
         if str(current_authenticated_user.get("role") or "").strip().lower() == "admin":
             current_demo_profile = build_admin_h5_preview_profile(current_authenticated_user, tenant)
         indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
-        fundamental_column = build_fundamental_column_payload(tenant)
-        dashboard_seed_cards = build_indicator_dashboard_seed_cards(tenant, count=8)
-        tenant_dashboard_payload = build_tenant_dashboard_payload(tenant, viewer=current_authenticated_user)
+        # The indicator hub was built immediately above. Reusing it avoids two
+        # complete duplicate aggregation passes on every H5/Web first paint.
+        fundamental_column = build_fundamental_column_payload_from_hub(tenant, indicator_hub)
+        dashboard_seed_cards = build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8)
+        # /web is the desktop shell of H5. Building the complete dashboard here
+        # repeats the same tenant-wide aggregation exposed by its API and makes
+        # first paint wait for unrelated workbench data. The client already
+        # refreshes an empty dashboard state through that API after the shell
+        # becomes interactive, so defer it for the desktop route.
+        tenant_dashboard_payload = {} if desktop_mode else build_tenant_dashboard_payload(tenant, viewer=current_authenticated_user)
         auth_settings = get_auth_settings(site_config)
         demo_profiles = get_h5_login_users(site_config) if auth_settings.get("quick_select_enabled") else []
     except Exception as exc:
@@ -240,7 +247,7 @@ def h5():
         indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False)
         fundamental_column = build_fundamental_column_payload_from_hub(tenant, indicator_hub)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8)
-        tenant_dashboard_payload = build_tenant_dashboard_payload_fallback(tenant)
+        tenant_dashboard_payload = {} if desktop_mode else build_tenant_dashboard_payload_fallback(tenant)
     # H5 uses the persisted owner-scoped watchlist. An explicit empty map is
     # intentional: it prevents the legacy demo catalog from reappearing after
     # the user removes their last stock.
@@ -282,14 +289,16 @@ def h5():
         for item in (indicator_hub.get("smart_items") or [])[:4]
     ]
     feed_boards = gen_feed_boards_from_watchlist_details(watchlist_details)
-    h5_site_config = build_fan_safe_site_config(site_config, current_authenticated_user)
+    h5_site_config = build_h5_bootstrap_site_config(site_config, current_authenticated_user)
     active_tenant_payload = next(
         (item for item in h5_site_config.get("tenants", []) if item.get("slug") == tenant.get("slug")),
         tenant,
     )
     return render_template(
         "h5.html",
-        site_config=h5_site_config,
+        # Keep this separate from the global context-processor variable. The
+        # latter is the full admin configuration and can be close to 1 MB.
+        h5_site_config=h5_site_config,
         market=market,
         news=news,
         news_tabs=news_tabs,
@@ -384,6 +393,7 @@ def kol_workbench():
     return render_template(
         "kol_workbench.html",
         workbench=workbench,
+        workbench_site_config=build_h5_bootstrap_site_config(site_config, current_user),
         brand=get_platform_brand(site_config),
         active_tenant=tenant,
         tenant_portal_enabled=is_feature_enabled("tenant_portal", site_config),

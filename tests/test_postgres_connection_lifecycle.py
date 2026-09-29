@@ -67,6 +67,43 @@ def test_default_pool_budget_is_bounded_by_runtime_role(monkeypatch):
         assert runtime._default_database_pool_max_connections() == expected
 
 
+def test_runtime_database_target_can_select_production_without_using_local_defaults(monkeypatch):
+    monkeypatch.setenv("GANGTISE_DB_TARGET", "production")
+    monkeypatch.setenv("DATABASE_RELEASE_PRODUCTION_DB_HOST", "prod-db")
+    monkeypatch.setenv("DATABASE_RELEASE_PRODUCTION_DB_PORT", "55432")
+    monkeypatch.setenv("DATABASE_RELEASE_PRODUCTION_DB_NAME", "prod_dashboard")
+    monkeypatch.setenv("DATABASE_RELEASE_PRODUCTION_DB_USER", "prod_user")
+    monkeypatch.setenv("DATABASE_RELEASE_PRODUCTION_DB_PASSWORD", "prod-secret")
+
+    target = core_services.get_runtime_db_target()
+
+    assert target["target"] == "production"
+    assert target["mode"] == "production"
+    assert target["use_staging"] is False
+    assert target["app"] == {
+        "host": "prod-db",
+        "port": 55432,
+        "dbname": "prod_dashboard",
+        "user": "prod_user",
+        "password": "prod-secret",
+        "label": "production",
+    }
+    assert target["vector"] == target["app"]
+
+
+def test_runtime_database_target_keeps_legacy_use_staging_file_compatible(monkeypatch):
+    monkeypatch.delenv("GANGTISE_DB_TARGET", raising=False)
+    monkeypatch.setenv("DATABASE_RELEASE_STAGING_DB_HOST", "stage-db")
+    monkeypatch.setenv("DATABASE_RELEASE_STAGING_DB_NAME", "stage_dashboard")
+    with patch.object(core_services, "load_db_runtime_config", return_value={"use_staging": True, "target": "staging", "updated_at": ""}), patch.object(
+        core_services, "APP_DB_HOST", "unused-app-db-host"
+    ):
+        target = core_services.get_runtime_db_target()
+
+    assert target["target"] == "staging"
+    assert target["app"]["host"] == "stage-db"
+
+
 def test_application_connection_close_rolls_back_and_returns_socket_to_pool(monkeypatch):
     class RawConnection:
         def __init__(self):

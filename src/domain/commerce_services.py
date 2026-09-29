@@ -460,6 +460,72 @@ def build_fan_safe_site_config(site_config, user=None):
     return config
 
 
+def build_h5_bootstrap_site_config(site_config, user=None):
+    """Return only the configuration H5/Web needs before its APIs load.
+
+    The persisted site config also contains content aggregates and operational
+    settings. Serializing that whole document into the application shell makes
+    every navigation pay for data that the page later loads through scoped
+    APIs. Keep the browser bootstrap intentionally small and never expose
+    model credentials.
+    """
+    safe_config = build_fan_safe_site_config(site_config, user)
+    raw_auth = safe_config.get("auth_settings") if isinstance(safe_config.get("auth_settings"), dict) else {}
+    raw_wechat = raw_auth.get("wechat") if isinstance(raw_auth.get("wechat"), dict) else {}
+    raw_hermes = safe_config.get("hermes_settings") if isinstance(safe_config.get("hermes_settings"), dict) else {}
+    raw_registry = safe_config.get("llm_registry") if isinstance(safe_config.get("llm_registry"), dict) else {}
+    tenant_fields = (
+        "id", "slug", "name", "short_name", "advisor", "focus", "rights",
+        "description", "dashboard_title", "dashboard_description", "tier", "logo_mark",
+    )
+    tenants = []
+    for raw_tenant in safe_config.get("tenants") if isinstance(safe_config.get("tenants"), list) else []:
+        if not isinstance(raw_tenant, dict):
+            continue
+        tenants.append({key: copy.deepcopy(raw_tenant.get(key)) for key in tenant_fields if key in raw_tenant})
+    public_models = []
+    for raw_model in raw_registry.get("models") if isinstance(raw_registry.get("models"), list) else []:
+        if not isinstance(raw_model, dict):
+            continue
+        public_models.append({
+            key: copy.deepcopy(raw_model.get(key))
+            for key in ("key", "label", "provider", "model_name", "purpose", "enabled")
+            if key in raw_model
+        })
+    return {
+        "brand": copy.deepcopy(safe_config.get("brand") or {}),
+        "tenants": tenants,
+        "default_theme": safe_config.get("default_theme") or "light",
+        "default_accent": safe_config.get("default_accent") or "blue",
+        "default_tenant_slug": safe_config.get("default_tenant_slug") or "",
+        "feature_flags": copy.deepcopy(safe_config.get("feature_flags") or {}),
+        "role_capabilities": copy.deepcopy(safe_config.get("role_capabilities") or {}),
+        "auth_settings": {
+            "password_login_enabled": raw_auth.get("password_login_enabled") is not False,
+            "quick_select_enabled": raw_auth.get("quick_select_enabled") is True,
+            "wechat_login_enabled": raw_auth.get("wechat_login_enabled") is True,
+            "wechat_runtime_test_enabled": raw_auth.get("wechat_runtime_test_enabled") is True,
+            "wechat": {
+                "app_id": str(raw_wechat.get("app_id") or ""),
+                "redirect_uri": str(raw_wechat.get("redirect_uri") or ""),
+                "scope": str(raw_wechat.get("scope") or "snsapi_userinfo"),
+            },
+        },
+        "knowledge_ingestion": {
+            "user_preview_enabled": bool((safe_config.get("knowledge_ingestion") or {}).get("user_preview_enabled")),
+        },
+        "hermes_settings": {
+            key: copy.deepcopy(raw_hermes.get(key))
+            for key in ("dav_access_enabled", "investor_access_enabled", "chart_types_enabled", "thinking_process_enabled")
+            if key in raw_hermes
+        },
+        "llm_registry": {
+            "default_model_key": str(raw_registry.get("default_model_key") or ""),
+            "models": public_models,
+        },
+    }
+
+
 def build_qr_png_data_uri(content):
     """Render QR locally; no tracking URL or third-party QR generator is used."""
     try:

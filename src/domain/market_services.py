@@ -4438,7 +4438,7 @@ DEFAULT_ADMIN_TASKS = [
         "task_name": "Gangtise 市场与行业指标同步",
         "task_group": "indicator",
         "task_type": "sync_market_snapshot",
-        "description": "每日 09:30、12:00、14:00、15:30 执行共享兜底同步；盘中页面读取发现快照超过 5 分钟时，仅排队一次按需共享刷新。仅采集各大V已发布的标准市场指数与申万一级行业（.SWI）面板指标去重并集，写入 PostgreSQL 供全部租户复用。",
+        "description": "每日 09:30、12:00、14:00、15:30 执行共享兜底同步；盘中页面读取发现快照超过 5 分钟时，仅排队一次按需获取并共享刷新。仅采集各大V已发布的标准市场指数与申万一级行业（.SWI）面板指标去重并集，写入 PostgreSQL 供全部租户复用。",
         "schedule_type": "daily",
         "schedule_value": "09:30,12:00,14:00,15:30",
         "enabled": 1,
@@ -6871,7 +6871,7 @@ def fetch_akshare_stock_intraday_series(security_code, trade_date="", ak=None):
 
 def _build_market_index_snapshot_item(indicator_code, series_result):
     entry = GANGTISE_INDICATOR_REGISTRY.get(indicator_code) or {}
-    data_source = str((series_result or {}).get("provider") or "AKShare").strip() or "AKShare"
+    data_source = str((series_result or {}).get("provider") or "Gangtise OpenAPI").strip() or "Gangtise OpenAPI"
     points = list((series_result or {}).get("points") or [])
     base = {
         "indicator_code": indicator_code,
@@ -7863,7 +7863,7 @@ def build_watchlist_indicator_detail(indicator_code, stock_name=""):
                 if str((item or {}).get("id") or "").strip() != normalized_code:
                     continue
                 fallback = normalize_watchlist_detail_from_indicator(item, normalized_code)
-                if fallback and str(fallback.get("data_source") or "").strip().lower() == "akshare" and (fallback.get("kline") or fallback.get("history_series")):
+                if fallback and str(fallback.get("data_source") or "").strip().lower() == "gangtise openapi" and (fallback.get("kline") or fallback.get("history_series")):
                     return fallback
         except Exception as exc:
             if not is_db_unavailable_error(exc):
@@ -9078,7 +9078,7 @@ def _build_watchlist_unavailable_detail(seed_detail=None, stock_code="", stock_n
     industry = str(seed.get("industry") or ("银行" if code.startswith(("600", "601", "603")) else "个股跟踪")).strip() or "个股跟踪"
     focus = str(seed.get("focus") or industry).strip() or industry
     # Static presets are only used for security metadata and research context.
-    # Price/K-line values must never be fabricated when AKShare has no data.
+    # Price/K-line values must never be fabricated when a live source has no data.
     preserved_price = None
     preserved_change = None
     preserved_change_pct = None
@@ -9089,7 +9089,7 @@ def _build_watchlist_unavailable_detail(seed_detail=None, stock_code="", stock_n
     base_fundamental = copy.deepcopy(
         seed.get("fundamental")
         or {
-            "summary": "AKShare 行情当前暂未返回该股票的可用历史样本。现阶段仅保留研究框架，等待真实行情同步后再展示价格与 K 线。",
+            "summary": "行情数据当前暂未返回该股票的可用历史样本。现阶段仅保留研究框架，等待真实行情同步后再展示价格与 K 线。",
             "metrics": [],
             "thesis": [],
         }
@@ -9097,9 +9097,9 @@ def _build_watchlist_unavailable_detail(seed_detail=None, stock_code="", stock_n
     summary_text = str(base_fundamental.get("summary") or "").strip()
     if "当前展示最近一次可用快照" not in summary_text:
         summary_text = (
-            f"{summary_text} 当前展示最近一次可用快照，待 AKShare 行情恢复后会自动刷新。".strip()
+            f"{summary_text} 当前展示最近一次可用快照，待行情数据恢复后会自动刷新。".strip()
             if summary_text else
-            "当前展示最近一次可用快照，待 AKShare 行情恢复后会自动刷新。"
+            "当前展示最近一次可用快照，待行情数据恢复后会自动刷新。"
         )
     base_fundamental["summary"] = summary_text
     base_metrics = base_fundamental.get("metrics") if isinstance(base_fundamental.get("metrics"), list) else []
@@ -9109,7 +9109,7 @@ def _build_watchlist_unavailable_detail(seed_detail=None, stock_code="", stock_n
             {
                 "label": "行情状态",
                 "value": "等待实时刷新",
-                "note": "当前先展示最近一次可用快照，AKShare 恢复后自动覆盖。",
+                "note": "当前先展示最近一次可用快照，行情数据恢复后自动覆盖。",
             },
         )
     base_fundamental["metrics"] = base_metrics[:6]
@@ -9127,9 +9127,9 @@ def _build_watchlist_unavailable_detail(seed_detail=None, stock_code="", stock_n
     forecast_band = str(base_forecast.get("band") or "").strip()
     if "最近一次可用快照" not in forecast_band:
         base_forecast["band"] = (
-            f"{forecast_band} 当前先参考最近一次可用快照，待 AKShare 行情恢复后再更新位置判断。".strip()
+            f"{forecast_band} 当前先参考最近一次可用快照，待行情数据恢复后再更新位置判断。".strip()
             if forecast_band else
-            "当前先参考最近一次可用快照，待 AKShare 行情恢复后再更新位置判断。"
+            "当前先参考最近一次可用快照，待行情数据恢复后再更新位置判断。"
         )
     return {
         "code": code,
@@ -9195,6 +9195,10 @@ def _build_dynamic_watchlist_detail(stock_code, stock_name=""):
     normalized_code = indicator_code or raw_code.upper()
     if not normalized_code:
         return None
+    # A local alias identifies the security, but must not overwrite its
+    # canonical name in the detail payload.
+    if normalized_code in WATCHLIST_DYNAMIC_DETAIL_PRESETS:
+        stock_name = str(WATCHLIST_DYNAMIC_DETAIL_PRESETS[normalized_code].get("name") or stock_name).strip()
     if normalized_code in GANGTISE_INDICATOR_REGISTRY:
         detail = build_watchlist_indicator_detail(normalized_code, stock_name=stock_name)
         if isinstance(detail, dict) and detail:
@@ -9335,11 +9339,16 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
         )
         return result
     if not allow_provider_fetch:
-        return _build_watchlist_unavailable_detail(detail, stock_code=normalized_code, stock_name=stock_name or normalized_code)
+        result = _build_watchlist_unavailable_detail(detail, stock_code=normalized_code, stock_name=stock_name or normalized_code)
+        if normalized_code in WATCHLIST_DYNAMIC_DETAIL_PRESETS:
+            result["name"] = WATCHLIST_DYNAMIC_DETAIL_PRESETS[normalized_code]["name"]
+        return result
     fallback = _build_dynamic_watchlist_detail(normalized_code, stock_name=stock_name)
     if not fallback:
         return None
     result = copy.deepcopy((_enrich_watchlist_details({normalized_code: fallback}).get(normalized_code)) or fallback)
+    if normalized_code in WATCHLIST_DYNAMIC_DETAIL_PRESETS:
+        result["name"] = WATCHLIST_DYNAMIC_DETAIL_PRESETS[normalized_code]["name"]
     app.logger.warning(
         "Watchlist detail fallback result code=%s kline_points=%s data_unavailable=%s data_source=%s message=%s",
         normalized_code,

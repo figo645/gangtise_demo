@@ -40,6 +40,21 @@ def api_public_registration_options():
     return jsonify({"ok": True, "tenant_slug": tenant_slug, "options": options})
 
 
+@app.route("/api/runtime-environment")
+def api_runtime_environment():
+    """Expose only the active environment label for the global UI badge."""
+    runtime = get_runtime_db_target()
+    target = str(runtime.get("target") or "local").strip().lower()
+    if target not in {"local", "staging", "production"}:
+        target = "local"
+    labels = {
+        "local": "本地开发",
+        "staging": "Staging 测试",
+        "production": "Production",
+    }
+    return jsonify({"ok": True, "target": target, "label": labels[target], "is_production": target == "production"})
+
+
 def _open_api_bearer_token():
     authorization = str(request.headers.get("Authorization") or "").strip()
     scheme, _, token = authorization.partition(" ")
@@ -1563,12 +1578,20 @@ def api_admin_indicator_trace(indicator_code):
 @app.route("/api/site-config")
 def api_site_config():
     try:
-        return jsonify(build_fan_safe_site_config(get_site_config(), get_current_authenticated_user()))
+        config = get_site_config()
+        current_user = get_current_authenticated_user()
+        if str(request.args.get("surface") or "").strip().lower() in {"h5", "web"}:
+            return jsonify(build_h5_bootstrap_site_config(config, current_user))
+        return jsonify(build_fan_safe_site_config(config, current_user))
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
         app.logger.warning("Database unavailable while serving site config API, using defaults")
-        return jsonify(build_fan_safe_site_config(normalize_site_config(DEFAULT_SITE_CONFIG), get_current_authenticated_user()))
+        config = normalize_site_config(DEFAULT_SITE_CONFIG)
+        current_user = get_current_authenticated_user()
+        if str(request.args.get("surface") or "").strip().lower() in {"h5", "web"}:
+            return jsonify(build_h5_bootstrap_site_config(config, current_user))
+        return jsonify(build_fan_safe_site_config(config, current_user))
 
 
 @app.route("/api/h5/auth-options")
@@ -2443,18 +2466,25 @@ def api_admin_site_config():
     payload = request.get_json(silent=True) or {}
     runtime_payload = payload.get("db_runtime") if isinstance(payload.get("db_runtime"), dict) else {}
     current_runtime = get_runtime_db_target()
-    original_use_staging = bool(current_runtime.get("use_staging"))
-    requested_use_staging = bool(runtime_payload.get("use_staging", original_use_staging))
-    runtime_switched = requested_use_staging != original_use_staging
+    original_target = str(current_runtime.get("target") or current_runtime.get("mode") or ("staging" if current_runtime.get("use_staging") else "local"))
+    requested_target = runtime_payload.get("target")
+    if requested_target is None:
+        # Compatibility with the previous two-state Admin control.
+        requested_target = "staging" if bool(runtime_payload.get("use_staging", original_target == "staging")) else "local"
+    requested_target = str(requested_target or original_target).strip().lower()
+    if requested_target not in {"local", "staging", "production"}:
+        return jsonify({"success": False, "error": "db_runtime_target_invalid"}), 400
+    runtime_switched = requested_target != original_target
     try:
         if runtime_switched:
-            save_db_runtime_config(requested_use_staging)
-            reset_request_runtime_state()
+            save_db_runtime_config(requested_target)
+            # Database target selection is a startup concern. Do not switch a
+            # live process halfway through this request; Web/Worker/Scheduler
+            # must all restart together and rebuild their pools.
         current = get_site_config()
     except Exception:
         if runtime_switched:
-            save_db_runtime_config(original_use_staging)
-            reset_request_runtime_state()
+            save_db_runtime_config(original_target)
         raise
     feature_flags = dict(current.get("feature_flags", {}))
     current_auth_settings = get_auth_settings(current, include_secret=True)
@@ -2543,14 +2573,18 @@ def api_admin_site_config():
         )
     except Exception:
         if runtime_switched:
-            save_db_runtime_config(original_use_staging)
-            reset_request_runtime_state()
+            save_db_runtime_config(original_target)
         raise
+    response_site_config = build_admin_site_config_payload(saved)
+    if runtime_switched:
+        response_site_config.setdefault("db_runtime", {})["pending_target"] = requested_target
+        response_site_config["db_runtime"]["restart_required"] = True
     return jsonify(
         {
             "success": True,
-            "site_config": build_admin_site_config_payload(saved),
+            "site_config": response_site_config,
             "db_runtime_switched": runtime_switched,
+            "db_runtime_restart_required": runtime_switched,
         }
     )
 

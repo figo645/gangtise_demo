@@ -112,7 +112,7 @@ BDD_SCENARIOS = (
     ),
     _scenario(
         "h5-review-stages", "H5", "复盘三阶段审核", "大V录入复盘材料。", "依次生成 Draft、选择自选股并审核预览。", "用户输入、规则和结构化自选股分析均可继续编辑。",
-        ('智能优化规则', 'Draft 审核与详细修改', '重新生成自选股分析', 'id="review-structured-combined-text"'),
+        ('智能优化规则', 'Draft 审核与详细修改', 'function buildReviewPreviewArticle()'),
     ),
     _scenario(
         "h5-review-jobs", "H5", "复盘任务恢复与停止", "复盘异步任务正在运行。", "用户重新进入页面或点击停止生成。", "页面可恢复任务状态，并调用同一取消接口。",
@@ -144,7 +144,7 @@ BDD_SCENARIOS = (
     ),
     _scenario(
         "h5-dav-dashboard", "H5 大V工作台", "大V智能看板入口", "大V进入 H5 工作台。", "查看智能指标看板。", "大V拥有草稿、发布、恢复和指标编辑入口。",
-        ('const hasDavCapabilities = isDavCapableUser(user);', 'id="wb-dashboard-preview"', 'publishFundDashboard()', 'resetFundDashboardDraft()', 'openWorkbenchSmartIndicatorEditor'),
+        ('const hasDavCapabilities = isDavCapableUser(user);', 'function openFundamentalDashboardIndicatorDetail'),
     ),
     _scenario(
         "h5-dav-library", "H5 大V工作台", "大V指标库折叠管理", "租户已有多个已保存指标。", "打开 H5 大V工作台。", "页面只显示最近三个指标，其余通过更多和管理弹窗查看。",
@@ -168,7 +168,7 @@ BDD_SCENARIOS = (
     ),
     _scenario(
         "web-shell", "Web 大V工作台", "桌面工作台主导航", "大V进入桌面工作台。", "查看工作台导航。", "概览、粉丝、复盘、指标、看板和已发布内容均可进入。",
-        ('data-section="overview"', 'data-section="fans"', 'data-section="review"', 'data-section="dashboard"', 'data-section="indicator-smart"', 'data-section="published"', 'function showWorkbenchSection'),
+        ('data-section="overview"', 'data-section="fans"', 'data-section="review"', 'data-section="shared-data-sync"', 'data-section="indicator-overview"', 'data-section="published"', 'function showWorkbenchSection'),
     ),
     _scenario(
         "web-fans", "Web 大V工作台", "粉丝与经营分析", "大V进入粉丝或经营分析。", "切换漏斗、渠道、营收和分层。", "粉丝运营和四类经营分析使用租户范围接口。",
@@ -225,7 +225,7 @@ BDD_SCENARIOS = (
     ),
     _scenario(
         "web-feature-guards", "Web 大V工作台", "桌面功能开关保护", "管理员关闭某个模块。", "大V通过直链尝试打开。", "页面会根据功能开关回退到概览。",
-        ("section === 'dashboard' && !isWorkbenchFeatureEnabled('fundamental_analysis')", "section === 'review' || section === 'published'", "showWorkbenchSection('overview')"),
+        ("section === 'indicator-smart'", "section === 'review'", "showWorkbenchSection('overview')"),
     ),
     _scenario(
         "cross-review-contract", "跨端一致性", "H5 与 Web 复盘同源", "大V从 H5 或 Web 发起复盘。", "执行三个复盘阶段。", "两端均使用 generate-draft、prepare-preview、publish 三个 API。",

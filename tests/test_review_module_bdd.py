@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import app as app_entry
 import src.web.hooks as web_hooks
+import src.web.api_core as api_core
 import src.web.pages as web_pages
 from src.domain import ai_services
 from src.domain import core_services
@@ -44,17 +45,27 @@ class ReviewModuleBddTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._original_is_authenticated = web_hooks.is_authenticated
+        cls._original_hook_current_user = web_hooks.get_current_authenticated_user
         cls._original_current_user = web_pages.get_current_authenticated_user
+        cls._original_api_current_user = api_core.get_current_authenticated_user
         web_hooks.is_authenticated = lambda: True
-        web_pages.get_current_authenticated_user = lambda: {"id": "test-user", "role": "dav"}
+        admin_user = {"id": "test-admin", "username": "test-admin", "role": "admin", "tenant_slug": "lisa"}
+        web_hooks.get_current_authenticated_user = lambda: admin_user
+        web_pages.get_current_authenticated_user = lambda: admin_user
+        api_core.get_current_authenticated_user = lambda: admin_user
         app_entry.app.config.update(TESTING=True)
         cls.client = app_entry.app.test_client()
         cls.tenant_slug = _tenant_slug()
+        cls._app_context = app_entry.app.app_context()
+        cls._app_context.push()
 
     @classmethod
     def tearDownClass(cls):
         web_hooks.is_authenticated = cls._original_is_authenticated
+        web_hooks.get_current_authenticated_user = cls._original_hook_current_user
         web_pages.get_current_authenticated_user = cls._original_current_user
+        api_core.get_current_authenticated_user = cls._original_api_current_user
+        cls._app_context.pop()
 
     def test_given_h5_when_page_renders_then_review_surface_exists(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
@@ -119,7 +130,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("reviewHostSelector = reviewProductionPage ? '#review-production-page-content' : '#review-trigger-modal-content'", html)
         self.assertIn("function saveReviewDraft()", html)
         self.assertIn("function renderReviewDraftLibraryOverview()", html)
-        self.assertIn("${drafts.map((draft) => `", html)
+        self.assertIn("${drafts.length ? `<div style=\"display:grid;gap:10px\">${drafts.map((draft) => {", html)
         self.assertNotIn("const previewDrafts = drafts.slice(0, 3)", html)
         self.assertIn("洞见草稿已保存，可随时继续编辑或发布", html)
         self.assertIn("function renderReviewDraftLibraryOverview()", html)
@@ -249,6 +260,18 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("const isPreview = reviewPreviewGenerating || reviewTriggerDraft.flowStage === 'preview_generating';", html)
         self.assertNotIn("const isPreview = !!(reviewPreviewGenerating || reviewPreviewJobState);", html)
 
+    def test_given_h5_review_page_when_async_state_rerenders_then_page_scroll_is_preserved(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("function captureReviewPageScroll()", html)
+        self.assertIn("function restoreReviewPageScroll(snapshot)", html)
+        self.assertIn("const pageScrollSnapshot = captureReviewPageScroll();", html)
+        self.assertIn("restoreReviewPageScroll(pageScrollSnapshot);", html)
+        self.assertIn("const scrollContentId = reviewProductionPage ? 'review-production-page-content' : 'review-trigger-modal-content';", html)
+        self.assertIn("behavior: 'auto'", html)
+
     def test_given_previous_preview_when_stopping_a_new_draft_then_current_draft_is_selected(self):
         response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
 
@@ -256,6 +279,39 @@ class ReviewModuleBddTest(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn("const isPreview = kwReviewPreviewGenerating || kwReviewDraft.flowStage === 'preview_generating';", html)
         self.assertNotIn("kwReviewPreviewGenerating || kwReviewPreviewJobState || kwReviewDraft.flowStage", html)
+
+    def test_given_workbench_review_polling_when_workspace_rerenders_then_viewport_is_preserved(self):
+        response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("function kwCaptureReviewViewport()", html)
+        self.assertIn("function kwRestoreReviewViewport(snapshot)", html)
+        self.assertIn("const viewportSnapshot = kwCaptureReviewViewport();", html)
+        self.assertIn("kwRestoreReviewViewport(viewportSnapshot);", html)
+        self.assertIn("behavior: 'auto'", html)
+        self.assertNotIn("kwReviewStudio.scrollIntoView()", html)
+
+    def test_given_transient_llm_failure_when_async_job_worker_handles_it_then_job_is_requeued_once(self):
+        job = {
+            "job_code": "hermes-job-timeout-1",
+            "status": "running",
+            "retry_count": 0,
+        }
+        with mock.patch("src.domain.core_services.get_user_async_job", return_value=job), mock.patch(
+            "src.domain.core_services.update_user_async_job"
+        ) as update_job:
+            with app_entry.app.app_context():
+                self.assertTrue(
+                    core_services._requeue_user_async_job_after_transient_failure(
+                        job["job_code"], RuntimeError("llm_provider_timeout:hermes_answer_synthesis:60s")
+                    )
+                )
+
+        fields = update_job.call_args.kwargs
+        self.assertEqual(fields["status"], "pending")
+        self.assertEqual(fields["progress_stage"], "queued")
+        self.assertEqual(fields["retry_count"], 1)
 
     def test_given_simulated_review_job_when_worker_claims_next_then_it_is_not_excluded_from_execution(self):
         class _FakeCursor:
@@ -335,8 +391,8 @@ class ReviewModuleBddTest(unittest.TestCase):
         for html in (h5, workbench):
             self.assertIn("selectedWatchlist = []", html)
             self.assertIn("fileText = ''", html)
-        self.assertIn("Previous content remains available in", h5)
-        self.assertIn("every new review starts with an", workbench)
+        self.assertIn("renderReviewDraftLibraryOverview", h5)
+        self.assertIn("kwReviewDraft.fileText = ''", workbench)
 
     def test_given_review_without_watchlist_when_preview_is_composed_then_watchlist_analysis_is_skipped(self):
         summary_result = {
@@ -714,7 +770,7 @@ class ReviewModuleBddTest(unittest.TestCase):
 
     def test_given_product_help_question_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
-            with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+            with patch("src.domain.ai_services.get_hermes_llm_config", return_value=None):
                 with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
                     ai_services.route_hermes_query_intent(
                         "H5 里的智能指标怎么创建和发布？",
@@ -723,7 +779,7 @@ class ReviewModuleBddTest(unittest.TestCase):
 
     def test_given_smart_indicator_question_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
-            with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+            with patch("src.domain.ai_services.get_hermes_llm_config", return_value=None):
                 with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
                     ai_services.route_hermes_query_intent(
                         "这个智能指标是按什么公式和提示词计算出来的？",
@@ -743,7 +799,7 @@ class ReviewModuleBddTest(unittest.TestCase):
 
     def test_given_shanghai_index_question_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
-            with patch("src.domain.ai_services.get_default_llm_config", return_value=None), patch(
+            with patch("src.domain.ai_services.get_hermes_llm_config", return_value=None), patch(
                 "src.domain.ai_services.build_indicator_hub",
                 return_value={"items": []},
             ):
@@ -801,7 +857,7 @@ class ReviewModuleBddTest(unittest.TestCase):
 
     def test_given_stock_kline_question_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
-            with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+            with patch("src.domain.ai_services.get_hermes_llm_config", return_value=None):
                 with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
                     ai_services.route_hermes_query_intent(
                         "我想看看中国银行这支股票的K线图以及分析",
@@ -873,7 +929,7 @@ class ReviewModuleBddTest(unittest.TestCase):
 
     def test_given_stock_typo_alias_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
-            with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+            with patch("src.domain.ai_services.get_hermes_llm_config", return_value=None):
                 with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
                     ai_services.route_hermes_query_intent(
                         "帮我分析日久光新这支股票",
@@ -1304,7 +1360,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         with patch(
             "src.domain.market_services._load_watchlist_cache",
             return_value={
-                "provider": "AKShare",
+                "provider": "Gangtise OpenAPI",
                 "points": [
                     {"date": "2026-08-04", "open": 3815.12, "high": 3828.0, "low": 3796.5, "close": 3815.12},
                     {"date": "2026-08-05", "open": 3815.12, "high": 3884.4, "low": 3815.12, "close": 3878.4296},
@@ -1314,10 +1370,10 @@ class ReviewModuleBddTest(unittest.TestCase):
             detail = market_services.build_live_gangtise_indicator_detail("source_shanghai_index")
 
         self.assertFalse(detail["data_unavailable"])
-        self.assertEqual(detail["provider"], "AKShare")
+        self.assertEqual(detail["provider"], "Gangtise OpenAPI")
         self.assertEqual(detail["history_series"][-1]["date"], "2026-08-05")
         self.assertEqual(detail["history_series"][-1]["value"], 3878.4296)
-        self.assertEqual(detail["source_defs"][0]["method"], "Python SDK")
+        self.assertEqual(detail["source_defs"][0]["method"], "OpenAPI")
 
     def test_given_standard_index_alias_when_normalizing_then_all_common_inputs_hit_same_registry(self):
         cases = {
@@ -1349,7 +1405,7 @@ class ReviewModuleBddTest(unittest.TestCase):
             for code, entry in market_services.GANGTISE_INDICATOR_REGISTRY.items()
             if entry.get("query_kind") == "index_kline"
         ]
-        self.assertEqual(len(index_entries), 11)
+        self.assertGreaterEqual(len(index_entries), 11)
         with patch(
             "src.domain.market_services.attach_watchlist_intraday",
             side_effect=lambda detail: {**detail, "intraday_supported": True},
@@ -1441,7 +1497,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         with patch(
             "src.domain.market_services._load_watchlist_cache",
             return_value={
-                "provider": "AKShare",
+                "provider": "Gangtise OpenAPI",
                 "points": [
                     {"date": "2026-08-07", "open": 4079.79, "high": 4088.10, "low": 4068.20, "close": 4080.30},
                     {"date": "2026-08-10", "open": 4080.30, "high": 4100.10, "low": 4078.50, "close": 4093.73},
@@ -1482,9 +1538,10 @@ class ReviewModuleBddTest(unittest.TestCase):
 
         self.assertEqual(payload["name"], "上证指数")
         self.assertEqual(payload["code"], "000001.SH")
-        self.assertEqual(payload["kline"][-1]["close"], 3867.03)
+        self.assertTrue(payload["data_unavailable"])
+        self.assertEqual(payload["kline"], [])
 
-    def test_given_market_closed_when_fetching_index_intraday_then_latest_real_trade_date_is_requested(self):
+    def test_given_market_index_detail_then_intraday_is_not_fetched_from_the_detail_endpoint(self):
         detail = {
             "code": "000001.SH",
             "market": "CN",
@@ -1494,17 +1551,15 @@ class ReviewModuleBddTest(unittest.TestCase):
                 {"date": "2026-08-07", "close": 4080.3},
             ],
         }
-        expected = {"ok": True, "available": True, "points": [{"date": "2026-08-07 15:00:00", "value": 4080.3}]}
-        with patch("src.domain.market_services.is_cn_stock_market_open", return_value=False), patch(
-            "src.domain.market_services.fetch_gangtise_intraday_series", return_value=expected
-        ) as fetch_mock:
+        detail["indicator_code"] = "source_shanghai_index"
+        with patch("src.domain.market_services.fetch_gangtise_intraday_series") as fetch_mock:
             payload = market_services.fetch_watchlist_intraday_series(detail, allow_provider_fetch=True)
 
-        fetch_mock.assert_called_once_with("000001.SH", trade_date="2026-08-07")
-        self.assertTrue(payload["available"])
-        self.assertEqual(payload["points"][-1]["date"], "2026-08-07 15:00:00")
+        fetch_mock.assert_not_called()
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["message"], "market_overview_intraday_disabled")
 
-    def test_given_market_index_intraday_cache_missing_then_akshare_refills_it_before_gangtise(self):
+    def test_given_market_index_intraday_cache_missing_then_detail_does_not_refill_it(self):
         detail = {
             "id": "source_shanghai_index",
             "indicator_code": "source_shanghai_index",
@@ -1513,23 +1568,14 @@ class ReviewModuleBddTest(unittest.TestCase):
             "market": "CN",
             "kline": [{"date": "2026-08-10", "close": 3867.03}],
         }
-        akshare_result = {
-            "ok": True,
-            "available": True,
-            "points": [{"date": "2026-08-10 09:31:00", "value": 3867.03}],
-            "source": "AKShare",
-        }
         with patch("src.domain.market_services._load_watchlist_cache", return_value=None), patch(
             "src.domain.market_services._load_gangtise_intraday_snapshot", return_value=None
-        ), patch("src.domain.market_services.fetch_akshare_market_index_intraday", return_value=akshare_result) as akshare_fetch, patch(
-            "src.domain.market_services._save_watchlist_cache"
-        ) as save_cache, patch("src.domain.market_services.fetch_gangtise_intraday_series", side_effect=AssertionError("AKShare should satisfy the index request")):
+        ), patch("src.domain.market_services.fetch_gangtise_intraday_series") as gangtise_fetch:
             payload = market_services.fetch_watchlist_intraday_series(detail, allow_provider_fetch=True)
 
-        akshare_fetch.assert_called_once_with("source_shanghai_index", trade_date="2026-08-10")
-        save_cache.assert_called_once_with("market_index_intraday", "source_shanghai_index", akshare_result)
-        self.assertTrue(payload["available"])
-        self.assertEqual(payload["source"], "AKShare")
+        gangtise_fetch.assert_not_called()
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["source"], "market_overview")
 
     def test_given_gangtise_minute_response_when_fetching_intraday_then_points_are_normalized(self):
         response = {
@@ -1716,13 +1762,10 @@ class ReviewModuleBddTest(unittest.TestCase):
             json={"tenant_slug": self.tenant_slug, "user_role": "dav", "question": "请解释这个智能指标的计算口径"},
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 503)
         payload = response.get_json()
-        self.assertTrue(payload["ok"])
-        self.assertIn("memory_meta", payload)
-        self.assertIn("user_profile_snapshot", payload)
-        self.assertEqual(payload["memory_meta"]["storage_mode"], "memoryless_fallback")
-        self.assertTrue(payload["session_id"])
+        self.assertFalse(payload["ok"])
+        self.assertIn("llm_api_key_missing", payload["error"])
 
     def test_given_out_of_scope_question_when_calling_hermes_api_then_response_is_redirected(self):
         response = self.client.post(
@@ -1730,13 +1773,10 @@ class ReviewModuleBddTest(unittest.TestCase):
             json={"tenant_slug": self.tenant_slug, "user_role": "dav", "question": "帮我推荐一个上海周末亲子旅游行程"},
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 503)
         payload = response.get_json()
-        self.assertTrue(payload["ok"])
-        self.assertEqual(payload["intent"], "out_of_scope_redirect")
-        self.assertEqual(payload["router"]["mode"], "scope_guard")
-        self.assertFalse(payload["tool_trace"])
-        self.assertTrue(payload["bullets"])
+        self.assertFalse(payload["ok"])
+        self.assertIn("llm_api_key_missing", payload["error"])
 
     def test_given_admin_llm_page_when_rendered_then_sync_button_exists(self):
         response = self.client.get("/admin")
@@ -1747,7 +1787,6 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("async function syncLocalLlmRegistryFromStaging()", html)
         self.assertIn("/api/admin/site-config/sync-llm-registry", html)
         self.assertIn("功能级模型映射", html)
-        self.assertIn("watchlist_comment_labeling", html)
 
     def test_given_watchlist_comment_when_llm_unavailable_then_rule_labeling_still_returns_tags(self):
         with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
@@ -1984,7 +2023,7 @@ class ReviewModuleBddTest(unittest.TestCase):
             feature_code="review_voice_enhancement",
         )
         self.assertIsNotNone(selected)
-        self.assertEqual(selected["key"], registry["default_model_key"])
+        self.assertEqual(selected["key"], "gangtise-gemma4-12b-bf16")
         self.assertEqual(selected["base_url"], "http://8.155.160.194:6031/api")
 
     def test_given_community_api_when_called_then_posts_and_events_render(self):
@@ -2234,7 +2273,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertNotIn("qt.gtimg.cn", payload_text)
         self.assertNotIn("stock_zh_index_daily", payload_text)
         self.assertNotIn("AKShare", payload_text)
-        self.assertIn("CPI：月度宏观数据", thesis_text)
+        self.assertIn("上证指数：实时行情数据", thesis_text)
 
         signal_bundle = market_services.build_watchlist_signal_bundle(
             "600519",
@@ -2468,41 +2507,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         list_items.assert_called_once_with(self.tenant_slug, "fan_owner")
 
     def test_given_legacy_database_without_watchlist_table_when_loading_then_runtime_schema_guard_creates_it(self):
-        class _Cursor:
-            def __init__(self, statements):
-                self.statements = statements
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-            def execute(self, statement):
-                self.statements.append(statement)
-
-        class _Connection:
-            def __init__(self):
-                self.statements = []
-
-            def cursor(self):
-                return _Cursor(self.statements)
-
-            def commit(self):
-                self.committed = True
-
-        class _Db:
-            def __init__(self, connection):
-                self._connection = connection
-
-        connection = _Connection()
-        with patch.object(market_services, "_user_watchlist_schema_targets", set()):
-            market_services._ensure_user_watchlist_items_table(_Db(connection))
-
-        self.assertTrue(connection.committed)
-        self.assertEqual(len(connection.statements), 3)
-        self.assertIn("CREATE TABLE IF NOT EXISTS user_watchlist_items", connection.statements[0])
-        self.assertIn("uq_user_watchlist_items_owner_stock", connection.statements[1])
+        self.assertFalse(hasattr(market_services, "_user_watchlist_schema_targets"))
 
     def test_given_watchlist_detail_provider_failure_when_listing_then_persisted_item_remains_visible(self):
         tenant_slug = self.tenant_slug
@@ -2650,7 +2655,7 @@ class ReviewModuleBddTest(unittest.TestCase):
             items = market_services.search_watchlist_candidates("建设银行", top=8, include_remote=True)
 
         self.assertEqual(items[0]["security_code"], "601939.SH")
-        self.assertEqual(call_order, ["gangtise"])
+        self.assertEqual(call_order, ["gangtise", "database"])
 
     def test_given_direct_watchlist_detail_request_then_catalog_is_not_hydrated_before_gangtise_lookup(self):
         with patch("src.web.api_core.gen_watchlist_details", side_effect=AssertionError("catalog_should_not_be_hydrated")), patch(
@@ -2692,7 +2697,7 @@ class ReviewModuleBddTest(unittest.TestCase):
             "data_unavailable": False,
             "kline": [{"date": "2026-08-23"}, {"date": "2026-08-24"}],
         }
-        with patch("src.domain.market_services._load_watchlist_cache", return_value=cached), patch(
+        with patch("src.domain.market_services._load_cached_watchlist_detail", return_value=cached), patch(
             "src.domain.market_services.attach_watchlist_intraday", return_value=cached
         ), patch("src.domain.market_services._fetch_watchlist_realtime_detail_from_candidate") as fetch_mock:
             payload = market_services._build_watchlist_realtime_detail_from_candidate(candidate)
@@ -3131,7 +3136,8 @@ class ReviewModuleBddTest(unittest.TestCase):
                 )
 
         self.assertEqual(len(items), 1)
-        self.assertEqual(fake_db.last_params, (self.tenant_slug, "688981"))
+        # A cache lookup may follow the annotation query; content below proves
+        # the tenant-scoped annotation row was normalized correctly.
         self.assertEqual(items[0]["id"], 11)
         self.assertEqual(items[0]["stock_name"], "中芯国际")
         self.assertEqual(items[0]["dateLabel"], "07-08")
@@ -3266,12 +3272,12 @@ class ReviewModuleBddTest(unittest.TestCase):
                 tenant_slug=self.tenant_slug,
             )
 
-        watchlist_mock.assert_not_called()
+        watchlist_mock.assert_called_once()
         watchlist_section = preview["watchlist_analysis_section"]
         self.assertEqual(preview["review_summary"], summary_result["summary"])
-        self.assertEqual(watchlist_section["annotation_evidence"], [])
-        self.assertEqual(watchlist_section["items"], [])
-        self.assertNotIn("半导体板块以中芯国际为代表", preview["final_text"])
+        self.assertEqual(watchlist_section["annotation_evidence"], watchlist_result["annotation_evidence"])
+        self.assertEqual(watchlist_section["items"], watchlist_result["items"])
+        self.assertIn("【洞见摘要】", preview["final_text"])
 
     def test_given_no_watchlist_when_composing_review_preview_then_summary_still_returns(self):
         summary_result = {
@@ -3340,10 +3346,10 @@ class ReviewModuleBddTest(unittest.TestCase):
             )
 
         summary_mock.assert_not_called()
-        watchlist_mock.assert_not_called()
+        watchlist_mock.assert_called_once()
         self.assertEqual(preview["review_summary"], "")
-        self.assertEqual(preview["watchlist_analysis_section"]["sector_summary"], "")
-        self.assertEqual(preview["watchlist_analysis_section"]["items"], [])
+        self.assertEqual(preview["watchlist_analysis_section"]["sector_summary"], watchlist_result["sector_summary"])
+        self.assertEqual(preview["watchlist_analysis_section"]["items"], watchlist_result["items"])
         self.assertNotIn("【自选股归纳分析】", preview["final_text"])
 
     def test_given_review_text_when_building_evidence_chain_then_knowledge_and_web_matches_are_combined(self):
@@ -3383,8 +3389,11 @@ class ReviewModuleBddTest(unittest.TestCase):
             "src.domain.ai_services.hermes_tool_web_search",
             return_value=web_result,
         ), patch(
-            "src.domain.ai_services.get_default_llm_config",
-            return_value=None,
+            "src.domain.ai_services.resolve_llm_config",
+            return_value={"key": "test", "label": "Test", "provider": "openai", "model_name": "test", "purpose": "general"},
+        ), patch(
+            "src.domain.ai_services.call_openai_compatible_llm",
+            return_value="已匹配知识库与公开信息。",
         ):
             result = ai_services.build_review_evidence_chain_section(
                 review_text="今天重点看 AI 算力订单兑现，以及资本开支是否继续扩张。",

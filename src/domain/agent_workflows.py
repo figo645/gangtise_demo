@@ -155,6 +155,28 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "edge_review_compose_3", "from": "review_compose_llm", "to": "review_compose_output"},
         ],
     },
+    "review_watchlist_analysis": {
+        "id": "review_watchlist_analysis",
+        "title": "复盘自选股多股分析",
+        "summary": "用 Gangtise Agent SSE 对大V选择的多只股票进行组合层面的复盘分析。",
+        "category": "复盘智能体",
+        "feature_key": "daily_review",
+        "execution_mode": "declared_agent_workflow",
+        "tags": ["大V", "自选股", "Gangtise SSE"],
+        "nodes": [
+            {"id": "review_watchlist_input", "label": "自选股输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收本次复盘选择的股票和复盘周期。"},
+            {"id": "review_watchlist_context", "label": "行情上下文", "processor": "context_assembly", "kind": "planner", "x": 342, "y": 88, "description": "加载股票基础信息、K线标注、行业归属和信号摘要。"},
+            {"id": "review_watchlist_sector_merge", "label": "板块归并", "processor": "sector_merge", "kind": "planner", "x": 648, "y": 88, "description": "按行业板块归并自选股代表性信息。"},
+            {"id": "review_watchlist_llm", "label": "Gangtise 多股分析", "processor": "gangtise_agent_sse", "kind": "tooling", "x": 954, "y": 88, "description": "调用 Gangtise Agent SSE，保留正式回答文本和原始流。"},
+            {"id": "review_watchlist_output", "label": "结果封装", "processor": "output", "kind": "output", "x": 1260, "y": 88, "description": "输出组合结论、板块摘要、证据和工作流轨迹。"},
+        ],
+        "edges": [
+            {"id": "edge_review_watchlist_1", "from": "review_watchlist_input", "to": "review_watchlist_context"},
+            {"id": "edge_review_watchlist_2", "from": "review_watchlist_context", "to": "review_watchlist_sector_merge"},
+            {"id": "edge_review_watchlist_3", "from": "review_watchlist_sector_merge", "to": "review_watchlist_llm"},
+            {"id": "edge_review_watchlist_4", "from": "review_watchlist_llm", "to": "review_watchlist_output"},
+        ],
+    },
     "review_voice_enhancement": {
         "id": "review_voice_enhancement",
         "title": "洞见语音增强",
@@ -511,6 +533,10 @@ def build_default_review_polish_workflow_definition():
 
 def build_default_review_compose_workflow_definition():
     return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["review_compose_draft"])
+
+
+def build_default_review_watchlist_analysis_workflow_definition():
+    return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["review_watchlist_analysis"])
 
 
 def build_default_review_voice_enhancement_workflow_definition():

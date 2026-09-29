@@ -29,7 +29,6 @@ MODEL = {
     "enabled": True,
 }
 
-
 def main():
     api_key = str(os.environ.get("VOLCENGINE_API_KEY") or "").strip()
     if not api_key:

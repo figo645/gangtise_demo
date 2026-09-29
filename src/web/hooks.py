@@ -1,3 +1,5 @@
+import gzip
+
 from src.runtime import *
 from src.services import *
 from src.web.request_helpers import get_client_ip, safe_next_target
@@ -146,6 +148,7 @@ def require_user_login():
         "/api/h5/wechat/callback",
         "/api/h5/logout",
         "/api/analytics/events",
+        "/api/runtime-environment",
     }
     # Tenant portals are public acquisition pages. Their protected content is
     # still stripped in the payload builder for anonymous visitors.
@@ -169,3 +172,25 @@ def require_user_login():
 @app.after_request
 def log_access(response):
     return record_access(response)
+
+
+@app.after_request
+def compress_browser_payload(response):
+    """Compress large rendered shells when the proxy has not already done so."""
+    if response.status_code < 200 or response.status_code in {204, 304}:
+        return response
+    if response.is_streamed or response.headers.get("Content-Encoding"):
+        return response
+    if "gzip" not in str(request.headers.get("Accept-Encoding") or "").lower():
+        return response
+    content_type = str(response.headers.get("Content-Type") or "").lower()
+    if not (content_type.startswith("text/html") or content_type.startswith("application/json")):
+        return response
+    payload = response.get_data()
+    if len(payload) < 2048:
+        return response
+    response.set_data(gzip.compress(payload, compresslevel=6))
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers["Content-Length"] = str(len(response.get_data()))
+    response.vary.add("Accept-Encoding")
+    return response

@@ -17,6 +17,11 @@ V4_MODEL = {
     "purpose": "general",
     "enabled": True,
 }
+V4_FEATURE_BINDINGS = {
+    "hermes_intent_router": V4_MODEL["key"],
+    "hermes_today_user_interaction_task_intent": V4_MODEL["key"],
+    "hermes_today_user_interaction_task": V4_MODEL["key"],
+}
 
 
 class _Rows:
@@ -128,7 +133,13 @@ class HermesTaskBddTest(unittest.TestCase):
         self.assertEqual(all_history["annotation_count"], 4)
 
     def test_given_task_data_when_synthesizing_then_deepseek_v4_is_used_without_gangtise(self):
-        site_config = {"llm_registry": {"models": [V4_MODEL], "default_model_key": "volcengine-deepseek-v4-flash"}}
+        site_config = {
+            "llm_registry": {
+                "models": [V4_MODEL],
+                "default_model_key": "volcengine-deepseek-v4-flash",
+                "feature_model_keys": dict(V4_FEATURE_BINDINGS),
+            }
+        }
         digest = {"date": "2026-09-14", "comment_count": 0, "annotation_count": 0, "comments": [], "annotations": [], "stocks": []}
         response = '{"answer":"今日暂无可总结的用户评论和K线标注。","summary":"暂无互动","lead_conclusion":"暂无数据","bullets":[],"analysis_sections":[],"next_steps":[],"confidence":"高","citations":["本地互动数据"]}'
         with patch.object(ai_services, "get_site_config", return_value=site_config), patch.object(
@@ -173,7 +184,11 @@ class HermesTaskBddTest(unittest.TestCase):
             "feature_flags": {"hermes": True},
             "role_capabilities": {"dav": ["hermes", "dav"]},
             "hermes_settings": {},
-            "llm_registry": {"models": [V4_MODEL], "default_model_key": "volcengine-deepseek-v4-flash"},
+            "llm_registry": {
+                "models": [V4_MODEL],
+                "default_model_key": "volcengine-deepseek-v4-flash",
+                "feature_model_keys": dict(V4_FEATURE_BINDINGS),
+            },
         }
         digest = {"date": "2026-09-14", "comment_count": 1, "annotation_count": 1, "comments": [{"content": "关注风险", "stock_name": "贵州茅台"}], "annotations": [{"content": "观察支撑", "stock_name": "贵州茅台"}], "stocks": [{"stock_name": "贵州茅台", "stock_code": "600519.SH"}]}
         intent_json = '{"supported":true,"time_range":"week","reason":"用户要求归纳本周互动"}'
@@ -224,7 +239,11 @@ class HermesTaskBddTest(unittest.TestCase):
             "feature_flags": {"hermes": True},
             "role_capabilities": {"dav": ["hermes", "dav"]},
             "hermes_settings": {},
-            "llm_registry": {"models": [V4_MODEL], "default_model_key": "volcengine-deepseek-v4-flash"},
+            "llm_registry": {
+                "models": [V4_MODEL],
+                "default_model_key": "volcengine-deepseek-v4-flash",
+                "feature_model_keys": dict(V4_FEATURE_BINDINGS),
+            },
         }
         unsupported_intent = '{"supported":false,"time_range":"today","reason":"当前任务不属于互动归纳"}'
         with app.test_request_context("/api/hermes/query", method="POST"):

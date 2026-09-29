@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -56,8 +57,49 @@ def get_server_runtime_options():
     }
 
 
+def start_direct_runtime_sidecars():
+    """Start one Worker and Scheduler for a direct ``python3 app.py`` run.
+
+    The daemon script sets ``GANGTISE_RUNTIME_ROLE=web`` and starts these
+    roles itself, so this path is deliberately inactive for managed startup.
+    The role locks in each sidecar make a second manual launch harmless.
+    """
+    if os.environ.get("GANGTISE_RUNTIME_ROLE"):
+        return []
+    if _is_enabled(os.environ.get("GANGTISE_DISABLE_AUTO_SIDECARS"), default=False):
+        return []
+    project_root = Path(__file__).resolve().parent
+    runtime_env = os.environ.copy()
+    runtime_env.update({
+        "PYTHONPATH": os.pathsep.join(filter(None, [str(project_root), runtime_env.get("PYTHONPATH", "")])),
+        "PYTHONUNBUFFERED": "1",
+        "DEBUG": "0",
+        "GANGTISE_RUNTIME_ENV": runtime_env.get("GANGTISE_RUNTIME_ENV", "local"),
+    })
+    started = []
+    for role in ("worker", "scheduler"):
+        entry = project_root / "src" / f"process_{role}.py"
+        log_path = project_root / f"app.{role}.log"
+        with log_path.open("a", encoding="utf-8") as log_handle:
+            child_env = dict(runtime_env)
+            child_env["GANGTISE_RUNTIME_ROLE"] = role
+            process = subprocess.Popen(
+                [sys.executable, str(entry)],
+                cwd=str(project_root),
+                env=child_env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        started.append({"role": role, "pid": process.pid})
+        print(f"Started direct {role} sidecar (PID: {process.pid}).", flush=True)
+    return started
+
+
 if __name__ == "__main__":
     server_options = get_server_runtime_options()
+    # ``python3 app.py`` is also used directly. Keep Gunicorn as its default
+    # server, but make this entry point self-contained for queued user jobs.
     server_mode = str(os.environ.get("APP_SERVER", "gunicorn")).strip().lower()
     if server_mode in {"gunicorn", "prod", "production"}:
         if not os.path.exists(os.path.join(os.path.dirname(sys.executable), "gunicorn")):
@@ -72,6 +114,8 @@ if __name__ == "__main__":
         # workers begin with no inherited PostgreSQL sockets. Running the
         # module through this interpreter prevents a global Gunicorn binary
         # from silently using a different Python environment.
+        start_direct_runtime_sidecars()
+        os.environ["GANGTISE_RUNTIME_ROLE"] = "web"
         startup_bootstrap(start_background=False)
         close_app_db_pool()
         # Every worker imports the complete research domain and keeps sizeable

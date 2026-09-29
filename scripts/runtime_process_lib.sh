@@ -182,7 +182,14 @@ runtime_project_pids() {
   local root_dir="$1"
   local current_pid="$$"
   # Keep the predicate on one logical line for the BSD awk shipped with macOS.
-  ps -axo pid=,command= 2>/dev/null | awk -v root="$root_dir" -v self="$current_pid" '$1 != self && index($0, root) && (index($0, "/app.py") || index($0, "process_scheduler.py") || index($0, "process_worker.py") || index($0, "gunicorn")) { print $1 }'
+  # Gunicorn's ``wsgi:app`` command can omit the checkout path, so also match
+  # the managed port and the application name while retaining a conservative
+  # project-root predicate for sidecars.
+  local app_port="${PORT:-5001}"
+  ps -axo pid=,command= 2>/dev/null | awk -v root="$root_dir" -v self="$current_pid" -v port="$app_port" '
+    $1 != self && index($0, root) && (index($0, "/app.py") || index($0, "process_scheduler.py") || index($0, "process_worker.py") || index($0, "gunicorn")) { print $1 }
+    $1 != self && index($0, "gunicorn") && (index($0, "--bind 0.0.0.0:" port) || index($0, "--bind 127.0.0.1:" port)) { print $1 }
+  ' | awk '!seen[$1]++ { print $1 }'
 }
 
 stop_all_runtime_processes() {

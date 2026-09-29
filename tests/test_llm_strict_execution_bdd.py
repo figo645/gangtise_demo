@@ -23,7 +23,7 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
             '{"answer":"模型回答","summary":"模型摘要","bullets":[],"citations":[]}',
         ]
         with app.app_context(), patch.object(
-            ai_services, "get_default_llm_config", return_value=self.MODEL
+            ai_services, "resolve_llm_config", return_value=self.MODEL
         ), patch.object(
             ai_services, "call_openai_compatible_llm", side_effect=responses
         ) as llm_call:
@@ -42,20 +42,20 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
         self.assertEqual(synthesis["answer"], "模型回答")
 
     def test_given_hermes_model_missing_then_router_fails_without_rule_plan(self):
-        with app.app_context(), patch.object(ai_services, "get_default_llm_config", return_value=None):
+        with app.app_context(), patch.object(ai_services, "resolve_llm_config", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
                 ai_services.route_hermes_query_intent("你好", tenant_slug="bdd")
 
     def test_given_hermes_model_returns_invalid_json_then_router_fails(self):
         with app.app_context(), patch.object(
-            ai_services, "get_default_llm_config", return_value=self.MODEL
+            ai_services, "resolve_llm_config", return_value=self.MODEL
         ), patch.object(ai_services, "call_openai_compatible_llm", return_value="not-json"):
             with self.assertRaisesRegex(RuntimeError, "invalid_llm_json_response"):
                 ai_services.route_hermes_query_intent("你好", tenant_slug="bdd")
 
     def test_given_small_talk_router_returns_knowledge_tool_then_tools_are_cleared(self):
         with app.app_context(), patch.object(
-            ai_services, "get_default_llm_config", return_value=self.MODEL
+            ai_services, "resolve_llm_config", return_value=self.MODEL
         ), patch.object(
             ai_services,
             "call_openai_compatible_llm",
@@ -68,7 +68,7 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
 
     def test_given_product_help_question_when_router_returns_product_help_then_no_embedding_tool_is_run(self):
         with app.app_context(), patch.object(
-            ai_services, "get_default_llm_config", return_value=self.MODEL
+            ai_services, "resolve_llm_config", return_value=self.MODEL
         ), patch.object(
             ai_services,
             "call_openai_compatible_llm",
@@ -100,7 +100,7 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
     def test_given_hermes_answer_call_fails_then_no_rule_answer_is_returned(self):
         plan = {"intent": "small_talk", "tools": [], "scope_status": "allowed"}
         with app.app_context(), patch.object(
-            ai_services, "get_default_llm_config", return_value=self.MODEL
+            ai_services, "resolve_llm_config", return_value=self.MODEL
         ), patch.object(
             ai_services,
             "call_openai_compatible_llm",
@@ -123,7 +123,7 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
         ]
         for generate in functions:
             with self.subTest(generate=generate), app.app_context(), patch.object(
-                ai_services, "get_default_llm_config", return_value=self.MODEL
+                ai_services, "resolve_llm_config", return_value=self.MODEL
             ), patch.object(
                 ai_services, "call_openai_compatible_llm", return_value="模型生成的复盘内容"
             ) as llm_call:
@@ -133,14 +133,14 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
             self.assertEqual(result["text"], "模型生成的复盘内容")
 
     def test_given_review_model_missing_then_generation_fails_without_original_text_fallback(self):
-        with app.app_context(), patch.object(ai_services, "get_default_llm_config", return_value=None):
+        with app.app_context(), patch.object(ai_services, "resolve_llm_config", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "review_draft_llm_not_configured"):
                 ai_services.generate_review_draft_with_llm(
                     source_text="原始复盘内容", tenant_slug="bdd"
                 )
 
     def test_given_review_model_call_fails_then_generation_propagates_error(self):
-        with app.app_context(), patch.object(ai_services, "get_default_llm_config", return_value=self.MODEL), patch.object(
+        with app.app_context(), patch.object(ai_services, "resolve_llm_config", return_value=self.MODEL), patch.object(
             ai_services,
             "call_openai_compatible_llm",
             side_effect=RuntimeError("review_provider_down"),
@@ -150,6 +150,42 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
                     source_text="原始复盘内容", tenant_slug="bdd"
                 )
 
+    def test_given_review_prompt_with_char_limit_then_service_does_not_truncate_generated_draft(self):
+        generated = "市场观察。" * 1000
+        with app.app_context(), patch.object(
+            ai_services, "resolve_llm_config", return_value=self.MODEL
+        ), patch.object(
+            ai_services, "call_openai_compatible_llm", return_value=generated
+        ):
+            result = ai_services.generate_review_draft_with_llm(
+                source_text="长篇原始洞见材料" * 2000,
+                prompt_text="请控制字数在1500字。保留风险提示。",
+                tenant_slug="bdd",
+            )
+
+        self.assertEqual(result["text"], generated)
+        self.assertEqual(result["output_char_count"], len(generated))
+        self.assertNotIn("output_char_limit", result)
+        self.assertNotIn("output_truncated", result)
+
+    def test_given_review_prompt_without_char_limit_then_generated_draft_is_not_truncated(self):
+        generated = "模型生成的完整洞见内容。" * 300
+        with app.app_context(), patch.object(
+            ai_services, "resolve_llm_config", return_value=self.MODEL
+        ), patch.object(
+            ai_services, "call_openai_compatible_llm", return_value=generated
+        ):
+            result = ai_services.generate_review_draft_with_llm(
+                source_text="原始洞见材料",
+                prompt_text="保留风险提示并按自然段输出",
+                tenant_slug="bdd",
+            )
+
+        self.assertEqual(result["text"], generated)
+        self.assertEqual(result["output_char_count"], len(generated))
+        self.assertNotIn("output_char_limit", result)
+        self.assertNotIn("output_truncated", result)
+
     def test_given_review_evidence_matches_when_publishing_then_filter_answer_and_summary_all_call_llm(self):
         responses = [
             '{"relevant_ids":["k1"],"reason":"与复盘相关"}',
@@ -157,7 +193,7 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
             "证据链总结",
         ]
         with app.app_context(), patch.object(
-            ai_services, "get_default_llm_config", return_value=self.MODEL
+            ai_services, "resolve_llm_config", return_value=self.MODEL
         ), patch.object(
             ai_services, "call_openai_compatible_llm", side_effect=responses
         ) as llm_call, patch.object(

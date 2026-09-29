@@ -103,7 +103,9 @@ def test_watchlist_intraday_never_calls_gangtise():
         "source": "Sina",
         "updated_at": "2026-09-02 09:31:00",
     }
-    with patch.object(market_services, "_load_watchlist_cache", return_value=None), patch.object(
+    with patch.object(market_services, "is_cn_stock_market_open", return_value=False), patch.object(
+        market_services, "_load_watchlist_cache", return_value=None
+    ), patch.object(
         market_services, "fetch_akshare_stock_intraday_series", return_value=expected
     ) as fetch_akshare, patch.object(
         market_services, "fetch_gangtise_intraday_series", side_effect=AssertionError("K-line must not call Gangtise")

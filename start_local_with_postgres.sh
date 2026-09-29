@@ -5,6 +5,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+DB_RUNTIME_TARGET="${GANGTISE_DB_TARGET:-}"
+if [ -z "$DB_RUNTIME_TARGET" ] && [ -f "$SCRIPT_DIR/.db_runtime.json" ]; then
+  DB_RUNTIME_TARGET="$(sed -n 's/.*"target"[[:space:]]*:[[:space:]]*"\([a-z_]*\)".*/\1/p' "$SCRIPT_DIR/.db_runtime.json" | head -n 1)"
+  if [ -z "$DB_RUNTIME_TARGET" ] && grep -Eq '"use_staging"[[:space:]]*:[[:space:]]*true' "$SCRIPT_DIR/.db_runtime.json"; then
+    DB_RUNTIME_TARGET="staging"
+  fi
+fi
+if [ -n "$DB_RUNTIME_TARGET" ] && [ "$DB_RUNTIME_TARGET" != "local" ]; then
+  echo "start_local_with_postgres.sh only supports the local database; configured target is $DB_RUNTIME_TARGET." >&2
+  echo "Use ./start_daemon_app.sh after configuring the target, or set GANGTISE_DB_TARGET=local." >&2
+  exit 2
+fi
+
 DB_HOST="${LOCAL_POSTGRES_HOST:-127.0.0.1}"
 DB_PORT="${LOCAL_POSTGRES_PORT:-5432}"
 APP_PORT="${PORT:-5001}"

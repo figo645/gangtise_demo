@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
 <script>
   window.ACTIVE_TENANT = {{ active_tenant | tojson }};
-  window.SITE_CONFIG = {{ site_config | tojson }};
+  window.SITE_CONFIG = {{ workbench_site_config | tojson }};
   window.WORKBENCH_DATA = {{ workbench | tojson }};
   window.WATCHLIST_DETAILS_MAP = {{ workbench.watchlist_details | tojson }};
   window.dashboardDefaultSection = 'funnel';
@@ -18,11 +18,12 @@
 <script src="/static/js/theme.js"></script>
 <script defer src="/static/js/analytics_tracker.js?v=20260916-1"></script>
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
+<script defer src="/static/js/environment_badge.js?v=20260929-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260831-1"></script>
-<script src="/static/echarts.min.js"></script>
-<script src="/static/js/echarts_helpers.js?v=20260828-2"></script>
+<script defer src="/static/echarts.min.js"></script>
+<script defer src="/static/js/echarts_helpers.js?v=20260828-2"></script>
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <style>
 body { background: var(--surface-2); color: var(--text-main); }
 .kw-page-summary { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
@@ -4981,11 +4982,16 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">最近已发布洞见</div>
-              <div class="kw-card-desc">普通投资者在前台看到的，就是这里确认发布后的洞见内容。粉丝也会通过消息板块第一时间收到通知。</div>
+              <div class="kw-card-title">已发布洞见</div>
+              <div class="kw-card-desc">与 H5 共用同一洞见目录，支持查询全部历史内容并按需继续加载。</div>
             </div>
             <span class="kw-tag">Published</span>
           </div>
+          <div style="position:relative;margin:14px 0 8px;max-width:520px">
+            <label class="visually-hidden" for="kw-published-review-search">查询已发布洞见</label>
+            <input id="kw-published-review-search" class="kw-input" type="search" placeholder="搜索标题、正文、个股或标签" autocomplete="off" oninput="kwHandlePublishedReviewSearch(this.value)">
+          </div>
+          <div id="kw-published-review-meta" class="kw-dashboard-panel-note" style="margin:0 0 10px"></div>
           <div id="kw-published-review-list" class="kw-broadcast-list">
             {% for item in workbench.published_reviews %}
             <div class="kw-broadcast-item">
@@ -4993,6 +4999,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 <div class="kw-broadcast-content">{{ item.title }}</div>
                 <span class="kw-tag">{{ item.period }}</span>
                 <span class="kw-tag">{{ item.access_label or '常规笔记' }}</span>
+                {% if item.is_pinned %}<span class="kw-tag" style="color:#8E6A1E;border-color:rgba(200,169,110,.42);background:rgba(200,169,110,.10)">置顶</span>{% endif %}
               </div>
               <div class="kw-broadcast-meta">{{ item.time }} · {{ item.summary }}</div>
               <div data-workbench-review-annotation="{{ loop.index0 }}" style="margin-top:10px"></div>
@@ -5002,11 +5009,13 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 {% endfor %}
               </div>
               <div style="display:flex;justify-content:flex-end;margin-top:10px">
+                <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#8E6A1E;border-color:rgba(200,169,110,.42)" onclick="kwTogglePublishedReviewPin('{{ item.id }}', {{ 'false' if item.is_pinned else 'true' }})">{{ '取消置顶' if item.is_pinned else '置顶' }}</button>
                 <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="kwDeletePublishedReview('{{ item.id }}')">删除洞见</button>
               </div>
             </div>
             {% endfor %}
           </div>
+          <div id="kw-published-review-more"></div>
         </div>
       </div>
 
@@ -5283,39 +5292,41 @@ const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
 
 async function refreshWorkbenchSiteConfig(options = {}) {
   try {
-    const res = await fetch('/api/site-config', {cache: 'no-store'});
+    const res = await fetch('/api/site-config?surface=web', {cache: 'no-store'});
     if (!res.ok) throw new Error('load_site_config_failed');
     const data = await res.json();
     if (!data || typeof data !== 'object') throw new Error('invalid_site_config');
     window.SITE_CONFIG = data;
     refreshWorkbenchNavVisibility();
-    try {
-      const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
-      const workbenchRes = await fetch(`/api/kol/workbench?tenant=${encodeURIComponent(tenantSlug)}`, {cache: 'no-store'});
-      if (workbenchRes.ok) {
-        const workbenchData = await workbenchRes.json();
-        if (workbenchData && typeof workbenchData === 'object') {
-          window.WORKBENCH_DATA = workbenchData;
-          kwFans = Array.isArray((window.WORKBENCH_DATA && window.WORKBENCH_DATA.fan_management && window.WORKBENCH_DATA.fan_management.fans))
-            ? window.WORKBENCH_DATA.fan_management.fans.map((fan) => ({
-                id: fan.id || 0,
-                username: fan.username || fan.name || '',
-                membership: fan.membership || fan.tier || '--',
-                is_paid_sample: !!fan.is_paid_sample,
-                source: fan.source || '用户导入',
-                created_at: fan.created_at || fan.joined || '--',
-                paid_sample_note: fan.paid_sample_note || '',
-                labels: Array.isArray(fan.labels) ? fan.labels : (fan.is_paid_sample ? ['付费用户'] : []),
-                phone_masked: fan.phone_masked || fan.value || '--',
-                status: fan.status === '已禁用' ? 'disabled' : (fan.status || 'active'),
-              }))
-            : [];
-          renderKwOpsStats();
-          kwRenderPublishedReviewList();
-          renderWorkbenchAnnotationViews();
+    if (options.refreshWorkbench !== false) {
+      try {
+        const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+        const workbenchRes = await fetch(`/api/kol/workbench?tenant=${encodeURIComponent(tenantSlug)}`, {cache: 'no-store'});
+        if (workbenchRes.ok) {
+          const workbenchData = await workbenchRes.json();
+          if (workbenchData && typeof workbenchData === 'object') {
+            window.WORKBENCH_DATA = workbenchData;
+            kwFans = Array.isArray((window.WORKBENCH_DATA && window.WORKBENCH_DATA.fan_management && window.WORKBENCH_DATA.fan_management.fans))
+              ? window.WORKBENCH_DATA.fan_management.fans.map((fan) => ({
+                  id: fan.id || 0,
+                  username: fan.username || fan.name || '',
+                  membership: fan.membership || fan.tier || '--',
+                  is_paid_sample: !!fan.is_paid_sample,
+                  source: fan.source || '用户导入',
+                  created_at: fan.created_at || fan.joined || '--',
+                  paid_sample_note: fan.paid_sample_note || '',
+                  labels: Array.isArray(fan.labels) ? fan.labels : (fan.is_paid_sample ? ['付费用户'] : []),
+                  phone_masked: fan.phone_masked || fan.value || '--',
+                  status: fan.status === '已禁用' ? 'disabled' : (fan.status || 'active'),
+                }))
+              : [];
+            renderKwOpsStats();
+            kwRenderPublishedReviewList();
+            renderWorkbenchAnnotationViews();
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
     const activeSection = new URLSearchParams(window.location.search).get('section') || 'overview';
     if (activeSection && !document.querySelector(`.admin-nav-item[data-section="${activeSection}"]`) && activeSection !== 'overview') {
       showWorkbenchSection('overview');
@@ -7481,6 +7492,12 @@ let kwReviewDraft = {
 let kwInsightDrafts = [];
 let kwInsightDraftsLoading = false;
 let kwInsightDraftsLoaded = false;
+const KW_PUBLISHED_INSIGHT_PAGE_SIZE = 30;
+let kwPublishedInsightDirectory = {
+  tenantSlug: '', query: '', loadedQuery: '', items: [], total: 0, offset: 0,
+  hasMore: false, loaded: false, loading: false, error: '', requestSeq: 0,
+};
+let kwPublishedInsightSearchTimer = null;
 const kwReviewRuntimeStore = {};
 const KW_REVIEW_WORKSPACE_PANELS = [
   { id: 'input', label: '输入内容', desc: '选择输入方式，录入本次洞见正文。', tone: 'default' },
@@ -9730,6 +9747,64 @@ function kwRestoreModalSheetScroll(contentId, snapshot) {
   sheet.scrollLeft = Number(snapshot.left || 0);
 }
 
+// Re-rendering the review workspace replaces the active editor DOM. Preserve
+// the viewport so async job polling cannot pull the user back to the top.
+function kwCaptureReviewViewport() {
+  const scrollingElement = document.scrollingElement || document.documentElement;
+  const elements = [];
+  const seen = new Set();
+  const captureElement = (element) => {
+    if (!element || seen.has(element)) return;
+    if (element.scrollHeight <= element.clientHeight && element.scrollWidth <= element.clientWidth) return;
+    seen.add(element);
+    elements.push({
+      element,
+      top: element.scrollTop,
+      left: element.scrollLeft,
+    });
+  };
+
+  captureElement(scrollingElement);
+  captureElement(document.body);
+  document.querySelectorAll('.kw-review-modal-sheet, .kw-review-shell, .kw-review-directory-main').forEach(captureElement);
+
+  return {
+    windowX: Number(window.scrollX || window.pageXOffset || 0),
+    windowY: Number(window.scrollY || window.pageYOffset || 0),
+    elements,
+  };
+}
+
+function kwRestoreReviewViewport(snapshot) {
+  if (!snapshot) return;
+  const restore = () => {
+    const scrollingElement = document.scrollingElement || document.documentElement;
+    if (typeof window.scrollTo === 'function') {
+      window.scrollTo({
+        left: Number(snapshot.windowX || 0),
+        top: Number(snapshot.windowY || 0),
+        behavior: 'auto',
+      });
+    }
+    if (scrollingElement) {
+      scrollingElement.scrollTop = Number(snapshot.windowY || 0);
+      scrollingElement.scrollLeft = Number(snapshot.windowX || 0);
+    }
+    (snapshot.elements || []).forEach((item) => {
+      if (!item || !item.element) return;
+      item.element.scrollTop = Number(item.top || 0);
+      item.element.scrollLeft = Number(item.left || 0);
+    });
+  };
+
+  restore();
+  // Quill and the replaced HTML can finish layout one frame later.
+  const schedule = typeof window.requestAnimationFrame === 'function'
+    ? window.requestAnimationFrame.bind(window)
+    : (callback) => window.setTimeout(callback, 0);
+  schedule(() => schedule(restore));
+}
+
 function kwOpenReviewIngestResultModal(title, lines) {
   const host = document.getElementById('kw-dashboard-cell-modal-content');
   const modal = document.getElementById('kw-dashboard-cell-modal');
@@ -11714,6 +11789,7 @@ function kwPublishReviewDraft() {
     runtime.latestReviewTitle = kwReviewDraft.reviewTitle || '';
     runtime.draftReady = false;
     kwSyncPublishedReviewState(publishResult);
+    kwInvalidatePublishedInsightDirectory();
     if (window.WORKBENCH_DATA) {
       if (Array.isArray(publishResult.snapshots) && publishResult.snapshots.length) {
         window.WORKBENCH_DATA.published_reviews = publishResult.snapshots.slice(0, 20);
@@ -11749,15 +11825,99 @@ function kwPublishReviewDraft() {
   });
 }
 
+function kwPublishedInsightTenantSlug() {
+  return String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+}
+
+function kwPublishedInsightStateMatchesCurrentView() {
+  return kwPublishedInsightDirectory.tenantSlug === kwPublishedInsightTenantSlug()
+    && kwPublishedInsightDirectory.loadedQuery === String(kwPublishedInsightDirectory.query || '').trim();
+}
+
+function kwInvalidatePublishedInsightDirectory() {
+  kwPublishedInsightDirectory = {
+    ...kwPublishedInsightDirectory,
+    items: [], total: 0, offset: 0, hasMore: false, loaded: false, loading: false, error: '', loadedQuery: '', requestSeq: kwPublishedInsightDirectory.requestSeq + 1,
+  };
+}
+
+async function kwLoadPublishedReviewPage(options = {}) {
+  const tenantSlug = kwPublishedInsightTenantSlug();
+  if (!tenantSlug || (kwPublishedInsightDirectory.loading && !options.force)) return;
+  const append = !!options.append;
+  const query = String(kwPublishedInsightDirectory.query || '').trim();
+  const offset = append && kwPublishedInsightStateMatchesCurrentView() ? kwPublishedInsightDirectory.offset : 0;
+  const requestSeq = kwPublishedInsightDirectory.requestSeq + 1;
+  kwPublishedInsightDirectory = {
+    ...kwPublishedInsightDirectory,
+    tenantSlug, loading: true, error: '', requestSeq,
+    ...(append ? {} : { items: [], total: 0, offset: 0, hasMore: false, loaded: false }),
+  };
+  const params = new URLSearchParams({ limit: String(KW_PUBLISHED_INSIGHT_PAGE_SIZE), offset: String(offset) });
+  if (query) params.set('q', query);
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/published-insights?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'published_insights_load_failed');
+    if (requestSeq !== kwPublishedInsightDirectory.requestSeq || tenantSlug !== kwPublishedInsightTenantSlug()) return;
+    const incoming = Array.isArray(payload.items) ? payload.items : [];
+    const items = append
+      ? kwPublishedInsightDirectory.items.concat(incoming.filter((item) => !kwPublishedInsightDirectory.items.some((existing) => String(existing.id || '') === String(item.id || ''))))
+      : incoming;
+    kwPublishedInsightDirectory = {
+      ...kwPublishedInsightDirectory,
+      items,
+      total: Math.max(0, Number(payload.total) || 0),
+      offset: Math.max(0, Number(payload.offset) || 0) + incoming.length,
+      hasMore: !!payload.has_more,
+      loaded: true, loadedQuery: query, loading: false, error: '',
+    };
+  } catch (error) {
+    if (requestSeq !== kwPublishedInsightDirectory.requestSeq) return;
+    kwPublishedInsightDirectory = { ...kwPublishedInsightDirectory, loading: false, error: error.message || '洞见列表加载失败' };
+  }
+  kwRenderPublishedReviewList();
+}
+
+function kwEnsurePublishedReviewDirectory() {
+  if (!kwPublishedInsightStateMatchesCurrentView() || (!kwPublishedInsightDirectory.loaded && !kwPublishedInsightDirectory.loading)) {
+    kwLoadPublishedReviewPage();
+  }
+}
+
+function kwHandlePublishedReviewSearch(value) {
+  kwPublishedInsightDirectory = {
+    ...kwPublishedInsightDirectory,
+    query: String(value || '').trim(),
+    loading: true,
+    error: '',
+    requestSeq: kwPublishedInsightDirectory.requestSeq + 1,
+  };
+  if (kwPublishedInsightSearchTimer) window.clearTimeout(kwPublishedInsightSearchTimer);
+  kwRenderPublishedReviewList();
+  kwPublishedInsightSearchTimer = window.setTimeout(() => kwLoadPublishedReviewPage({ force: true }), 180);
+}
+
+function kwLoadMorePublishedReviews() {
+  if (kwPublishedInsightStateMatchesCurrentView() && kwPublishedInsightDirectory.hasMore && !kwPublishedInsightDirectory.loading) {
+    kwLoadPublishedReviewPage({ append: true });
+  }
+}
+
 function kwRenderPublishedReviewList() {
   const host = document.getElementById('kw-published-review-list');
-  const reviews = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews) || [];
   if (!host) return;
+  const stateIsCurrent = kwPublishedInsightStateMatchesCurrentView();
+  const reviews = stateIsCurrent && kwPublishedInsightDirectory.loaded
+    ? kwPublishedInsightDirectory.items
+    : (kwPublishedInsightDirectory.query ? [] : ((window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews) || []));
   host.innerHTML = reviews.map((item, index) => `
     <div class="kw-broadcast-item">
       <div class="kw-broadcast-top">
         <div class="kw-broadcast-content">${escapeHtml(item.title || '')}</div>
         <span class="kw-tag">${escapeHtml(item.period || '')}</span>
+        <span class="kw-tag">${escapeHtml(item.access_label || (item.access_mode === 'subscriber' ? '订阅专享' : '常规笔记'))}</span>
+        ${item.is_pinned ? '<span class="kw-tag" style="color:#8E6A1E;border-color:rgba(200,169,110,.42);background:rgba(200,169,110,.10)">置顶</span>' : ''}
       </div>
       <div class="kw-broadcast-meta">${escapeHtml(item.time || '')} · ${escapeHtml(item.summary || '')}</div>
       <div data-workbench-review-annotation="${index}" style="margin-top:10px"></div>
@@ -11765,10 +11925,32 @@ function kwRenderPublishedReviewList() {
         ${Array.isArray(item.tags) ? item.tags.map(tag => `<span class="kw-chip">${escapeHtml(tag)}</span>`).join('') : ''}
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#8E6A1E;border-color:rgba(200,169,110,.42)" onclick="kwTogglePublishedReviewPin('${escapeAttr(item.id || '')}', ${item.is_pinned ? 'false' : 'true'})">${item.is_pinned ? '取消置顶' : '置顶'}</button>
         <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="kwDeletePublishedReview('${escapeAttr(item.id || '')}')">删除洞见</button>
       </div>
     </div>
-  `).join('');
+  `).join('') || '<div class="kw-dashboard-panel-note">当前没有匹配的已发布洞见。</div>';
+  const meta = document.getElementById('kw-published-review-meta');
+  if (meta) {
+    meta.textContent = kwPublishedInsightDirectory.error
+      ? kwPublishedInsightDirectory.error
+      : (kwPublishedInsightDirectory.loading
+        ? '正在加载洞见...'
+        : (stateIsCurrent && kwPublishedInsightDirectory.loaded
+          ? `已加载 ${reviews.length} / ${kwPublishedInsightDirectory.total} 篇${kwPublishedInsightDirectory.query ? '匹配洞见' : '洞见'}`
+          : '正在准备全部历史洞见...'));
+  }
+  const more = document.getElementById('kw-published-review-more');
+  if (more) {
+    more.innerHTML = kwPublishedInsightDirectory.error
+      ? '<button class="btn-outline" type="button" style="width:100%;margin-top:12px" onclick="kwLoadPublishedReviewPage()">重试加载</button>'
+      : (stateIsCurrent && kwPublishedInsightDirectory.hasMore && !kwPublishedInsightDirectory.loading
+        ? `<button class="btn-outline" type="button" style="width:100%;margin-top:12px" onclick="kwLoadMorePublishedReviews()">加载更多（${reviews.length} / ${kwPublishedInsightDirectory.total}）</button>`
+        : (stateIsCurrent && kwPublishedInsightDirectory.loaded && !kwPublishedInsightDirectory.loading
+          ? '<div class="kw-dashboard-panel-note" style="text-align:center;margin-top:12px">已加载全部洞见</div>'
+          : ''));
+  }
+  kwEnsurePublishedReviewDirectory();
 }
 
 async function kwDeletePublishedReview(reviewId) {
@@ -11786,6 +11968,7 @@ async function kwDeletePublishedReview(reviewId) {
     const payload = await response.json();
     if (!response.ok || !payload.ok) throw new Error(payload.error || 'review_delete_failed');
     kwSyncPublishedReviewState(payload);
+    kwInvalidatePublishedInsightDirectory();
     if (window.WORKBENCH_DATA) {
       window.WORKBENCH_DATA.published_reviews = Array.isArray(payload.snapshots) ? payload.snapshots.slice(0, 20) : [];
     }
@@ -11797,7 +11980,35 @@ async function kwDeletePublishedReview(reviewId) {
   }
 }
 
+async function kwTogglePublishedReviewPin(reviewId, pinned) {
+  const normalizedReviewId = String(reviewId || '').trim();
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  if (!normalizedReviewId || !tenantSlug) {
+    showToast('当前洞见缺少有效标识，无法管理置顶');
+    return;
+  }
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(normalizedReviewId)}/pin`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pinned: !!pinned}),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'review_pin_update_failed');
+    kwSyncPublishedReviewState(payload);
+    kwInvalidatePublishedInsightDirectory();
+    if (window.WORKBENCH_DATA) {
+      window.WORKBENCH_DATA.published_reviews = Array.isArray(payload.snapshots) ? payload.snapshots.slice(0, 20) : [];
+    }
+    kwRenderPublishedReviewList();
+    showToast(payload.message || (pinned ? '洞见已置顶' : '洞见已取消置顶'));
+  } catch (error) {
+    showToast(error.message || '洞见置顶操作失败');
+  }
+}
+
 function kwRenderReviewStudio() {
+  const viewportSnapshot = kwCaptureReviewViewport();
   const runtime = ensureKwReviewRuntime();
   const periodHost = document.getElementById('kw-review-top-period-row');
   const directoryHost = document.getElementById('kw-review-directory-nav-list');
@@ -11889,6 +12100,7 @@ function kwRenderReviewStudio() {
   }
   kwApplyReviewWorkspacePanelState();
   kwEnsureReviewEditors();
+  kwRestoreReviewViewport(viewportSnapshot);
   if (!kwInsightDraftsLoaded && !kwInsightDraftsLoading) kwLoadInsightDrafts();
 }
 
@@ -15396,7 +15608,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.GangtiseReleaseNotes?.init({ surface: 'kol-workbench', autoShow: true });
   initWorkbenchNavGroups();
   refreshWorkbenchNavVisibility();
-  refreshWorkbenchSiteConfig({silent: true});
+  refreshWorkbenchSiteConfig({silent: true, refreshWorkbench: false});
   if (document.getElementById('workbench-section-portal')) kwRenderPortalWorkspace();
   kwRenderReviewStudio();
   kwRenderPublishedReviewList();
@@ -15503,6 +15715,6 @@ window.addEventListener('storage', (event) => {
   }
 });
 </script>
-<script src="/static/js/charts.js?v=20260828-2"></script>
+<script defer src="/static/js/charts.js?v=20260828-2"></script>
 </body>
 </html>

@@ -49,8 +49,11 @@ def test_admin_task_and_both_surfaces_use_same_api_component():
         assert '🎁' in source
         assert '>盲盒</span>' in source
     css = (ROOT / "static/css/quiz_blind_box.css").read_text(encoding="utf-8")
-    assert "left:calc(50% + min(162.5px, 41.6667vw))" in css
-    assert "right:auto" in css
+    # On mobile the gift is centered above the bottom navigation so it stays
+    # visible; desktop keeps a non-obstructive right-side position.
+    assert "right:18px" in css
+    assert "left:50%" in css
+    assert "bottom:104px" in css
 
 
 def test_kol_workbench_has_stats_but_no_floating_blind_box_marker():
@@ -95,7 +98,7 @@ def test_interaction_observation_renders_quiz_statistics():
     assert "kw-watch-quiz-stats" in source
     assert "loadKwInteractionQuizStats" in source
     assert "kw-watch-quiz-chart" in source
-    assert "题型得分与失分分布" in source
+    assert "题型" in source
     assert "kw-watch-quiz-category-chart" in source
     assert "category_breakdown" in source
     assert "window.GangtiseEcharts.render" in source

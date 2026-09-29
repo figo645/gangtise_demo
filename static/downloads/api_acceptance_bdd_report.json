@@ -1,0 +1,89 @@
+{
+  "title": "真实业务 API 编排 BDD 验收",
+  "generated_at": "2026-09-29 10:45:08",
+  "base_url": "http://127.0.0.1:5001",
+  "tenant": "laowang",
+  "scenarios": [
+    {
+      "domain": "身份与租户域",
+      "name": "业务 API 可达性",
+      "given": "验收环境提供 HTTP 服务。",
+      "when": "请求公开登录入口作为 HTTP 探针。",
+      "then": "服务可达，后续登录 API 可以继续执行。",
+      "passed": false,
+      "detail": "HTTP 0",
+      "evidence": {}
+    },
+    {
+      "domain": "身份与租户域",
+      "name": "未登录访问租户指标 API",
+      "given": "客户端没有登录 Cookie。",
+      "when": "直接请求租户 smart-indicators API。",
+      "then": "服务端拒绝未认证请求，不返回业务数据。",
+      "passed": false,
+      "detail": "HTTP 0; error=None",
+      "evidence": {
+        "response": {}
+      }
+    },
+    {
+      "domain": "身份与租户域",
+      "name": "真实大V登录",
+      "given": "提供真实验收账号，不使用测试会话注入。",
+      "when": "调用 H5 密码登录 API 并保存 HTTP Cookie。",
+      "then": "登录成功并获得当前账号上下文。",
+      "passed": false,
+      "detail": "HTTP 0; error=None",
+      "evidence": {
+        "response": {}
+      }
+    }
+  ],
+  "blocked": true,
+  "execution_mode": "仅 HTTP API；不读取数据库、不调用 Flask 内部函数、不使用 mock 或模拟指标值。",
+  "cleanup": [],
+  "blocking_reason": "真实账号登录失败：0",
+  "http_evidence": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "http://127.0.0.1:5001/login",
+        "headers": {
+          "Accept": "application/json",
+          "User-Agent": "real-api-acceptance-bdd/1.0"
+        },
+        "body": null
+      },
+      "response": {
+        "status": 0,
+        "body": {},
+        "transport_error": "URLError: <urlopen error [Errno 1] Operation not permitted>"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5001/api/h5/login/password",
+        "headers": {
+          "Accept": "application/json",
+          "User-Agent": "real-api-acceptance-bdd/1.0",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "username": "财经老王",
+          "password": "demo123"
+        }
+      },
+      "response": {
+        "status": 0,
+        "body": {},
+        "transport_error": "URLError: <urlopen error [Errno 1] Operation not permitted>"
+      }
+    }
+  ],
+  "passed_count": 0,
+  "failed_count": 3,
+  "domain_summary": {
+    "身份与租户域": 3
+  }
+}

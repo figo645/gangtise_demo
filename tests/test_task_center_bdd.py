@@ -21,7 +21,7 @@ def test_market_top10_views_share_one_gangtise_edb_task():
     assert ".SWI" in task["description"]
     assert "申万一级行业" in task["description"]
     assert "标准市场指数" in task["description"]
-    assert "按需获取" in task["description"]
+    assert "按需获取并共享刷新" in task["description"]
     assert task["task_type"] == "sync_market_snapshot"
 
 
@@ -153,8 +153,8 @@ def test_admin_and_kol_broadcast_routes_use_same_task_code():
 
 def test_real_empty_fan_inbox_does_not_render_demo_conversations():
     source = (ROOT / "templates/h5.html").read_text(encoding="utf-8")
-    assert "dmConversationsCache = isDavDmMode() ? [] : [getInvestorDmConversation()];" in source
-    assert "Array.isArray(data.threads)\n      ? data.threads" in source
+    assert "dmConversationsCache = isDavDmMode() ? localThreads : [getInvestorDmConversation()];" in source
+    assert "if (!isDavDmMode() && !dmConversationsCache.length) dmConversationsCache = [getInvestorDmConversation()];" in source
 
 
 def test_activity_distribution_is_a_tablist():

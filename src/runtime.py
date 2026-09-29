@@ -84,6 +84,10 @@ def _load_project_credentials_file(path):
 
 
 _load_project_credentials_file(PROJECT_ROOT / ".gangtise_postgres_credentials")
+# Database release credentials are also the source for the explicit runtime
+# target selector (local/staging/production). Environment variables still win
+# because the loader uses setdefault semantics.
+_load_project_credentials_file(PROJECT_ROOT / ".database_release.env")
 # Authentication material belongs to this checkout by default. An explicit
 # deployment override remains available for read-only/container deployments.
 PERSISTENT_APP_SECRET_PATH = Path(
@@ -150,6 +154,9 @@ app = Flask(
     template_folder=str(PROJECT_ROOT / "templates"),
     static_folder=str(PROJECT_ROOT / "static"),
 )
+# Static assets are versioned in the templates when they change. Cache them in
+# browsers so shared libraries such as ECharts are not fetched on every visit.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 7 * 24 * 60 * 60
 
 
 class _AgentLogFilter(logging.Filter):
@@ -298,6 +305,18 @@ MARKET_DASHBOARD_REGISTRY_PATH = Path(
     )
 )
 DB_RUNTIME_CONFIG_PATH = PROJECT_ROOT / ".db_runtime.json"
+# Freeze the database target for the lifetime of this process. Admin may write
+# a new startup target, but all Web/Worker/Scheduler processes must restart
+# together before any connection pool changes.
+if not str(os.environ.get("GANGTISE_DB_TARGET") or os.environ.get("APP_DB_TARGET") or "").strip():
+    try:
+        runtime_payload = json.loads(DB_RUNTIME_CONFIG_PATH.read_text(encoding="utf-8"))
+        runtime_target = str(runtime_payload.get("target") or "").strip().lower()
+        if runtime_target not in {"local", "staging", "production"}:
+            runtime_target = "staging" if bool(runtime_payload.get("use_staging", False)) else "local"
+        os.environ["GANGTISE_DB_TARGET"] = runtime_target
+    except Exception:
+        os.environ.setdefault("GANGTISE_DB_TARGET", "local")
 DEFAULT_LLM_FEATURE_CATALOG = [
     {"feature_code": "knowledge_processing_llm", "feature_label": "知识加工", "default_purpose": "general"},
     {"feature_code": "review_voice_enhancement", "feature_label": "复盘语音增强", "default_purpose": "general"},
@@ -735,6 +754,8 @@ DEFAULT_SITE_CONFIG = {
         "dav_access_enabled": True,
         "internet_answer_enabled": False,
         "thinking_process_enabled": True,
+        "answer_timeout_seconds": 60,
+        "transient_retry_count": 1,
         "default_response_style": "structured",
         "chart_types_enabled": ["kline_chart", "line_chart", "distribution_chart", "compare_chart"],
         "route_priority": [

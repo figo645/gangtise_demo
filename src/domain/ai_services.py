@@ -50,11 +50,11 @@ def get_review_generation_config(site_config=None):
 
 
 def get_default_llm_config(site_config=None, purpose="general", feature_code=""):
-    """Resolve the Admin-selected model for one LLM feature.
+    """Resolve a model without silently falling back across feature bindings.
 
-    A feature-specific model binding is preferred when configured. Otherwise
-    the registry default is used. Both paths return the same normalized model
-    contract consumed by the shared LLM adapter.
+    This compatibility helper may still resolve the registry default for
+    callers that do not identify a feature. Once a feature code is supplied,
+    its explicit binding is mandatory; missing bindings return ``None``.
     """
     config = site_config or get_site_config()
     registry = normalize_llm_registry_config((config or {}).get("llm_registry"))
@@ -63,6 +63,8 @@ def get_default_llm_config(site_config=None, purpose="general", feature_code="")
     models = registry.get("models") if isinstance(registry.get("models"), list) else []
     selected = None
     feature_key = str((registry.get("feature_model_keys") or {}).get(str(feature_code or "").strip()) or "").strip()
+    if str(feature_code or "").strip() and not feature_key:
+        return None
     if feature_key:
         for item in models:
             if not isinstance(item, dict):
@@ -259,6 +261,7 @@ def call_openai_compatible_llm(
     entry_point="",
     metadata=None,
     request_timeout_seconds=120,
+    transient_retry_count=None,
     max_tokens=None,
 ):
     config = normalize_llm_model_config(model_config)
@@ -285,16 +288,60 @@ def call_openai_compatible_llm(
     }
     if max_tokens is not None:
         request_payload["max_tokens"] = max(64, int(max_tokens))
-    response = session.post(
-        f"{endpoint_base}/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json=request_payload,
-        timeout=max(5, int(request_timeout_seconds or 120)),
-        allow_redirects=False,
-    )
+    timeout_seconds = max(5, int(request_timeout_seconds or 120))
+    configured_retry_count = transient_retry_count if transient_retry_count is not None else os.environ.get("LLM_TRANSIENT_RETRY_COUNT", "1")
+    retry_count = max(0, min(int(configured_retry_count), 2))
+    response = None
+    for attempt in range(retry_count + 1):
+        try:
+            response = session.post(
+                f"{endpoint_base}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=request_payload,
+                timeout=timeout_seconds,
+                allow_redirects=False,
+            )
+            break
+        except requests.exceptions.Timeout as exc:
+            if attempt >= retry_count:
+                app.logger.warning(
+                    "LLM provider read timeout feature=%s model=%s timeout=%ss attempts=%s",
+                    feature_code or "general_llm",
+                    model_name,
+                    timeout_seconds,
+                    attempt + 1,
+                )
+                raise RuntimeError(f"llm_provider_timeout:{feature_code or 'general_llm'}:{timeout_seconds}s") from exc
+            app.logger.warning(
+                "LLM provider timeout; retrying feature=%s model=%s attempt=%s/%s",
+                feature_code or "general_llm",
+                model_name,
+                attempt + 1,
+                retry_count + 1,
+            )
+            time.sleep(min(2.0, 0.5 * (attempt + 1)))
+        except requests.exceptions.ConnectionError as exc:
+            if attempt >= retry_count:
+                app.logger.warning(
+                    "LLM provider connection failure feature=%s model=%s attempts=%s",
+                    feature_code or "general_llm",
+                    model_name,
+                    attempt + 1,
+                )
+                raise RuntimeError(f"llm_provider_connection_failed:{feature_code or 'general_llm'}") from exc
+            app.logger.warning(
+                "LLM provider connection failure; retrying feature=%s model=%s attempt=%s/%s",
+                feature_code or "general_llm",
+                model_name,
+                attempt + 1,
+                retry_count + 1,
+            )
+            time.sleep(min(2.0, 0.5 * (attempt + 1)))
+    if response is None:
+        raise RuntimeError(f"llm_provider_no_response:{feature_code or 'general_llm'}")
     if response.status_code >= 400:
         raise RuntimeError(f"llm_request_failed:{response.status_code}:{response.text[:240]}")
     payload = response.json()
@@ -689,6 +736,7 @@ def generate_review_draft_with_llm(
             "detail": "大模型已生成洞见草稿。",
             "state_updates": {
                 "rendered_text": normalized_text,
+                "output_char_count": len(normalized_text),
                 "llm_model": {
                     "key": llm_model.get("key"),
                     "label": llm_model.get("label"),
@@ -697,13 +745,16 @@ def generate_review_draft_with_llm(
                     "purpose": llm_model.get("purpose"),
                 },
             },
-            "context_preview": {"output_chars": len(normalized_text)},
+            "context_preview": {
+                "output_chars": len(normalized_text),
+            },
         }
 
     def _review_draft_output_executor(state, runtime, node, upstream):
         _ensure_not_cancelled(runtime)
         result = {
             "text": state.get("rendered_text") or "",
+            "output_char_count": len(state.get("rendered_text") or ""),
             "llm_model": copy.deepcopy(state.get("llm_model") or {}),
             "workflow_meta": build_declared_agent_workflow_meta(
                 workflow_definition,
@@ -742,8 +793,12 @@ def generate_review_draft_with_llm(
 
 
 def _get_review_period_label(review_period):
-    """Keep legacy period input compatible without exposing it in product copy."""
-    return "洞见"
+    labels = {
+        "day": "日复盘",
+        "week": "周复盘",
+        "month": "月复盘",
+    }
+    return labels.get(str(review_period or "").strip().lower(), "复盘")
 
 
 def build_gangtise_multi_stock_review_request(stock_labels, review_period="day"):
@@ -1219,10 +1274,8 @@ def analyze_review_watchlist_with_llm(
     tenant_slug="",
     job_code="",
 ):
-    raise RuntimeError("review_watchlist_analysis_disabled")
-
-    # Legacy implementation retained below only for data-shape compatibility
-    # during migration; no current insight workflow can invoke it.
+    # Use the shared Gangtise Agent SSE path for multi-stock review analysis.
+    # This workflow intentionally does not call the local/general LLM adapter.
     workflow_definition = build_default_review_watchlist_analysis_workflow_definition()
     normalized_watchlist = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
     if not normalized_watchlist:
@@ -1680,7 +1733,15 @@ def label_watchlist_comment_with_llm(comment_text, stock_detail=None, tenant_slu
     fallback = _build_watchlist_comment_labeling_fallback(normalized, stock_detail=stock_detail)
     if not normalized:
         return fallback
-    llm_model = resolve_llm_config(feature_code="watchlist_comment_labeling", purpose="general")
+    try:
+        llm_model = resolve_llm_config(feature_code="watchlist_comment_labeling", purpose="general")
+    except RuntimeError as exc:
+        # Comment labels remain useful as deterministic operational metadata.
+        # This is not a model fallback: an unavailable feature binding simply
+        # skips the optional LLM enhancement.
+        if str(exc).startswith("llm_feature_"):
+            return fallback
+        raise
     if not llm_model:
         return fallback
     detail = stock_detail if isinstance(stock_detail, dict) else {}
@@ -1793,17 +1854,14 @@ def compose_review_structured_preview(
     normalized_source = str(source_text or "").strip()
     if not normalized_source:
         raise ValueError("review_source_text_required")
-    # Insight publishing no longer has the legacy second-stage watchlist
-    # analysis. Individual stock details enter the draft through Hermes; the
-    # publish pipeline only summarizes and edits the submitted insight text.
-    watchlist_items = []
+    watchlist_items = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
     if include_summary and job_code:
         report_user_async_job_progress(
             job_code,
             stage="review_summary_generating",
             percent=24,
             summary="正在生成洞见摘要",
-            log_text="摘要仅基于用户自主输入内容生成，不引用自选股归纳。",
+            log_text="摘要仅基于用户自主输入内容生成；自选股组合分析单独通过 Gangtise Agent SSE 处理。",
         )
     if include_summary:
         summary_result = summarize_review_user_input_with_llm(
@@ -1825,19 +1883,27 @@ def compose_review_structured_preview(
             stage="review_insight_draft_ready",
             percent=46,
             summary="洞见草稿内容已整理",
-            log_text="当前洞见只处理用户输入和小金智能体带入的正文，不再执行旧的自选股二阶段分析。",
+            log_text="用户输入摘要已完成，正在准备自选股组合分析（如本次选择了自选股）。",
         )
-    watchlist_result = {
-        "sector_summary": "",
-        "sector_profiles": [],
-        "items": [],
-        "annotation_evidence": [],
-        "llm_model": None,
-        "workflow_meta": {
-            "status": "not_run",
-            "reason": "insight_uses_user_or_hermes_draft",
-        },
-    }
+    if watchlist_items:
+        watchlist_result = analyze_review_watchlist_with_llm(
+            selected_watchlist=watchlist_items,
+            review_period=review_period,
+            source_text=normalized_source,
+            speaker_name=speaker_name,
+            entry_point=entry_point,
+            tenant_slug=tenant_slug,
+            job_code=job_code,
+        )
+    else:
+        watchlist_result = {
+            "sector_summary": "",
+            "sector_profiles": [],
+            "items": [],
+            "annotation_evidence": [],
+            "llm_model": None,
+            "workflow_meta": {"status": "not_run", "reason": "watchlist_not_selected"},
+        }
     user_input_section = {
         "source_mode": str(source_mode or "").strip().lower() or "manual",
         "source_mode_label": _normalize_review_source_mode_label(source_mode),
@@ -1849,6 +1915,7 @@ def compose_review_structured_preview(
         part for part in [
             f"【洞见摘要】\n{summary_result['summary']}" if str(summary_result.get("summary") or "").strip() else "",
             f"【用户输入转化内容】\n{user_input_section['display_text']}",
+            f"【自选股组合分析】\n{watchlist_result.get('combined_text')}" if str(watchlist_result.get('combined_text') or '').strip() else "",
             "",
         ] if part
     ).strip()
@@ -3007,6 +3074,19 @@ def _extract_json_payload_from_llm_text(text, default, strict=False):
             continue
         if isinstance(parsed, type(default)):
             return parsed
+    # OpenAI-compatible models sometimes add a short preamble or trailing
+    # sentence even when the prompt requires JSON. Recover a complete JSON
+    # object/array without accepting malformed fragments or evaluating text.
+    decoder = json.JSONDecoder()
+    for offset, char in enumerate(normalized):
+        if char not in "[{":
+            continue
+        try:
+            parsed, _end = decoder.raw_decode(normalized[offset:])
+        except (TypeError, ValueError):
+            continue
+        if isinstance(parsed, type(default)):
+            return parsed
     if strict:
         raise RuntimeError("invalid_llm_json_response")
     return copy.deepcopy(default)
@@ -3869,6 +3949,15 @@ def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=N
             "status": "blocked",
             "reason": "当前问题更像直接交易指令或仓位建议，超出 Hermes 的服务边界。",
             "message": "Hermes 不直接提供买卖、仓位或喊单式指令。你可以改问标的的基本面、证据链、风险边界或跟踪变量。",
+            "suggestions": suggestions,
+            "intent_hint": "out_of_scope_redirect",
+            "flags": flags,
+        }
+    if flags["out_of_scope"] and not flags["platform_related"]:
+        return {
+            "status": "redirected",
+            "reason": "问题与投研和平台能力无关，直接在模型调用前收口。",
+            "message": "Hermes 主要回答个股/自选股、复盘证据链、知识框架、智能指标和平台功能使用相关问题。你可以换成这些方向继续问。",
             "suggestions": suggestions,
             "intent_hint": "out_of_scope_redirect",
             "flags": flags,
@@ -7020,31 +7109,54 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
     llm_model = get_hermes_llm_config("hermes_intent_router")
     if not llm_model:
         raise RuntimeError("hermes_intent_router_llm_not_configured")
+    router_user_prompt = build_hermes_intent_router_prompt(
+        question_text=question_text,
+        has_attachments=bool(attachments),
+        selected_knowledge_ids=selected_knowledge_ids,
+        messages=messages,
+        memory_context_text=str((memory_state or {}).get("context_text") or "").strip(),
+        scope_result=scope_result,
+        memory_state=memory_state,
+    )
     try:
-        raw = call_openai_compatible_llm(
-            llm_model,
-            HERMES_QUERY_INTENT_PROMPT,
-            build_hermes_intent_router_prompt(
-                question_text=question_text,
-                has_attachments=bool(attachments),
-                selected_knowledge_ids=selected_knowledge_ids,
-                messages=messages,
-                memory_context_text=str((memory_state or {}).get("context_text") or "").strip(),
-                scope_result=scope_result,
-                memory_state=memory_state,
-            ),
-            feature_code="hermes_intent_router",
-            feature_label="Hermes 意图路由",
-            tenant_slug=tenant_slug,
-            entry_point="hermes_query",
-            metadata={"attachment_count": len(attachments), "selected_knowledge_count": len(selected_knowledge_ids)},
-            # The configured 27B model can spend more than 20 seconds on a
-            # short JSON classification. Keep this a single request, but do
-            # not mistake normal generation latency for a routing failure.
-            request_timeout_seconds=60,
-            max_tokens=512,
-        )
-        parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
+        parsed = None
+        router_attempts = 2
+        for attempt in range(router_attempts):
+            retry_instruction = ""
+            if attempt:
+                retry_instruction = (
+                    "\n\n这是一次格式纠正重试。上一次输出未通过 JSON 校验。"
+                    "本次只能输出一个合法 JSON 对象，禁止 Markdown、解释、思考过程或 JSON 前后的任何文字。"
+                )
+            raw = call_openai_compatible_llm(
+                llm_model,
+                HERMES_QUERY_INTENT_PROMPT + retry_instruction,
+                router_user_prompt + retry_instruction,
+                feature_code="hermes_intent_router",
+                feature_label="Hermes 意图路由",
+                tenant_slug=tenant_slug,
+                entry_point="hermes_query",
+                metadata={
+                    "attachment_count": len(attachments),
+                    "selected_knowledge_count": len(selected_knowledge_ids),
+                    "retry_attempt": attempt,
+                },
+                # The configured 27B model can spend more than 20 seconds on
+                # a short JSON classification. Keep this a single request, but
+                # do not mistake normal generation latency for a routing failure.
+                request_timeout_seconds=60,
+                max_tokens=512,
+            )
+            try:
+                parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
+                break
+            except RuntimeError as exc:
+                retryable = str(exc).startswith(("invalid_llm_json_response", "empty_llm_response:reasoning_only"))
+                if attempt + 1 >= router_attempts or not retryable:
+                    raise
+                app.logger.warning("Hermes intent router returned invalid JSON; retrying once")
+        if not isinstance(parsed, dict):
+            raise RuntimeError("invalid_llm_json_response")
         if "tools" not in parsed or not isinstance(parsed.get("tools"), list):
             # New multi-task output keeps tools inside each task, but the
             # top-level compatibility field is still required by legacy
@@ -7266,7 +7378,8 @@ def evaluate_hermes_interception_skills(
         tenant_slug=tenant_slug,
         entry_point="hermes_query",
         metadata={"skill_count": len(skill_contract), "session_id": session_id},
-        request_timeout_seconds=40,
+        request_timeout_seconds=get_hermes_settings().get("answer_timeout_seconds", 60),
+        transient_retry_count=get_hermes_settings().get("transient_retry_count", 1),
         max_tokens=768,
     )
     parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
@@ -8677,9 +8790,16 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
             "stock_highlights",
             "multi_watchlist_analysis",
         }
+        # Direct Gangtise reports are shown verbatim by default.  Tenant K-line
+        # annotations are only extra context when the user explicitly asked
+        # for a contextual follow-up; otherwise loading them would silently
+        # change a direct report into a local-LLM synthesis request.
         should_load_annotation_context = (
             intent not in HERMES_GANGTISE_DIRECT_INTENTS
-            or intent in annotation_aware_direct_intents
+            or (
+                intent in annotation_aware_direct_intents
+                and bool(task_plan.get("answer_with_context"))
+            )
         )
         if build_hermes_tool_execution_plan(task_plan, web_answer=web_answer) and should_load_annotation_context:
             annotation_context = resolve_hermes_watchlist_annotation_context(tenant_slug=tenant_slug, question_text=question_text)
@@ -9793,6 +9913,23 @@ def ensure_hermes_positive_opening(answer_text, question_text="", intent="", sco
     return f"{opening}{answer_text if answer_text.startswith(('，', '。', '：')) else ' ' + answer_text}"
 
 
+HERMES_NON_FINANCIAL_ATTACHMENT_REMINDER = (
+    "提示：本次上传内容与金融主题关联较弱。以后请上传和金融有关的材料，我可以继续为你解读。"
+)
+
+
+def append_hermes_attachment_domain_reminder(answer_text, attachment_domain, tool_outputs=None):
+    """Append the product reminder only after a model classifies an attachment."""
+    answer = str(answer_text or "").strip()
+    domain = str(attachment_domain or "").strip().lower().replace("-", "_")
+    attachments = ((tool_outputs or {}).get("attachment_context") or {}).get("items") if isinstance(tool_outputs, dict) else []
+    if domain not in {"non_financial", "nonfinancial"} or not attachments:
+        return answer
+    if HERMES_NON_FINANCIAL_ATTACHMENT_REMINDER in answer:
+        return answer
+    return f"{answer}\n\n{HERMES_NON_FINANCIAL_ATTACHMENT_REMINDER}".strip()
+
+
 def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None, response_style="structured"):
     tenant = get_tenant_by_slug(tenant_slug)
     tenant_name = (tenant or {}).get("name") or (tenant or {}).get("short_name") or str(tenant_slug or "").strip() or "当前租户"
@@ -9829,6 +9966,9 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
         "这句正向反馈要放在回答最前面，再进入结论、依据、边界或下一步。"
         "优先依据工具结果，不要编造不存在的数据。"
         "只依据已执行的工具结果、会话记忆和用户问题作答；不要声称执行了未列出的检索。"
+        "如果工具结果包含附件，必须先判断附件与金融主题的关联性，但无论是否金融相关都要正常解读附件内容，不要因为非金融而拒绝回答。"
+        "当附件主要不是金融内容时，在 answer 的最后追加提醒：提示：本次上传内容与金融主题关联较弱。以后请上传和金融有关的材料，我可以继续为你解读。"
+        "当附件主要是金融内容时，不要追加上述提醒。附件领域判断只能输出 financial、non_financial 或 unclear。"
         "如果存在租户自选股K线标注摘要，应把它视为研究侧补充证据，融入结论、解读或边界说明。"
         "如果意图是 small_talk，只输出自然、简短、像真人一样的回应；不要输出标题、摘要、路由说明、过程说明，也不要写‘用户进行了简单问候’或‘助手需要确认研究状态’这类内部描述。此时 summary、lead_conclusion、bullets、analysis_sections、next_steps、citations 应为空。"
         "如果用户问小金智能体有哪些功能，准确说明：今日个股观察报告、今日大盘综合分析、个股深化研究（公司一页通，非当日）、个股看点摘要（最多6000只批量）、多支自选股综合分析，以及支持上下文的多轮闲聊。"
@@ -9840,7 +9980,7 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
     user_prompt = (
         "\n\n".join(blocks) +
         "\n\n请输出 JSON："
-        '{"answer":"中文最终回答","summary":"一句摘要","lead_conclusion":"结论","bullets":["模型判断要点"],"analysis_sections":[{"title":"分析维度","body":"模型分析"}],"next_steps":["模型建议的下一步"],"confidence":"中","citations":["..." ]}'
+        '{"answer":"中文最终回答","summary":"一句摘要","lead_conclusion":"结论","bullets":["模型判断要点"],"analysis_sections":[{"title":"分析维度","body":"模型分析"}],"next_steps":["模型建议的下一步"],"confidence":"中","citations":["..."],"attachment_domain":"financial|non_financial|unclear"}'
     )
     return system_prompt, user_prompt
 
@@ -10166,7 +10306,8 @@ def _build_hermes_composite_non_research_synthesis(
             "direct_research_task_count": len(descriptors) - len(non_research_tasks),
             "response_style": response_style,
         },
-        request_timeout_seconds=40,
+        request_timeout_seconds=get_hermes_settings().get("answer_timeout_seconds", 60),
+        transient_retry_count=get_hermes_settings().get("transient_retry_count", 1),
     )
     parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
     answer = str(parsed.get("answer") or "").strip()
@@ -10475,12 +10616,11 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
             memory_state=memory_state,
             response_style=response_style,
         )
-    annotation_context_available = bool(
-        isinstance(tool_outputs, dict)
-        and (tool_outputs.get("watchlist_annotation_context") or {}).get("available")
-    )
-    contextual_research = intent in HERMES_GANGTISE_DIRECT_INTENTS and (
-        bool((plan or {}).get("answer_with_context")) or annotation_context_available
+    # A direct research capability must remain direct unless the user
+    # explicitly asks to continue from conversation/context.  The mere
+    # presence of stored annotations is not such a request.
+    contextual_research = intent in HERMES_GANGTISE_DIRECT_INTENTS and bool(
+        (plan or {}).get("answer_with_context")
     )
     if intent in HERMES_GANGTISE_DIRECT_INTENTS and not contextual_research:
         return build_hermes_gangtise_direct_synthesis(plan, tool_outputs), None, "gangtise_direct"
@@ -10510,13 +10650,20 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
             tenant_slug=tenant_slug,
             entry_point="hermes_query",
             metadata={"intent": plan.get("intent"), "tool_count": len(plan.get("tools") or []), "response_style": response_style},
-            request_timeout_seconds=40,
+            request_timeout_seconds=get_hermes_settings().get("answer_timeout_seconds", 60),
+            transient_retry_count=get_hermes_settings().get("transient_retry_count", 1),
         )
         parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
         answer = str(parsed.get("answer") or "").strip()
         summary = str(parsed.get("summary") or "").strip()[:240]
         if not answer:
             raise RuntimeError("hermes_answer_synthesis_empty_answer")
+        attachment_domain = str(parsed.get("attachment_domain") or "").strip().lower().replace("-", "_")
+        answer = append_hermes_attachment_domain_reminder(
+            answer,
+            attachment_domain,
+            tool_outputs=tool_outputs,
+        )
         bullets = [str(item).strip() for item in (parsed.get("bullets") if isinstance(parsed.get("bullets"), list) else []) if str(item).strip()][:6]
         citations = [str(item).strip() for item in (parsed.get("citations") if isinstance(parsed.get("citations"), list) else []) if str(item).strip()][:8]
         analysis_sections = []
@@ -10536,6 +10683,7 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
             "next_steps": [str(item).strip() for item in (parsed.get("next_steps") if isinstance(parsed.get("next_steps"), list) else []) if str(item).strip()][:6],
             "confidence": str(parsed.get("confidence") or "").strip()[:20],
             "citations": citations,
+            "attachment_domain": attachment_domain or "unclear",
         }, llm_model, "llm_contextual_research" if contextual_research else "llm_synthesized"
     except RuntimeError:
         raise
@@ -11482,7 +11630,7 @@ def build_review_evidence_chain_section(review_text="", tenant_slug="", review_t
                 "你是洞见证据链整理助手。请基于用户正文和命中证据，输出一句简洁的中文总结。"
                 "如果证据与正文关联弱，要明确说“暂无充分匹配证据”。不要编造。",
                 (
-                    f"用户洞见正文：\n{normalized_text[:1500] or '暂无正文'}\n\n"
+                    f"用户洞见正文：\n{normalized_text or '暂无正文'}\n\n"
                     f"证据命中：\n{chr(10).join(evidence_blocks)}\n\n"
                     "请只输出 1 到 2 句总结。"
                 ),
