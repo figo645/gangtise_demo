@@ -88,10 +88,20 @@ WITH RECURSIVE user_tables AS (
   FROM information_schema.columns
   WHERE table_schema = 'public'
     AND column_name IN ('tenant_slug', 'user_profile_id', 'created_by_user_id', 'user_id', 'created_by')
+), protected_content_tables(table_name) AS (
+  VALUES
+    ('public.tenant_published_insights'::text COLLATE "C"),
+    ('public.tenant_insight_drafts'::text COLLATE "C"),
+    ('public.tenant_message_threads'::text COLLATE "C"),
+    ('public.tenant_messages'::text COLLATE "C"),
+    ('public.tenant_broadcasts'::text COLLATE "C"),
+    ('public.tenant_broadcast_deliveries'::text COLLATE "C"),
+    ('public.tenant_knowledge_documents'::text COLLATE "C")
 )
 SELECT DISTINCT discovered.table_name COLLATE "C" FROM (
   SELECT table_name FROM user_tables
   UNION ALL SELECT table_name FROM identity_tables
+  UNION ALL SELECT table_name FROM protected_content_tables
 ) discovered
 JOIN information_schema.tables t ON format('%I.%I', t.table_schema, t.table_name)::text COLLATE "C" = discovered.table_name COLLATE "C"
 WHERE t.table_type = 'BASE TABLE' AND t.table_name <> 'app_settings'

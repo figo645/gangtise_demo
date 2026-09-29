@@ -44,6 +44,16 @@ if [[ "$PACKAGE_TYPE" == "schema" ]]; then
     echo "Refusing non-additive SQL in schema release package." >&2
     exit 2
   fi
+  # A schema release may not backfill or overwrite business content.  Keep
+  # this guard at the execution boundary because a package can be edited
+  # after it was generated and reviewed.  The only permitted INSERT target in
+  # a schema package is the release ledger itself; tenant_registry repairs are
+  # generated as narrowly-scoped FK prerequisites and do not contain user
+  # content.
+  if grep -Eiq '(^|[^[:alnum:]_])(INSERT[[:space:]]+INTO|MERGE[[:space:]]+INTO|COPY[[:space:]]+)(["`]?)(users|tenant_published_insights|tenant_insight_drafts|tenant_message_threads|tenant_messages|tenant_broadcasts|tenant_broadcast_deliveries|tenant_knowledge_documents|user_watchlist_items|watchlist_comments|watchlist_kline_annotations|hermes_conversation_turns|hermes_session_memory|hermes_user_memory|hermes_user_profiles|fan_subscriptions|fan_payment_orders|analytics_events|access_logs)(["`]?)([^[:alnum:]_]|$)' "$SQL_FILE"; then
+    echo "Refusing schema release SQL that writes protected user or content data." >&2
+    exit 2
+  fi
 fi
 echo "==> [preflight] Checking ${TARGET} database connection for ${RELEASE_VERSION} (timeout ${CONNECT_TIMEOUT_SECONDS}s)"
 "${PSQL[@]}" -Atqc "SELECT 1" >/dev/null
