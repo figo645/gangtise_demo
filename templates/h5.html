@@ -1848,6 +1848,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 
 .settings-list { margin:0 16px 100px; background:var(--navy-mid); border-radius:12px; overflow:hidden; }
 .settings-item { display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(200,169,110,0.06); cursor:pointer; }
+.settings-item.settings-logout-link { color:inherit; text-decoration:none; }
 .settings-item:last-child { border-bottom:none; }
 .settings-icon { font-size:18px; width:28px; }
 .settings-label { font-size:14px; color:var(--white); flex:1; }
@@ -5382,11 +5383,11 @@ body,
         <div style="font-size:11px;color:var(--gray-400);margin-left:auto">v1.5</div>
         <div class="settings-arrow">›</div>
       </div>
-      <div class="settings-item" onclick="logoutH5User()">
+      <a class="settings-item settings-logout-link" href="/logout" aria-label="退出登录">
         <div class="settings-icon">🚪</div>
         <div class="settings-label" style="color:var(--red)">退出登录</div>
         <div class="settings-arrow">›</div>
-      </div>
+      </a>
     </div>
   </div>
 
@@ -5498,7 +5499,7 @@ body,
       <div class="h5-onboarding-tip">该渠道会按平台统一渠道口径写入后台分析，方便后续查看渠道来源分布。</div>
       <div class="h5-onboarding-error" id="h5-onboarding-error"></div>
       <div class="modal-actions" style="margin-top:12px">
-        <button class="btn-outline" type="button" onclick="logoutH5User()">退出登录</button>
+        <a class="btn-outline" href="/logout" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">退出登录</a>
         <button class="btn-gold" type="button" id="h5-onboarding-submit-btn" onclick="submitH5Onboarding()">确认进入</button>
       </div>
     </div>

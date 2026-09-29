@@ -59,6 +59,20 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIn("text/html", response.content_type)
                 self.assertIn("Hermes", response.get_data(as_text=True))
 
+    def test_h5_logout_is_native_navigation_and_clears_session(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('class="settings-item settings-logout-link" href="/logout"', html)
+
+        with self.client.session_transaction() as session:
+            session["demo_profile_id"] = "test-user"
+        logout = self.client.get("/logout", follow_redirects=False)
+        self.assertEqual(logout.status_code, 302)
+        self.assertEqual(logout.headers.get("Location"), "/login")
+        with self.client.session_transaction() as session:
+            self.assertEqual(dict(session), {})
+
     def test_h5_home_promotes_latest_insight_only(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 
