@@ -2333,9 +2333,46 @@ body { background: var(--surface-2); color: var(--text-main); }
 .watch-research-meta { font-size:10px; color:var(--gray-400); margin-bottom:6px; }
 .watch-research-title { font-size:12px; font-weight:700; color:var(--text-main); }
 .watch-research-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:6px; }
-#watchlist-detail-modal .modal-sheet {
+.watchlist-detail-page {
+  max-width:980px;
+  margin:0 auto;
+  padding:16px;
   background:linear-gradient(180deg, #F8FBFF 0%, #EEF5FF 100%);
-  border-top:1px solid rgba(47,116,192,0.14);
+  min-height:calc(100vh - 120px);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:18px;
+  box-sizing:border-box;
+}
+.watch-analysis-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+.watch-analysis-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:12px;
+  padding:12px;
+}
+.watch-analysis-card.wide { grid-column:1 / -1; }
+.watch-analysis-label { font-size:11px; color:var(--gray-400); }
+.watch-analysis-value { margin-top:5px; font-size:18px; line-height:1.25; font-weight:700; color:var(--text-main); }
+.watch-analysis-note { margin-top:5px; font-size:11px; line-height:1.6; color:var(--gray-400); }
+.watch-analysis-table { width:100%; border-collapse:collapse; font-size:11px; }
+.watch-analysis-table th,
+.watch-analysis-table td { padding:8px 6px; text-align:left; border-bottom:1px solid rgba(47,116,192,0.09); vertical-align:top; }
+.watch-analysis-table th { color:var(--gray-400); font-weight:600; }
+.watch-analysis-table td { color:var(--text-main); }
+.watch-analysis-badge { display:inline-block; padding:3px 7px; border-radius:999px; background:rgba(47,116,192,0.08); color:#2F74C0; white-space:nowrap; }
+.watch-analysis-bars { display:flex; align-items:flex-end; gap:4px; height:86px; margin-top:10px; padding:8px 4px 0; border-bottom:1px solid rgba(47,116,192,0.12); }
+.watch-analysis-bar { flex:1; min-width:5px; border-radius:4px 4px 0 0; background:linear-gradient(180deg,#2F74C0,#8CB8E3); }
+.watch-analysis-chart-caption { display:flex; justify-content:space-between; gap:8px; margin-top:5px; color:var(--gray-400); font-size:10px; }
+.watch-analysis-muted { color:var(--gray-400); font-size:11px; line-height:1.7; }
+.watch-analysis-limitations { margin:0; padding-left:18px; color:var(--gray-400); font-size:11px; line-height:1.8; }
+@media (max-width:640px) {
+  .watchlist-detail-page { margin:0 -8px; border-radius:0; padding:12px; }
+  .watch-analysis-grid { grid-template-columns:1fr; }
+  .watch-analysis-card.wide { grid-column:auto; }
 }
 .fund-overview-card {
   background:linear-gradient(160deg, #FFFFFF, #F6FAFF);
@@ -5053,6 +5090,11 @@ body,
       </div>
       </div>
     </div>
+    <div id="watchlist-detail-page" class="watchlist-detail-page" style="display:none">
+      <div id="watchlist-detail-content">
+        <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
+      </div>
+    </div>
     <div id="market-dav-research-guide" class="h5-section" style="display:none">
       <div class="h5-section-title">大V研究节奏</div>
       <div class="card" style="padding:14px">
@@ -5064,16 +5106,6 @@ body,
           4. 在洞见中确认用户输入和草稿内容后，再发布给粉丝。
         </div>
         <div style="font-size:11px;color:var(--gray-400);margin-top:6px">标注、评论、研究和洞见在同一租户内沉淀，便于持续追踪。</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="watchlist-detail-modal" onclick="if(event.target===this)this.classList.remove('show')">
-    <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-      <div class="modal-handle"></div>
-      <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeH5ModalById('watchlist-detail-modal')">关闭</button></div>
-      <div id="watchlist-detail-content">
-        <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
       </div>
     </div>
   </div>
@@ -15098,7 +15130,7 @@ function renderFundamentalWatchlistBoards(group = 'feed') {
       <div class="fund-stock-list">${items.map((item) => {
         const change = Number(item.change);
         const positive = change >= 0;
-        return `<div class="fund-stock-card" onclick="openWatchlistDetail('${escapeAttr(item.code)}','overview'); switchTab('market');">
+        return `<div class="fund-stock-card" onclick="openWatchlistDetailFromCard('${escapeAttr(item.code)}','overview');">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="fund-stock-name">${escapeHtml(item.name || item.code)}</div><div class="fund-stock-meta">${escapeHtml(item.code)} · ${escapeHtml(item.market || '--')} · ${escapeHtml(item.industry || item.focus || '--')}</div></div><div class="fund-stock-price-wrap"><div class="fund-stock-price">${Number(item.price).toFixed(2)}</div><div class="fund-stock-change ${positive ? 'up' : 'down'}">${positive ? '▲' : '▼'} ${Math.abs(Number(item.change_pct)).toFixed(2)}%</div></div></div>
           <div class="fund-stock-signal">${escapeHtml(item.signal_summary || '继续关注行情与研究进展')}</div>
         </div>`;
@@ -15255,7 +15287,7 @@ function renderMarketEtf(items) {
   }
   const formatVolume = (value) => {
     const number = Number(value);
-    if (!Number.isFinite(number)) return '--';
+    if (!Number.isFinite(number) || number <= 0) return '--';
     if (number >= 100000000) return `${(number / 100000000).toFixed(2)}亿`;
     if (number >= 10000) return `${(number / 10000).toFixed(2)}万`;
     return Math.round(number).toLocaleString('zh-CN');
@@ -15265,8 +15297,8 @@ function renderMarketEtf(items) {
     const changePct = Number(item.change_pct);
     const positive = Number.isFinite(changePct) && changePct >= 0;
     const value = available && Number.isFinite(Number(item.price)) ? Number(item.price).toFixed(4) : '--';
-    const changeText = available && Number.isFinite(changePct) ? `${positive ? '+' : ''}${changePct.toFixed(2)}%` : '暂无真实行情';
-    const action = available ? ` onclick="openWatchlistDetail('${escapeHtml(item.security_code || item.code || '')}')"` : '';
+    const changeText = available && item.change_available === false ? '暂无涨跌' : (available && Number.isFinite(changePct) ? `${positive ? '+' : ''}${changePct.toFixed(2)}%` : '暂无真实行情');
+    const action = available ? ` onclick="openWatchlistDetail('${escapeHtml(item.security_code || item.code || '')}','overview','etf-detail')"` : '';
     return `<button type="button"${action} style="text-align:left;width:100%;min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white);cursor:${available ? 'pointer' : 'default'};opacity:${available ? '1' : '0.72'}">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
         <div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.security_code || '--')} · ${escapeHtml(item.category || 'ETF')}</div></div>
@@ -15463,7 +15495,7 @@ function calcMovingAverage(series, windowSize) {
   });
 }
 
-function buildWatchlistComputedMetrics(series) {
+function buildWatchlistComputedMetrics(series, maxWindow = 90) {
   const list = Array.isArray(series)
     ? series
         .map((item) => ({
@@ -15482,7 +15514,7 @@ function buildWatchlistComputedMetrics(series) {
       </div>
     `;
   }
-  const windowSize = Math.min(list.length, 20);
+  const windowSize = Math.min(list.length, maxWindow);
   const windowSeries = list.slice(-windowSize);
   const latest = list[list.length - 1];
   const first = windowSeries[0] || latest;
@@ -15492,27 +15524,27 @@ function buildWatchlistComputedMetrics(series) {
   const rangeLow = lows.length ? Math.min(...lows) : Number(latest.close || 0);
   const amplitude = rangeLow > 0 ? ((rangeHigh - rangeLow) / rangeLow) * 100 : 0;
   const trendPct = Number(first.close || 0) > 0 ? ((Number(latest.close || 0) - Number(first.close || 0)) / Number(first.close || 0)) * 100 : 0;
-  const trendLabel = trendPct > 0.5 ? '偏强' : trendPct < -0.5 ? '偏弱' : '震荡';
+  const trendLabel = trendPct > 0.5 ? '上涨' : trendPct < -0.5 ? '下跌' : '震荡';
   const cards = [
     {
-      label: '当前收盘',
+      label: '最近收盘价',
       value: Number(latest.close || 0).toFixed(2),
-      note: '最近一个有效交易日收盘价',
+      note: '最近一个交易日结束时的价格',
     },
     {
-      label: `近${windowSize}日区间`,
+      label: `近${windowSize}个交易日价格范围`,
       value: `${Number(rangeLow || 0).toFixed(2)} ~ ${Number(rangeHigh || 0).toFixed(2)}`,
-      note: '由最近 K 线的最高/最低价计算',
+      note: '这段时间出现过的最低价到最高价',
     },
     {
-      label: `近${windowSize}日振幅`,
+      label: `近${windowSize}个交易日波动范围`,
       value: `${Math.abs(Number(amplitude || 0)).toFixed(2)}%`,
-      note: '按区间高低点计算波动幅度',
+      note: '最高价和最低价之间相差了多少',
     },
     {
-      label: `近${windowSize}日趋势`,
+      label: `近${windowSize}个交易日大致方向`,
       value: trendLabel,
-      note: `首尾收盘变动 ${trendPct >= 0 ? '+' : ''}${Number(trendPct || 0).toFixed(2)}%`,
+      note: `从最早到最近的收盘价变化 ${trendPct >= 0 ? '+' : ''}${Number(trendPct || 0).toFixed(2)}%`,
     },
   ];
   return cards.map(metric => `
@@ -15562,9 +15594,9 @@ function buildWatchlistKlineSvg(series, options) {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
         <div style="font-size:12px;font-weight:700;color:var(--text-main)">${escapeHtml(config.candleLabel || '日K线走势')}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
-          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
-          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
-          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>5天平均价</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>10天平均价</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>20天平均价</span>
         </div>
       </div>
       ${shell.chartHtml}
@@ -15611,12 +15643,15 @@ function buildWatchlistIntradaySvg(series, unavailableMessage, source, tradeDate
   `;
 }
 
-async function openWatchlistDetail(stockCode, section) {
-  const modal = document.getElementById('watchlist-detail-modal');
+async function openWatchlistDetail(stockCode, section, detailType) {
+  const page = document.getElementById('watchlist-detail-page');
   const host = document.getElementById('watchlist-detail-content');
-  if (!modal || !host) return;
+  if (!page || !host) return;
   currentWatchlistSection = section || 'overview';
-  modal.classList.add('show');
+  switchMarketView('watchlist');
+  const watchlistPanel = document.getElementById('market-watchlist-panel');
+  if (watchlistPanel) watchlistPanel.style.display = 'none';
+  page.style.display = '';
   host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>';
   try {
     const tenantSlug = getActiveWatchlistTenantSlug();
@@ -15625,7 +15660,8 @@ async function openWatchlistDetail(stockCode, section) {
     if (tenantSlug) search.set('tenant_slug', tenantSlug);
     if (userPayload.user_role) search.set('user_role', userPayload.user_role);
     if (userPayload.user_profile_id) search.set('user_profile_id', userPayload.user_profile_id);
-    const resp = await fetch('/api/watchlist/' + encodeURIComponent(stockCode) + (String(search) ? `?${String(search)}` : ''));
+    const detailPath = detailType === 'etf-detail' ? '/api/etf-detail/' : '/api/watchlist/';
+    const resp = await fetch(detailPath + encodeURIComponent(stockCode) + (String(search) ? `?${String(search)}` : ''));
     const data = await resp.json();
     currentWatchlistDetail = data;
     const activeUser = getActiveDemoUser() || {};
@@ -15643,11 +15679,126 @@ async function openWatchlistDetail(stockCode, section) {
   }
 }
 
+function closeWatchlistDetailPage() {
+  const page = document.getElementById('watchlist-detail-page');
+  const list = document.getElementById('market-watchlist-panel');
+  if (page) page.style.display = 'none';
+  if (list) list.style.display = '';
+  currentWatchlistDetail = null;
+  currentWatchlistSection = 'overview';
+}
+
+function renderWatchlistKlineAnalysis(analysis) {
+  const result = analysis && typeof analysis === 'object' ? analysis : {};
+  const trends = result.trends && typeof result.trends === 'object' ? result.trends : {};
+  const rolling = result.rolling_returns && typeof result.rolling_returns === 'object' ? result.rolling_returns : {};
+  const volatility = result.volatility && typeof result.volatility === 'object' ? result.volatility : {};
+  const events = Array.isArray(result.events) ? result.events : [];
+  const limitations = Array.isArray(result.limitations) ? result.limitations : [];
+  const numberText = (value, suffix = '') => value === null || value === undefined || value === '' ? '--' : `${escapeHtml(String(value))}${suffix}`;
+  const friendlyTrend = (label) => ({
+    '上行': '上涨',
+    '下行': '下跌',
+    '震荡': '震荡',
+    '样本不足': '数据不足',
+  }[String(label || '')] || '暂时无法判断');
+  const friendlyProfile = (profile) => ({
+    '趋势型': '趋势明确',
+    '震荡型': '震荡为主',
+    '题材脉冲型': '波动较大',
+  }[String(profile || '')] || '暂不判断');
+  const friendlyEventStrength = (strength) => ({
+    '强异动': '双重异动',
+    '弱异动': '单项异动',
+  }[String(strength || '')] || '需关注');
+  const friendlyEventDriver = (driver) => String(driver || '') === '待人工归因' ? '看公告/新闻' : String(driver || '待判断');
+  const friendlyEventValidity = (validity) => String(validity || '') === '待样本检验' ? '继续观察' : String(validity || '继续观察');
+  const numericValues = (items) => Array.isArray(items) ? items.filter((value) => Number.isFinite(Number(value))).map(Number) : [];
+  const histogram = (items) => {
+    const values = numericValues(items);
+    if (!values.length) return '<div class="watch-analysis-muted">目前可用的20日数据还不够，暂不画分布图。</div>';
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    const bins = Array.from({length: 8}, () => 0);
+    values.forEach((value) => bins[Math.min(7, Math.floor(((value - min) / span) * 8))] += 1);
+    const peak = Math.max(...bins, 1);
+    return `<div class="watch-analysis-bars">${bins.map((count) => `<div class="watch-analysis-bar" style="height:${Math.max(4, (count / peak) * 100)}%" title="${count} 条"></div>`).join('')}</div><div class="watch-analysis-chart-caption"><span>${min.toFixed(2)}%</span><span>${values.length} 个滚动样本</span><span>${max.toFixed(2)}%</span></div>`;
+  };
+  const trendCards = [
+    ['较长一段时间（约90个交易日）', trends.long],
+    ['中间一段时间（约60个交易日）', trends.medium],
+    ['最近一段时间（约20个交易日）', trends.short],
+  ].map(([title, item]) => `
+    <div class="watch-analysis-card">
+      <div class="watch-analysis-label">${title}</div>
+      <div class="watch-analysis-value">${escapeHtml(friendlyTrend(item && item.label))}</div>
+      <div class="watch-analysis-note">这段时间的平均价格约为 ${numberText(item && item.ma)}；使用了 ${numberText(item && item.sample_size, ' 个交易日')}。</div>
+    </div>
+  `).join('');
+  const returnsSummary = (items) => {
+    const values = Array.isArray(items) ? items.filter((value) => Number.isFinite(Number(value))).map(Number) : [];
+    if (!values.length) return '数据不足';
+    const latest = values[values.length - 1];
+    const high = Math.max(...values);
+    const low = Math.min(...values);
+    return `最新 ${latest >= 0 ? '+' : ''}${latest.toFixed(2)}%<br>区间 ${low.toFixed(2)}% 至 ${high.toFixed(2)}%`;
+  };
+  const eventRows = events.length ? events.map((event) => `
+    <tr>
+      <td>${escapeHtml(event.date || '--')}</td>
+      <td>${numberText(event.change_pct, '%')}</td>
+      <td><span class="watch-analysis-badge">${escapeHtml(friendlyEventStrength(event.strength))}</span></td>
+      <td>${escapeHtml(friendlyEventDriver(event.driver))}<br><span class="watch-analysis-muted">${escapeHtml(friendlyEventValidity(event.signal_validity))}</span></td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" class="watch-analysis-muted">当前样本没有识别出异动，或历史数据不足。</td></tr>';
+  return `
+    <div class="watch-section-card">
+      <div class="watch-section-title">这只股票最近是什么状态</div>
+      <div class="watch-section-desc">把不同时间长度的走势放在一起看，帮助判断它是持续上涨、持续下跌，还是主要在一个区间里来回波动。</div>
+      <div class="watch-analysis-grid" style="margin-top:10px">
+        ${trendCards}
+        <div class="watch-analysis-card wide">
+          <div class="watch-analysis-label">一句话判断</div>
+          <div class="watch-analysis-value" style="font-size:15px">${escapeHtml(friendlyProfile(result.profile))}</div>
+          <div class="watch-analysis-note">${result.trend_alignment ? '各周期方向一致。' : '各周期方向不一，谨慎观察。'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">最近涨跌幅度和稳定程度</div>
+      <div class="watch-analysis-grid">
+        <div class="watch-analysis-card"><div class="watch-analysis-label">最近20个交易日，涨跌幅大致分布</div><div class="watch-analysis-value" style="font-size:14px">${returnsSummary(rolling['20d'])}</div>${histogram(rolling['20d'])}<div class="watch-analysis-note">柱子越集中，说明涨跌幅度越接近；柱子越分散，说明每天的波动差异越大。</div></div>
+        <div class="watch-analysis-card"><div class="watch-analysis-label">每天涨跌的起伏程度</div><div class="watch-analysis-value">${numberText(volatility.daily_pct_std, '%')}</div><div class="watch-analysis-note">这个数越大，说明每天价格变化越剧烈，持有时更容易遇到大幅波动。</div></div>
+      </div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">哪些日子出现了明显变化</div>
+      <div class="watch-section-desc">系统把明显偏离平时涨跌幅、或成交量明显放大的日期标出来。它只是提醒你回看当天发生了什么，不代表一定会继续上涨或下跌。</div>
+      <div style="overflow-x:auto;margin-top:10px">
+        <table class="watch-analysis-table"><thead><tr><th>日期</th><th>涨跌</th><th>异动</th><th>备注</th></tr></thead><tbody>${eventRows}</tbody></table>
+      </div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">成交量和风险提醒</div>
+      <div class="watch-analysis-grid">
+        <div class="watch-analysis-card"><div class="watch-analysis-label">过去这段时间最多从高点跌过多少</div><div class="watch-analysis-value">${numberText(result.max_drawdown_pct, '%')}</div><div class="watch-analysis-note">表示历史上从前面高点跌下来时，曾经出现过的最大跌幅；不是未来一定会跌这么多。</div></div>
+        <div class="watch-analysis-card"><div class="watch-analysis-label">本次判断用了哪些数据</div><div class="watch-analysis-value" style="font-size:14px">${numberText(result.sample_size, ' 个交易日')}</div><div class="watch-analysis-note">${escapeHtml(result.date_start || '--')} 到 ${escapeHtml(result.date_end || '--')}</div></div>
+        <div class="watch-analysis-card wide"><div class="watch-analysis-label">看盘时可以这样理解</div><div class="watch-analysis-note">上涨时成交量变大、回调时成交量变小，通常说明上涨更有承接；下跌时成交量突然变大，要留意卖出压力。成交量较小的股票，买卖大笔资金时也可能更难成交。</div></div>
+      </div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">使用前请注意</div>
+      <ul class="watch-analysis-limitations">${(limitations.length ? limitations : ['过去的走势只是参考，不能保证未来也会这样走。']).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+    </div>
+  `;
+}
+
 function renderWatchlistDetail(data, section) {
   const host = document.getElementById('watchlist-detail-content');
   if (!host || !data) return;
   if (section) currentWatchlistSection = section;
-  const activeUser = getActiveDemoUser();
+  const activeUser = getActiveDemoUser() || {role: 'investor', tenant: {id: ''}};
   const isInvestorView = activeUser.role === 'investor';
   const activeSection = currentWatchlistSection || 'overview';
   const commentItems = Array.isArray(data.comments) ? data.comments : [];
@@ -15671,13 +15822,16 @@ function renderWatchlistDetail(data, section) {
     data.intraday_source || '',
     String(data.intraday_trade_date || '').trim(),
   );
-  const computedMetricCards = buildWatchlistComputedMetrics(data.kline || []);
+  const analysisSeries = data.history_kline && Array.isArray(data.history_kline.candles)
+    ? data.history_kline.candles
+    : (data.kline || []);
+  const computedMetricCards = buildWatchlistComputedMetrics(analysisSeries, 90);
   const overviewSection = `
     <div class="watch-section-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
         <div>
-          <div class="watch-section-title">纯计算信息</div>
-          <div class="watch-section-desc">仅展示由日 K 线序列直接计算出的结果。${data.kline_contains_intraday ? ` 当前日K为盘中分钟行情合成，更新至 ${escapeHtml(String(data.kline_intraday_updated_at || '').slice(11, 16) || '--')}。` : ''}${activeUser.role === 'dav' ? ' 点击任一 K 线可添加或编辑标注。' : ''}</div>
+          <div class="watch-section-title">最近行情概览</div>
+          <div class="watch-section-desc">下面的内容只根据真实行情计算，不是预测。${data.kline_contains_intraday ? ` 当前价格包含盘中行情，更新至 ${escapeHtml(String(data.kline_intraday_updated_at || '').slice(11, 16) || '--')}。` : ''}${activeUser.role === 'dav' ? ' 点击任一 K 线可添加或编辑标注。' : ''}</div>
         </div>
       </div>
       ${klineChart}
@@ -15726,16 +15880,23 @@ function renderWatchlistDetail(data, section) {
       <div class="watch-research-grid" style="margin-top:12px">${commentCards}</div>
     </div>
   `;
+  const showKlineAnalysis = String(data.asset_type || '').toLowerCase() === 'stock';
+  const analysisSection = showKlineAnalysis ? renderWatchlistKlineAnalysis(data.kline_analysis || {}) : '';
   const sectionMap = {
     overview: overviewSection,
     intraday: intradaySection,
     comments: commentsSection,
+    ...(showKlineAnalysis ? {analysis: analysisSection} : {}),
   };
-  // Keep the tab stable for every watchlist detail. An unavailable snapshot is
-  // rendered as an explicit data state instead of making the capability vanish.
+  // K-line analysis is limited to individual stock details. ETF and indicator
+  // pages retain their applicable history/quote views without this tab.
   const showIntradayTab = data.intraday_supported === true;
+  const visibleSection = showKlineAnalysis ? activeSection : (activeSection === 'analysis' ? 'overview' : activeSection);
   host.innerHTML = `
     <div style="padding-bottom:8px">
+      <div style="display:flex;justify-content:flex-start;margin-bottom:10px">
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="closeWatchlistDetailPage()">← 返回自选股</button>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
         <div>
           <div style="font-size:18px;font-weight:700;color:var(--text-main)">${data.name}</div>
@@ -15758,11 +15919,12 @@ function renderWatchlistDetail(data, section) {
         </div>
       ` : ''}
       <div class="watch-detail-tabs">
-        <div class="watch-detail-tab ${activeSection === 'overview' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'overview')">总览</div>
-        ${showIntradayTab ? `<div class="watch-detail-tab ${activeSection === 'intraday' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'intraday')">分时</div>` : ''}
+        <div class="watch-detail-tab ${visibleSection === 'overview' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'overview')">总览</div>
+        ${showIntradayTab ? `<div class="watch-detail-tab ${visibleSection === 'intraday' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'intraday')">分时</div>` : ''}
         <div class="watch-detail-tab ${activeSection === 'comments' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'comments')">评论</div>
+        ${showKlineAnalysis ? `<div class="watch-detail-tab ${visibleSection === 'analysis' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'analysis')">K线分析</div>` : ''}
       </div>
-      ${sectionMap[activeSection] || overviewSection}
+      ${sectionMap[visibleSection] || overviewSection}
     </div>
   `;
   if (window.GangtiseEcharts) window.GangtiseEcharts.flush(host);
@@ -15852,7 +16014,7 @@ function openWatchlistAuthorDm(name) {
     '港股研究员': { id: 2, avatar: '🏙️', tier: '观察投顾' },
   };
   const author = mapping[name];
-  document.getElementById('watchlist-detail-modal')?.classList.remove('show');
+  closeWatchlistDetailPage();
   if (author) {
     openDmChat(author.id, name, author.avatar, author.tier);
   } else {
@@ -16046,7 +16208,7 @@ function runWatchlistHermes(stockCode, mode) {
     : null;
   const skillKey = mode === 'forecast' ? 'judgement' : 'basic';
   const stockLabel = detail ? `${detail.name}（${detail.code}）` : stockCode;
-  document.getElementById('watchlist-detail-modal')?.classList.remove('show');
+  closeWatchlistDetailPage();
   switchTab('hermes');
   fillHermesStockCode(stockCode);
   selectHermesSkill(skillKey);
@@ -17345,6 +17507,11 @@ const DEFAULT_HERMES_SKILLS = {
 };
 
 let currentWatchlistSection = 'overview';
+
+function openWatchlistDetailFromCard(stockCode, section) {
+  switchTab('market');
+  window.setTimeout(() => openWatchlistDetail(stockCode, section || 'overview'), 0);
+}
 
 async function selectHermesMode(mode) {
   const mapping = {

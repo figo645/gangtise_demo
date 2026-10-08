@@ -237,10 +237,68 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertLess(html.index('id="market-watchlist-tab"'), html.index('id="market-sector-tab"'))
         self.assertLess(html.index('id="market-sector-tab"'), html.index('id="market-overview-tab"'))
         self.assertIn("/api/etf-overview", html)
+        self.assertIn("openWatchlistDetail('${escapeHtml(item.security_code || item.code || '')}','overview','etf-detail')", html)
         self.assertIn("renderColumn('涨幅', gains", html)
         self.assertIn("renderColumn('跌幅', losses", html)
         self.assertIn("candleLabel: `${data.name || '标的'} 日K线${data.kline_contains_intraday ? '（含盘中）' : ''}`", html)
         self.assertIn("data.annotation_key || data.indicator_code || data.code", html)
+
+    def test_h5_watchlist_detail_is_a_page_with_kline_analysis_after_comments(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="watchlist-detail-page"', html)
+        self.assertIn('function closeWatchlistDetailPage()', html)
+        self.assertIn('function openWatchlistDetailFromCard(stockCode, section)', html)
+        self.assertIn('function renderWatchlistKlineAnalysis(analysis)', html)
+        self.assertIn('5天平均价', html)
+        self.assertIn('最近20个交易日，涨跌幅大致分布', html)
+        self.assertIn('最近行情概览', html)
+        self.assertNotIn('id="watchlist-detail-modal"', html)
+        self.assertNotIn('relative.series', html)
+        self.assertNotIn('relative.direction', html)
+        self.assertNotIn("openWatchlistDetail('${escapeAttr(item.code)}','overview'); switchTab('market')", html)
+        self.assertLess(html.index('>评论</div>'), html.index('>K线分析</div>'))
+
+    def test_watchlist_kline_analysis_is_only_returned_for_stock_details(self):
+        stock = {
+            "code": "600519",
+            "name": "贵州茅台",
+            "asset_type": "stock",
+            "kline": [],
+            "history_kline": {"candles": []},
+        }
+        indicator = {
+            "code": "000001.SH",
+            "name": "上证指数",
+            "indicator_code": "source_shanghai_index",
+            "asset_type": "indicator",
+            "kline": [],
+            "history_kline": {"candles": []},
+        }
+        with patch.object(api_core, "get_watchlist_detail_by_code", side_effect=[stock, indicator]), patch.object(
+            api_core, "get_site_config", return_value={}
+        ):
+            stock_response = self.client.get("/api/watchlist/600519")
+            indicator_response = self.client.get("/api/watchlist/source_shanghai_index")
+
+        self.assertEqual(stock_response.status_code, 200)
+        self.assertIn("kline_analysis", stock_response.get_json())
+        self.assertEqual(indicator_response.status_code, 200)
+        self.assertEqual(indicator_response.get_json().get("asset_type"), "indicator")
+        self.assertNotIn("kline_analysis", indicator_response.get_json())
+
+    def test_indicator_and_etf_details_do_not_render_kline_analysis_tab(self):
+        source = Path(__file__).resolve().parents[1] / "templates/h5.html"
+        html = source.read_text(encoding="utf-8")
+        render_start = html.index("function renderWatchlistDetail(data, section)")
+        render_end = html.index("\nfunction submitWatchlistComment", render_start)
+        render_source = html[render_start:render_end]
+        self.assertIn("data.asset_type", render_source)
+        self.assertIn("showKlineAnalysis ?", render_source)
+        self.assertIn("${showKlineAnalysis ?", render_source)
+        self.assertIn('"asset_type": "etf"', Path(__file__).resolve().parents[1].joinpath("src/domain/market_services.py").read_text(encoding="utf-8"))
 
     def test_web_market_reuses_the_same_etf_tab_contract(self):
         response = self.client.get(f"/web?tenant={self.tenant_slugs[0]}")
@@ -821,7 +879,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("上传文件解析", html)
         self.assertIn("handleHermesComposerSubmit()", html)
         self.assertNotIn("toggleHermesVoiceCapture()", html)
-        self.assertIn("closeH5ModalById('watchlist-detail-modal')", html)
+        self.assertIn("closeWatchlistDetailPage()", html)
         self.assertIn('class="modal-close-btn"', html)
         self.assertIn("ensureHermesSessionId()", html)
         self.assertIn("function scrollHermesThreadToBottom(options = {})", html)

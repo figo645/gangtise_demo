@@ -1913,6 +1913,34 @@ def fetch_gangtise_etf_kline_series(security_codes, start_date="", end_date="", 
             "duration_ms": int(duration or 0),
             "message": "" if success and len(points) >= 2 else (message or "Gangtise ETF 日线暂不可用"),
         }
+    if not success:
+        return result
+    # The batch endpoint can return only the latest row for some ETF codes.
+    # Retry only those incomplete codes with the single-security contract so a
+    # partial batch response does not hide an otherwise valid latest quote.
+    for code in codes:
+        if len(result.get(code, {}).get("points") or []) >= 2:
+            continue
+        try:
+            single = fetch_gangtise_market_kline_series(
+                GANGTISE_SECURITY_KLINE_DAILY_PATH,
+                code,
+                start_date=effective_start,
+                end_date=effective_end,
+                limit=limit,
+                timeout=timeout,
+            )
+        except Exception as exc:
+            app.logger.warning("Gangtise ETF single-security retry failed code=%s: %s", code, exc)
+            continue
+        single_points = single.get("points") if isinstance(single, dict) else []
+        if len(single_points or []) > len(result.get(code, {}).get("points") or []):
+            result[code].update({
+                "ok": len(single_points) >= 2,
+                "points": single_points,
+                "message": "" if len(single_points) >= 2 else str(single.get("message") or result[code].get("message") or "Gangtise ETF 日线暂不可用"),
+                "duration_ms": int(single.get("duration_ms") or result[code].get("duration_ms") or 0),
+            })
     return result
 
 
@@ -6592,6 +6620,7 @@ WATCHLIST_NAME_ALIAS_MAP = {
 WATCHLIST_SEARCH_CACHE_TTL_SECONDS = 6 * 60 * 60
 WATCHLIST_DETAIL_CACHE_TTL_SECONDS = 10 * 60
 WATCHLIST_INDEX_DETAIL_CACHE_TTL_SECONDS = 5 * 60
+WATCHLIST_ANALYSIS_HISTORY_POINTS = 90
 
 MARKET_OVERVIEW_INDEX_CODES = (
     "source_sse50",
@@ -6940,20 +6969,23 @@ def build_etf_overview_payload(tenant_slug=""):
             previous_close = numeric_value(previous.get("close"))
             change = round(close - previous_close, 4) if close is not None and previous_close is not None else None
             change_pct = round(change / previous_close * 100, 4) if change is not None and previous_close else None
+            has_latest_price = close is not None
+            has_change = close is not None and previous_close is not None
             items.append({
                 "code": code,
                 "security_code": security_code,
                 "name": name,
                 "market": market,
                 "category": category,
-                "available": close is not None and previous_close is not None,
+                "available": has_latest_price,
+                "change_available": has_change,
                 "price": round(close, 4) if close is not None else None,
                 "change": change,
                 "change_pct": change_pct,
                 "volume": latest.get("volume"),
                 "updated_at": str(latest.get("date") or ""),
                 "data_source": str(result.get("provider") or "Gangtise OpenAPI"),
-                "message": "" if close is not None and previous_close is not None else str(result.get("message") or "Gangtise ETF 日线暂不可用"),
+                "message": "" if has_latest_price else str(result.get("message") or "Gangtise ETF 日线暂不可用"),
             })
         payload = {
             "ok": True,
@@ -6981,6 +7013,78 @@ def _apply_tenant_etf_selection(payload, tenant_slug=""):
         result["items"] = [item for item in items if str(item.get("security_code") or "").strip() in selected]
     result["tenant_display_config"] = settings
     return result
+
+
+def build_etf_detail_payload(security_code, tenant_slug=""):
+    """Build an ETF detail page from Gangtise daily candles only."""
+    normalized_code = str(security_code or "").strip().upper()
+    catalog_item = next(
+        (item for item in ETF_PRESENTATION_CATALOG if item[0] == normalized_code),
+        None,
+    )
+    if not catalog_item:
+        return {"ok": False, "error": "etf_not_found"}
+    _security_code, name, category = catalog_item
+    start_date, end_date = resolve_gangtise_market_date_window(days=180)
+    try:
+        series_by_code = fetch_gangtise_etf_kline_series(
+            [normalized_code], start_date=start_date, end_date=end_date,
+        )
+    except Exception as exc:
+        app.logger.warning("Gangtise ETF detail unavailable code=%s: %s", normalized_code, exc)
+        series_by_code = {}
+    result = series_by_code.get(normalized_code) or {}
+    points = [item for item in (result.get("points") or []) if isinstance(item, dict)]
+    history_points = points[-WATCHLIST_ANALYSIS_HISTORY_POINTS:]
+    latest = history_points[-1] if history_points else {}
+    previous = history_points[-2] if len(history_points) > 1 else {}
+    latest_close = numeric_value(latest.get("close"))
+    previous_close = numeric_value(previous.get("close"))
+    change = round(latest_close - previous_close, 4) if latest_close is not None and previous_close is not None else None
+    change_pct = round(change / previous_close * 100, 4) if change is not None and previous_close else None
+    candles = [
+        {
+            "date": str(item.get("date") or "").strip(),
+            "open": numeric_value(item.get("open")) or numeric_value(item.get("close")) or 0,
+            "high": numeric_value(item.get("high")) or numeric_value(item.get("close")) or 0,
+            "low": numeric_value(item.get("low")) or numeric_value(item.get("close")) or 0,
+            "close": numeric_value(item.get("close")) or 0,
+            "volume": numeric_value(item.get("volume")),
+        }
+        for item in history_points
+        if numeric_value(item.get("close")) is not None
+    ]
+    available = latest_close is not None
+    return {
+        "ok": True,
+        "asset_type": "etf",
+        "code": normalized_code.split(".", 1)[0],
+        "security_code": normalized_code,
+        "name": name,
+        "market": normalized_code.split(".", 1)[1] if "." in normalized_code else "CN",
+        "industry": category,
+        "category": category,
+        "price": round(latest_close, 4) if latest_close is not None else None,
+        "change": change,
+        "change_pct": change_pct,
+        "data_unavailable": not available,
+        "data_unavailable_message": "Gangtise ETF 日线暂不可用" if not available else "",
+        "kline": candles,
+        "history_kline": build_real_indicator_kline_payload(candles),
+        "history_window": WATCHLIST_ANALYSIS_HISTORY_POINTS,
+        "history_series": [{"date": item["date"], "value": item["close"]} for item in candles],
+        "authors": [],
+        "comments": [],
+        "annotations": [],
+        "fundamental": {
+            "summary": f"这是 {name} 的真实 ETF 日线历史，当前展示最近最多 90 个交易日。",
+            "metrics": [],
+            "thesis": [],
+        },
+        "forecast": {"label": "行情观察", "verdict": "仅供观察", "confidence": "--", "band": "历史行情不代表未来走势。", "drivers": []},
+        "data_source": str(result.get("provider") or "Gangtise OpenAPI"),
+        "updated_at": str(latest.get("date") or ""),
+    }
 
 
 def fetch_akshare_stock_kline_series(security_code, start_date="", end_date="", ak=None):
@@ -7928,6 +8032,7 @@ def normalize_watchlist_detail_from_indicator(detail, indicator_code):
     display_code = standard_code or normalized_code
     normalized.update(
         {
+            "asset_type": "indicator",
             "id": normalized_code,
             "code": display_code,
             "indicator_code": normalized_code,
@@ -7992,6 +8097,7 @@ def build_market_overview_index_detail(indicator_code):
     ]
     provider = "Gangtise OpenAPI"
     return {
+        "asset_type": "indicator",
         "id": indicator_code,
         "indicator_code": indicator_code,
         "indicator_name": entry.get("indicator_name") or indicator_code,
@@ -8062,6 +8168,7 @@ def build_watchlist_indicator_detail(indicator_code, stock_name=""):
                 raise
         entry = GANGTISE_INDICATOR_REGISTRY.get(normalized_code) or {}
         return {
+            "asset_type": "indicator",
             "id": normalized_code,
             "indicator_code": normalized_code,
             "code": str(entry.get("security_code") or normalized_code).strip(),
@@ -8857,6 +8964,10 @@ def _watchlist_detail_cache_is_usable(detail):
     kline = detail.get("kline")
     if not isinstance(kline, list) or len(kline) < 2:
         return False
+    history_kline = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    history_window = int(detail.get("history_window") or history_kline.get("history_window") or 0)
+    if history_window < WATCHLIST_ANALYSIS_HISTORY_POINTS:
+        return False
     if str(detail.get("data_source") or "").strip().lower() != "sina":
         return False
     return not _watchlist_detail_has_future_kline(detail)
@@ -8965,6 +9076,7 @@ def _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
     }.get(market, "个股")
     industry = str(normalized.get("industry") or f"{market_label}个股").strip() or "个股跟踪"
     verdict = "偏强跟踪" if trend_delta > 0 and change_pct >= 0 else ("谨慎观察" if trend_delta < 0 and change_pct < 0 else "继续跟踪")
+    history_points = [item for item in points[-WATCHLIST_ANALYSIS_HISTORY_POINTS:] if isinstance(item, dict)]
     detail = {
         "code": code,
         "name": name,
@@ -8994,8 +9106,7 @@ def _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
                     "low": round(NumberLike(item.get("low")), 2),
                     "close": round(NumberLike(item.get("close")), 2),
                 }
-                for item in points[-60:]
-                if isinstance(item, dict)
+                for item in history_points
             ]
         ),
         "history_series": [
@@ -9004,12 +9115,12 @@ def _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
                 "value": round(NumberLike(item.get("close")), 2),
                 "status": build_real_indicator_status(
                     NumberLike(item.get("close")),
-                    NumberLike(points[-60:][index - 1].get("close")) if index > 0 else NumberLike(item.get("close")),
+                    NumberLike(history_points[index - 1].get("close")) if index > 0 else NumberLike(item.get("close")),
                 ),
             }
-            for index, item in enumerate(points[-60:])
-            if isinstance(item, dict)
+            for index, item in enumerate(history_points)
         ],
+        "history_window": WATCHLIST_ANALYSIS_HISTORY_POINTS,
         "authors": [],
         "fundamental": {
             "summary": f"当前已接入{name}的真实行情样本，先基于价格位置、波动区间和租户知识做第一轮基本面拆解；如需更深层业务与财务判断，可继续补充年报、纪要或研报。",
@@ -9181,8 +9292,9 @@ def _merge_watchlist_intraday_candle(detail, intraday_points):
     daily_candles = merge_candles(detail.get("kline"))
     detail["kline"] = daily_candles[-20:]
     history_payload = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
-    history_candles = merge_candles(history_payload.get("candles") or detail.get("kline"))[-60:]
+    history_candles = merge_candles(history_payload.get("candles") or detail.get("kline"))[-WATCHLIST_ANALYSIS_HISTORY_POINTS:]
     detail["history_kline"] = build_real_indicator_kline_payload(history_candles)
+    detail["history_window"] = WATCHLIST_ANALYSIS_HISTORY_POINTS
     detail["history_series"] = [
         {
             "date": item["date"],

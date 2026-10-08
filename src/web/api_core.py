@@ -1,6 +1,7 @@
 from src.runtime import *
 from src.services import *
 from src.domain.ai_services import _is_truthy_flag
+from src.domain.watchlist_analysis_services import build_watchlist_kline_analysis
 from src.domain.core_services import (
     _merge_site_config,
     force_admin_task_stop,
@@ -584,6 +585,18 @@ def api_etf_overview():
         return jsonify({"ok": False, "error": "etf_overview_failed"}), 502
 
 
+@app.route("/api/etf-detail/<security_code>")
+def api_etf_detail(security_code):
+    try:
+        payload = build_etf_detail_payload(security_code)
+        return jsonify(payload), 200 if payload.get("ok") else 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load ETF detail")
+        return jsonify({"ok": False, "error": "etf_detail_failed"}), 502
+
+
 @app.route("/api/market-overview")
 def api_market_overview():
     try:
@@ -782,6 +795,20 @@ def api_watchlist_detail(stock_code):
         },
     }
     normalized = apply_watchlist_feature_flags(payload, site_config)
+    normalized["asset_type"] = str(
+        normalized.get("asset_type")
+        or ("indicator" if normalized.get("indicator_code") else "stock")
+    ).strip().lower() or "stock"
+    # K-line analysis is a stock-detail capability. Indicators and indices can
+    # expose their source history for context, but must not be presented as
+    # stock-style trend analysis.
+    if normalized["asset_type"] == "stock":
+        analysis_candles = normalized.get("history_kline", {}).get("candles") if isinstance(normalized.get("history_kline"), dict) else normalized.get("kline")
+        normalized["kline_analysis"] = build_watchlist_kline_analysis(
+            analysis_candles or normalized.get("kline") or [],
+        )
+    else:
+        normalized.pop("kline_analysis", None)
     app.logger.warning(
         "Watchlist API response code=%s tenant=%s kline_points=%s data_unavailable=%s data_source=%s intraday_points=%s intraday_available=%s unavailable_message=%s",
         str(stock_code or "").strip().upper(),

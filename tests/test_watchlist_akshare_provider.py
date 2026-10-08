@@ -62,6 +62,31 @@ def test_on_demand_unseeded_a_share_detail_fetches_its_canonical_sina_series():
     assert fetch_daily.call_args.kwargs["security_code"] == "601818.SH"
 
 
+def test_watchlist_detail_keeps_up_to_ninety_daily_points_for_analysis():
+    candidate = {
+        "code": "600519",
+        "name": "贵州茅台",
+        "market": "SH",
+        "security_code": "600519.SH",
+        "industry": "食品饮料",
+    }
+    points = [
+        {"date": f"2026-01-{index:02d}", "open": 100 + index, "high": 101 + index, "low": 99 + index, "close": 100 + index}
+        for index in range(1, 101)
+    ]
+    with patch.object(
+        market_services, "fetch_akshare_stock_kline_series", return_value={"ok": True, "provider": "Sina", "points": points}
+    ), patch.object(market_services, "attach_watchlist_intraday", side_effect=lambda detail: detail), patch.object(
+        market_services, "_save_watchlist_cache"
+    ):
+        detail = market_services._fetch_watchlist_realtime_detail_from_candidate(candidate)
+
+    assert len(detail["kline"]) == 20
+    assert len(detail["history_kline"]["candles"]) == 90
+    assert len(detail["history_series"]) == 90
+    assert detail["history_window"] == 90
+
+
 def test_stock_minute_uses_sina_backed_akshare_for_a_share():
     frame = pd.DataFrame([
         {"day": "2026-09-02 09:31:00", "close": 320.1},
@@ -199,4 +224,15 @@ def test_old_eastmoney_cache_marked_as_akshare_is_not_usable():
         "data_source": "AKShare",
         "kline": [{"date": "2026-09-01"}, {"date": "2026-09-02"}],
     }
+    assert market_services._watchlist_detail_cache_is_usable(cached) is False
+
+
+def test_watchlist_analysis_history_cache_requires_ninety_points_window():
+    cached = {
+        "data_source": "Sina",
+        "kline": [{"date": "2026-09-01"}, {"date": "2026-09-02"}],
+        "history_kline": {"candles": [{"date": "2026-09-02"}], "history_window": 60},
+        "history_window": 60,
+    }
+
     assert market_services._watchlist_detail_cache_is_usable(cached) is False
