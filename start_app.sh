@@ -27,6 +27,7 @@ SCHEDULER_PID_FILE="$SCRIPT_DIR/.app.foreground.scheduler.pid"
 WORKER_LOG_FILE="$SCRIPT_DIR/app.foreground.worker.log"
 SCHEDULER_LOG_FILE="$SCRIPT_DIR/app.foreground.scheduler.log"
 APP_PORT="${PORT:-5001}"
+APP_SERVER="${APP_SERVER:-gunicorn}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ "$(uname -s)" = "Darwin" ]; then
   GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-local}"
@@ -50,6 +51,8 @@ esac
 cd "$SCRIPT_DIR"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/scripts/runtime_process_lib.sh"
+APP_SERVER="$(validate_app_server)"
+export APP_SERVER
 
 pid_matches_app() {
   local pid="$1"
@@ -87,8 +90,10 @@ if lsof -nP -iTCP:"$APP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   exit 1
 fi
 
-start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" worker "$WORKER_PID_FILE" "$WORKER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
-start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" scheduler "$SCHEDULER_PID_FILE" "$SCHEDULER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
+if [[ "$APP_SERVER" == "gunicorn" ]]; then
+  start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" worker "$WORKER_PID_FILE" "$WORKER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
+  start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" scheduler "$SCHEDULER_PID_FILE" "$SCHEDULER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
+fi
 
 APP_PID=""
 cleanup_runtime() {
@@ -101,13 +106,17 @@ cleanup_runtime() {
 }
 trap cleanup_runtime EXIT INT TERM
 
-echo "Starting the Gunicorn Web service in the foreground on port $APP_PORT."
-env PORT="$APP_PORT" DEBUG=0 APP_SERVER=gunicorn PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" GANGTISE_RUNTIME_ROLE=web "$PYTHON_BIN" "$SCRIPT_DIR/app.py" &
+echo "Starting the $APP_SERVER Web service in the foreground on port $APP_PORT."
+env PORT="$APP_PORT" DEBUG=0 APP_SERVER="$APP_SERVER" PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" GANGTISE_RUNTIME_ROLE=web "$PYTHON_BIN" "$SCRIPT_DIR/app.py" &
 APP_PID=$!
 echo "$APP_PID" >"$PID_FILE"
 
-if ! wait_for_runtime_process "$APP_PID" "gunicorn" "${WEB_START_TIMEOUT_SECONDS:-30}"; then
-  echo "Foreground Gunicorn Web service failed to start." >&2
+EXPECTED_WEB_PROCESS="$SCRIPT_DIR/app.py"
+if [[ "$APP_SERVER" == "gunicorn" ]]; then
+  EXPECTED_WEB_PROCESS="gunicorn"
+fi
+if ! wait_for_runtime_process "$APP_PID" "$EXPECTED_WEB_PROCESS" "${WEB_START_TIMEOUT_SECONDS:-30}"; then
+  echo "Foreground $APP_SERVER Web service failed to start." >&2
   exit 1
 fi
 

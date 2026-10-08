@@ -4965,11 +4965,19 @@ body,
       <div class="h5-section-title">自选股</div>
       <div class="h5-segmented-tabs" role="tablist" aria-label="行情视图" style="display:flex;gap:8px;margin:0 0 12px;padding:4px;background:rgba(47,116,192,0.08);border-radius:10px">
         <button id="market-watchlist-tab" type="button" role="tab" aria-selected="true" class="h5-segmented-tab active" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:var(--gold);color:var(--navy);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('watchlist')">自选股列表</button>
+        <button id="market-etf-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('etf')">ETF</button>
         <button id="market-sector-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('sectors')">热门行业</button>
         <button id="market-overview-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('overview')">市场一览</button>
         <button id="market-macro-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('macro')">宏观经济</button>
       </div>
       <div id="h5-market-display-config" style="display:none;margin:0 0 12px"></div>
+      <div id="market-etf-panel" role="tabpanel" style="display:none">
+        <div id="market-etf-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">ETF 目录参考统一 ETF 看板，价格、涨跌和成交量只读取 Gangtise OpenAPI 真实日线行情。</div>
+        <div id="market-etf-category-tabs" class="h5-segmented-tabs" role="tablist" aria-label="ETF分类" style="display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding:3px;background:rgba(47,116,192,0.06);border-radius:8px"></div>
+        <div id="market-etf-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实 ETF 行情...</div>
+        </div>
+      </div>
       <div id="market-overview-panel" role="tabpanel">
         <div id="market-overview-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">市场一览由大V选择，Gangtise OpenAPI 统一采集后写入共享快照。</div>
         <div id="market-overview-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
@@ -8286,7 +8294,7 @@ function marketSnapshotTenantQuery() {
 
 let h5MarketDisplayConfigLoading = false;
 let h5MarketDisplayConfig = { settings: {}, catalog: {} };
-let h5MarketDisplayDraft = { market_overview_codes: [], sector_names: [], macro_economic_codes: [] };
+let h5MarketDisplayDraft = { market_overview_codes: [], sector_names: [], macro_economic_codes: [], etf_codes: [] };
 let h5MarketPickerTab = 'sectors';
 let h5MarketDisplaySummaryExpanded = false;
 
@@ -8303,14 +8311,15 @@ function renderH5MarketDisplayConfig(payload) {
   const catalog = h5MarketDisplayConfig.catalog || {};
   const marketRows = Array.isArray(catalog.market_overview) ? catalog.market_overview : [];
   const macroRows = Array.isArray(catalog.macro_economic) ? catalog.macro_economic : [];
-  const limits = catalog.limits || { market_overview: 4, hot_industries: 10, macro_economic: 6 };
+  const etfRows = Array.isArray(catalog.etf) ? catalog.etf : [];
   const chips = (values, labelOf, emptyText) => values.length
     ? values.map((value) => `<span class="market-layout-chip">${escapeHtml(labelOf(value))}</span>`).join('')
     : `<span style="font-size:11px;color:#7A8C9F">${emptyText}</span>`;
   const marketName = (code) => ((marketRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
   const macroName = (code) => ((macroRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
-  const summaryCard = (title, values, limit, labelOf) => `<div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">${title}</strong><span class="market-layout-count">${values.length}/${limit}</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(values, labelOf, '尚未配置')}</div></div>`;
-  const summary = `<div class="market-layout-summary-grid">${summaryCard('热门行业', settings.sector_names || [], Number(limits.hot_industries || 10), (value) => value)}${summaryCard('市场一览', settings.market_overview_codes || [], Number(limits.market_overview || 4), marketName)}${summaryCard('宏观经济', settings.macro_economic_codes || [], Number(limits.macro_economic || 6), macroName)}</div>`;
+  const etfName = (code) => ((etfRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
+  const summaryCard = (title, values, labelOf) => `<div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">${title}</strong><span class="market-layout-count">已选 ${values.length} 项</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(values, labelOf, '尚未配置')}</div></div>`;
+  const summary = `<div class="market-layout-summary-grid">${summaryCard('热门行业', settings.sector_names || [], (value) => value)}${summaryCard('市场一览', settings.market_overview_codes || [], marketName)}${summaryCard('宏观经济', settings.macro_economic_codes || [], macroName)}${summaryCard('ETF', settings.etf_codes || [], etfName)}</div>`;
   host.innerHTML = `<section class="market-layout-summary ${h5MarketDisplaySummaryExpanded ? '' : 'is-collapsed'}"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="font-size:12px;font-weight:750;color:#183A62">粉丝端行情版面</div><div style="font-size:11px;color:#62758A;margin-top:3px">${settings.configured ? `已发布 · ${escapeHtml(settings.updated_at || '--')}` : '尚未发布，可按需选择，不必填满'}</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button type="button" class="btn btn-light border btn-sm" onclick="toggleH5MarketDisplaySummary()">${h5MarketDisplaySummaryExpanded ? '收起' : '展开'}</button><button type="button" class="btn btn-outline-primary btn-sm" onclick="openH5MarketDisplayModal()">调整版面</button></div></div>${summary}</section>`;
 }
 
@@ -8318,7 +8327,7 @@ function toggleH5MarketDisplaySummary() { h5MarketDisplaySummaryExpanded = !h5Ma
 
 function openH5MarketDisplayModal() {
   const settings = h5MarketDisplayConfig.settings || {};
-  h5MarketDisplayDraft = { market_overview_codes: [...(settings.market_overview_codes || [])], sector_names: [...(settings.sector_names || [])], macro_economic_codes: [...(settings.macro_economic_codes || [])] };
+  h5MarketDisplayDraft = { market_overview_codes: [...(settings.market_overview_codes || [])], sector_names: [...(settings.sector_names || [])], macro_economic_codes: [...(settings.macro_economic_codes || [])], etf_codes: [...(settings.etf_codes || [])] };
   h5MarketPickerTab = 'sectors';
   renderH5MarketDisplayModal();
   document.getElementById('h5-market-layout-modal')?.classList.add('show');
@@ -8328,11 +8337,10 @@ function closeH5MarketDisplayModal() { document.getElementById('h5-market-layout
 
 function setH5MarketPickerTab(tab) { h5MarketPickerTab = tab; renderH5MarketDisplayModal(); }
 
-function toggleH5MarketDraftSelection(field, value, limit) {
+function toggleH5MarketDraftSelection(field, value) {
   const values = [...(h5MarketDisplayDraft[field] || [])];
   const index = values.indexOf(value);
   if (index >= 0) values.splice(index, 1);
-  else if (values.length >= limit) { showToast(`最多选择 ${limit} 个指标`); return; }
   else values.push(value);
   h5MarketDisplayDraft[field] = values;
   renderH5MarketDisplayModal();
@@ -8344,11 +8352,11 @@ function renderH5MarketDisplayModal() {
   const catalog = h5MarketDisplayConfig.catalog || {};
   const isSector = h5MarketPickerTab === 'sectors';
   const isMacro = h5MarketPickerTab === 'macro';
-  const field = isSector ? 'sector_names' : (isMacro ? 'macro_economic_codes' : 'market_overview_codes');
-  const limit = isSector ? 10 : (isMacro ? 6 : 4);
-  const options = isSector ? (catalog.hot_industries || []).map((item) => ({ value: String(item || ''), label: String(item || '') })) : (isMacro ? (catalog.macro_economic || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' })) : (catalog.market_overview || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' })));
+  const isEtf = h5MarketPickerTab === 'etf';
+  const field = isSector ? 'sector_names' : (isMacro ? 'macro_economic_codes' : (isEtf ? 'etf_codes' : 'market_overview_codes'));
+  const options = isSector ? (catalog.hot_industries || []).map((item) => ({ value: String(item || ''), label: String(item || '') })) : (isMacro ? (catalog.macro_economic || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' })) : (isEtf ? (catalog.etf || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' })) : (catalog.market_overview || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' }))));
   const selected = h5MarketDisplayDraft[field] || [];
-  host.innerHTML = `<div class="p-3 p-md-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="fw-bold" style="color:#183A62">配置粉丝端行情版面</div><div class="small mt-1" style="color:#62758A">选择需要展示的指标即可，未选满不会影响发布。</div></div><button type="button" class="btn-close" aria-label="关闭" onclick="closeH5MarketDisplayModal()"></button></div><div class="market-picker-tabs mt-3"><button type="button" class="market-picker-tab ${isSector ? 'active' : ''}" data-h5-market-picker="sectors" onclick="setH5MarketPickerTab('sectors')">热门行业</button><button type="button" class="market-picker-tab ${!isSector && !isMacro ? 'active' : ''}" data-h5-market-picker="market" onclick="setH5MarketPickerTab('market')">市场一览</button><button type="button" class="market-picker-tab ${isMacro ? 'active' : ''}" data-h5-market-picker="macro" onclick="setH5MarketPickerTab('macro')">宏观经济</button></div><div class="d-flex justify-content-between align-items-center mt-3"><strong style="font-size:13px;color:#183A62">${isSector ? '选择热门行业' : (isMacro ? '选择宏观指标' : '选择市场指标')}</strong><span class="badge text-bg-light border" style="color:#2F74C0!important;border-color:#CFE2F6!important">已选择 ${selected.length} / ${limit} · 可留空</span></div><div class="row row-cols-3 g-2 mt-1">${options.map((item) => `<div class="col"><button type="button" class="market-picker-tile ${selected.includes(item.value) ? 'is-selected' : ''}" data-h5-market-picker-tile="${escapeAttr(item.value)}" onclick="toggleH5MarketDraftSelection('${field}','${escapeAttr(item.value)}',${limit})">${selected.includes(item.value) ? '<span class="market-picker-check">✓</span>' : ''}<span>${escapeHtml(item.label)}</span></button></div>`).join('') || '<div class="col-12 small text-center py-4" style="color:#62758A">暂无可选择的指标</div>'}</div><div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top"><button type="button" class="btn btn-light border" onclick="closeH5MarketDisplayModal()">取消</button><button type="button" class="btn btn-primary" onclick="publishH5MarketDisplayDraft()">发布版面</button></div></div>`;
+  host.innerHTML = `<div class="p-3 p-md-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="fw-bold" style="color:#183A62">配置粉丝端行情版面</div><div class="small mt-1" style="color:#62758A">可按需选择任意数量的指标。</div></div><button type="button" class="btn-close" aria-label="关闭" onclick="closeH5MarketDisplayModal()"></button></div><div class="market-picker-tabs mt-3"><button type="button" class="market-picker-tab ${isSector ? 'active' : ''}" data-h5-market-picker="sectors" onclick="setH5MarketPickerTab('sectors')">热门行业</button><button type="button" class="market-picker-tab ${!isSector && !isMacro && !isEtf ? 'active' : ''}" data-h5-market-picker="market" onclick="setH5MarketPickerTab('market')">市场一览</button><button type="button" class="market-picker-tab ${isMacro ? 'active' : ''}" data-h5-market-picker="macro" onclick="setH5MarketPickerTab('macro')">宏观经济</button><button type="button" class="market-picker-tab ${isEtf ? 'active' : ''}" data-h5-market-picker="etf" onclick="setH5MarketPickerTab('etf')">ETF</button></div><div class="d-flex justify-content-between align-items-center mt-3"><strong style="font-size:13px;color:#183A62">${isSector ? '选择热门行业' : (isMacro ? '选择宏观指标' : (isEtf ? '选择 ETF' : '选择市场指标'))}</strong><span class="badge text-bg-light border" style="color:#2F74C0!important;border-color:#CFE2F6!important">已选择 ${selected.length} 项 · 可留空</span></div><div class="row row-cols-3 g-2 mt-1">${options.map((item) => `<div class="col"><button type="button" class="market-picker-tile ${selected.includes(item.value) ? 'is-selected' : ''}" data-h5-market-picker-tile="${escapeAttr(item.value)}" onclick="toggleH5MarketDraftSelection('${field}','${escapeAttr(item.value)}')">${selected.includes(item.value) ? '<span class="market-picker-check">✓</span>' : ''}<span>${escapeHtml(item.label)}</span></button></div>`).join('') || '<div class="col-12 small text-center py-4" style="color:#62758A">暂无可选择的指标</div>'}</div><div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top"><button type="button" class="btn btn-light border" onclick="closeH5MarketDisplayModal()">取消</button><button type="button" class="btn btn-primary" onclick="publishH5MarketDisplayDraft()">发布版面</button></div></div>`;
 }
 
 async function loadH5MarketDisplayConfig() {
@@ -8374,10 +8382,11 @@ async function saveH5MarketDisplayConfig() {
   const market = [...(h5MarketDisplayDraft.market_overview_codes || [])];
   const sectors = [...(h5MarketDisplayDraft.sector_names || [])];
   const macro = [...(h5MarketDisplayDraft.macro_economic_codes || [])];
+  const etf = [...(h5MarketDisplayDraft.etf_codes || [])];
   try {
     const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, {
       method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({market_overview_codes: market, sector_names: sectors, macro_economic_codes: macro}),
+      body: JSON.stringify({market_overview_codes: market, sector_names: sectors, macro_economic_codes: macro, etf_codes: etf}),
     });
     const payload = await response.json();
     if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_save_failed');
@@ -15163,6 +15172,9 @@ async function loadPersistedUserWatchlist() {
 let marketOverviewLoaded = false;
 let marketSectorLoaded = false;
 let marketMacroLoaded = false;
+let marketEtfLoaded = false;
+let marketEtfItems = [];
+let marketEtfCategory = '宽基指数';
 let marketOverviewRetryCount = 0;
 let marketSectorRetryCount = 0;
 let marketMacroRetryCount = 0;
@@ -15172,18 +15184,22 @@ function switchMarketView(view) {
   const overview = view === 'overview';
   const sectors = view === 'sectors';
   const macro = view === 'macro';
+  const etf = view === 'etf';
   const overviewPanel = document.getElementById('market-overview-panel');
   const sectorPanel = document.getElementById('market-sector-panel');
   const macroPanel = document.getElementById('market-macro-panel');
+  const etfPanel = document.getElementById('market-etf-panel');
   const watchlistPanel = document.getElementById('market-watchlist-panel');
   const overviewTab = document.getElementById('market-overview-tab');
   const sectorTab = document.getElementById('market-sector-tab');
   const macroTab = document.getElementById('market-macro-tab');
+  const etfTab = document.getElementById('market-etf-tab');
   const watchlistTab = document.getElementById('market-watchlist-tab');
   if (overviewPanel) overviewPanel.style.display = overview ? '' : 'none';
   if (sectorPanel) sectorPanel.style.display = sectors ? '' : 'none';
   if (macroPanel) macroPanel.style.display = macro ? '' : 'none';
-  if (watchlistPanel) watchlistPanel.style.display = overview || sectors || macro ? 'none' : '';
+  if (etfPanel) etfPanel.style.display = etf ? '' : 'none';
+  if (watchlistPanel) watchlistPanel.style.display = overview || sectors || macro || etf ? 'none' : '';
   if (overviewTab) {
     overviewTab.classList.toggle('active', overview);
     overviewTab.setAttribute('aria-selected', overview ? 'true' : 'false');
@@ -15202,15 +15218,80 @@ function switchMarketView(view) {
     macroTab.style.background = macro ? 'var(--gold)' : 'transparent';
     macroTab.style.color = macro ? 'var(--navy)' : 'var(--gray-400)';
   }
+  if (etfTab) {
+    etfTab.classList.toggle('active', etf);
+    etfTab.setAttribute('aria-selected', etf ? 'true' : 'false');
+    etfTab.style.background = etf ? 'var(--gold)' : 'transparent';
+    etfTab.style.color = etf ? 'var(--navy)' : 'var(--gray-400)';
+  }
   if (watchlistTab) {
-    watchlistTab.classList.toggle('active', !overview && !sectors && !macro);
-    watchlistTab.setAttribute('aria-selected', !overview && !sectors && !macro ? 'true' : 'false');
-    watchlistTab.style.background = !overview && !sectors && !macro ? 'var(--gold)' : 'transparent';
-    watchlistTab.style.color = !overview && !sectors && !macro ? 'var(--navy)' : 'var(--gray-400)';
+    const active = !overview && !sectors && !macro && !etf;
+    watchlistTab.classList.toggle('active', active);
+    watchlistTab.setAttribute('aria-selected', active ? 'true' : 'false');
+    watchlistTab.style.background = active ? 'var(--gold)' : 'transparent';
+    watchlistTab.style.color = active ? 'var(--navy)' : 'var(--gray-400)';
   }
   if (overview && !marketOverviewLoaded) loadMarketOverview();
   if (sectors && !marketSectorLoaded) loadMarketSectors();
   if (macro && !marketMacroLoaded) loadMarketMacro();
+  if (etf && !marketEtfLoaded) loadMarketEtf();
+}
+
+function renderMarketEtf(items) {
+  const host = document.getElementById('market-etf-list');
+  const categoryHost = document.getElementById('market-etf-category-tabs');
+  if (!host || !categoryHost) return;
+  marketEtfItems = Array.isArray(items) ? items : [];
+  const categories = Array.from(new Set(marketEtfItems.map((item) => String(item.category || '').trim()).filter(Boolean)));
+  categoryHost.innerHTML = categories.map((category) => {
+    const active = category === marketEtfCategory;
+    return `<button type="button" aria-selected="${active ? 'true' : 'false'}" style="flex:0 0 auto;border:0;border-radius:7px;padding:7px 10px;background:${active ? 'var(--gold)' : 'transparent'};color:${active ? 'var(--navy)' : 'var(--gray-400)'};font-size:11px;font-weight:700;cursor:pointer" onclick="marketEtfCategory='${escapeHtml(category)}';renderMarketEtf(marketEtfItems)">${escapeHtml(category)}</button>`;
+  }).join('');
+  if (!categories.includes(marketEtfCategory)) marketEtfCategory = categories[0] || '';
+  const rows = marketEtfItems.filter((item) => String(item.category || '') === marketEtfCategory);
+  if (!rows.length) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">暂无 ETF 目录数据</div>';
+    return;
+  }
+  const formatVolume = (value) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '--';
+    if (number >= 100000000) return `${(number / 100000000).toFixed(2)}亿`;
+    if (number >= 10000) return `${(number / 10000).toFixed(2)}万`;
+    return Math.round(number).toLocaleString('zh-CN');
+  };
+  host.innerHTML = rows.map((item) => {
+    const available = item && item.available;
+    const changePct = Number(item.change_pct);
+    const positive = Number.isFinite(changePct) && changePct >= 0;
+    const value = available && Number.isFinite(Number(item.price)) ? Number(item.price).toFixed(4) : '--';
+    const changeText = available && Number.isFinite(changePct) ? `${positive ? '+' : ''}${changePct.toFixed(2)}%` : '暂无真实行情';
+    const action = available ? ` onclick="openWatchlistDetail('${escapeHtml(item.security_code || item.code || '')}')"` : '';
+    return `<button type="button"${action} style="text-align:left;width:100%;min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white);cursor:${available ? 'pointer' : 'default'};opacity:${available ? '1' : '0.72'}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.security_code || '--')} · ${escapeHtml(item.category || 'ETF')}</div></div>
+        <div style="text-align:right;flex:0 0 auto"><div style="font-size:16px;font-weight:700">${value}</div><div style="font-size:11px;color:${positive ? 'var(--red)' : 'var(--green)'}">${changeText}</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--gray-400);margin-top:9px"><span>成交量 ${formatVolume(item.volume)}</span><span>${escapeHtml(item.updated_at || '--')}</span></div>
+    </button>`;
+  }).join('');
+}
+
+async function loadMarketEtf() {
+  const host = document.getElementById('market-etf-list');
+  if (!host) return;
+  try {
+    const response = await fetch(`/api/etf-overview${marketSnapshotTenantQuery()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'etf_overview_failed');
+    marketEtfLoaded = true;
+    renderMarketEtf(payload.items || []);
+    const sourceNote = document.getElementById('market-etf-source-note');
+    if (sourceNote && payload.updated_at) sourceNote.textContent = `ETF 目录参考统一 ETF 看板，价格、涨跌和成交量只读取 Gangtise OpenAPI 真实日线行情。最近交易日：${payload.updated_at}`;
+  } catch (error) {
+    marketEtfLoaded = false;
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">ETF 行情暂时不可用，请点击重试</div><div style="grid-column:1/-1;text-align:center"><button type="button" class="btn-gold" style="font-size:12px;padding:8px 14px" onclick="loadMarketEtf()">重试</button></div>';
+  }
 }
 
 function renderMarketOverview(items) {

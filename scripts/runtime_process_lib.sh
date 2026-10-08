@@ -25,6 +25,7 @@ ensure_python_dependencies() {
   local python_bin="$2"
   local requirements_file="${REQUIREMENTS_FILE:-$root_dir/requirements.txt}"
   local auto_install="${AUTO_INSTALL_PYTHON_DEPS:-1}"
+  local app_server="${APP_SERVER:-gunicorn}"
 
   if [[ ! -f "$requirements_file" ]]; then
     echo "requirements.txt not found: $requirements_file" >&2
@@ -79,11 +80,28 @@ PY
     echo "Warning: unrelated Python dependency conflicts detected for $python_bin." >&2
     "$python_bin" -m pip check >&2 || true
   fi
-  "$python_bin" -c 'import flask, requests, psycopg2, qrcode; import gunicorn; from cryptography.fernet import Fernet' >/dev/null 2>&1 || {
+  "$python_bin" -c 'import flask, requests, psycopg2, qrcode; from cryptography.fernet import Fernet' >/dev/null 2>&1 || {
     echo "Core Python runtime dependencies are not importable for $python_bin." >&2
     return 1
   }
+  if [[ "$app_server" != "flask" ]] && ! "$python_bin" -c 'import gunicorn' >/dev/null 2>&1; then
+    echo "Gunicorn is required when APP_SERVER=$app_server." >&2
+    return 1
+  fi
   echo "Python dependencies verified: $python_bin"
+}
+
+validate_app_server() {
+  local app_server="${APP_SERVER:-gunicorn}"
+  case "$app_server" in
+    gunicorn|flask)
+      printf '%s\n' "$app_server"
+      ;;
+    *)
+      echo "Invalid APP_SERVER: $app_server (expected gunicorn or flask)." >&2
+      return 1
+      ;;
+  esac
 }
 
 runtime_pid_matches() {

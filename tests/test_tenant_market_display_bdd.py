@@ -16,7 +16,7 @@ def _json(response):
     return response[0].get_json() if isinstance(response, tuple) else response.get_json()
 
 
-def test_given_shared_gangtise_snapshot_when_tenant_has_published_selection_then_only_4_and_10_are_visible():
+def test_given_shared_gangtise_snapshot_when_tenant_has_published_selection_then_all_selected_items_are_visible():
     from src.domain import market_services
 
     overview = {
@@ -33,8 +33,8 @@ def test_given_shared_gangtise_snapshot_when_tenant_has_published_selection_then
     }
     settings = {
         "configured": True,
-        "market_overview_codes": list(market_services.MARKET_OVERVIEW_INDEX_CODES[:4]),
-        "sector_names": list(market_services.SHENWAN_LEVEL1_INDUSTRIES[:10]),
+        "market_overview_codes": list(market_services.MARKET_OVERVIEW_INDEX_CODES[:5]),
+        "sector_names": list(market_services.SHENWAN_LEVEL1_INDUSTRIES[:11]),
     }
     with patch("src.domain.core_services.load_tenant_market_display_settings", return_value=settings):
         selected_market = market_services._apply_tenant_market_display_selection(overview, "laowang", "market")
@@ -42,8 +42,8 @@ def test_given_shared_gangtise_snapshot_when_tenant_has_published_selection_then
 
     assert [item["indicator_code"] for item in selected_market["items"]] == settings["market_overview_codes"]
     assert [item["sector"] for item in selected_sectors["items"]] == settings["sector_names"]
-    assert selected_market["display_limit"] == 4
-    assert selected_sectors["display_limit"] == 10
+    assert selected_market["display_limit"] == 5
+    assert selected_sectors["display_limit"] == 11
 
 
 def test_given_dav_clears_all_choices_when_published_then_the_snapshot_projection_is_empty():
@@ -76,7 +76,7 @@ def test_given_dav_publishes_macro_choices_when_follower_reads_macro_snapshot_th
         payload = market_services.build_macro_economic_payload(tenant_slug="laowang")
 
     assert [item["indicator_code"] for item in payload["items"]] == ["source_ppi"]
-    assert payload["display_limit"] == len(market_services.MACRO_ECONOMIC_VISIBLE_CODES)
+    assert payload["display_limit"] == 1
 
 
 def test_given_unconfigured_tenant_when_reading_shared_snapshot_then_platform_recommendation_is_limited_but_not_persisted():
@@ -90,26 +90,55 @@ def test_given_unconfigured_tenant_when_reading_shared_snapshot_then_platform_re
     assert len(selected["items"]) == 4
 
 
-def test_given_dav_posts_more_than_4_market_or_10_sector_choices_when_saving_then_api_rejects_it():
+def test_given_dav_posts_more_than_the_legacy_selection_limits_when_saving_then_api_accepts_it():
     from src.web import api_kol
+    from src.domain import market_services
 
     with app.test_request_context(
         "/api/tenant/laowang/market-display-config", method="POST", json={
-            "market_overview_codes": ["x"] * 5, "sector_names": []
+            "market_overview_codes": list(market_services.MARKET_OVERVIEW_INDEX_CODES[:5]),
+            "sector_names": list(market_services.SHENWAN_LEVEL1_INDUSTRIES[:11]),
+            "macro_economic_codes": [],
+            "etf_codes": [code for code, _name, _category in market_services.ETF_PRESENTATION_CATALOG],
         }
-    ), patch.object(api_kol, "get_current_authenticated_user", return_value=DAV):
+    ), patch.object(api_kol, "get_current_authenticated_user", return_value=DAV), patch.object(
+        api_kol, "save_tenant_market_display_settings", return_value={
+            "configured": True,
+            "market_overview_codes": list(market_services.MARKET_OVERVIEW_INDEX_CODES[:5]),
+            "sector_names": list(market_services.SHENWAN_LEVEL1_INDUSTRIES[:11]),
+            "macro_economic_codes": [],
+            "etf_codes": [code for code, _name, _category in market_services.ETF_PRESENTATION_CATALOG],
+        }
+    ):
         response = api_kol.api_tenant_market_display_config("laowang")
-    assert _status(response) == 400
-    assert _json(response)["error"] == "market_overview_limit_exceeded"
+    assert _status(response) == 200
+    payload = _json(response)
+    assert len(payload["settings"]["market_overview_codes"]) == 5
+    assert len(payload["settings"]["sector_names"]) == 11
+    assert len(payload["settings"]["etf_codes"]) == len(market_services.ETF_PRESENTATION_CATALOG)
 
-    with app.test_request_context(
-        "/api/tenant/laowang/market-display-config", method="POST", json={
-            "market_overview_codes": [], "sector_names": ["x"] * 11
-        }
-    ), patch.object(api_kol, "get_current_authenticated_user", return_value=DAV):
-        response = api_kol.api_tenant_market_display_config("laowang")
-    assert _status(response) == 400
-    assert _json(response)["error"] == "hot_industry_limit_exceeded"
+
+def test_given_configured_tenant_when_reading_etf_overview_then_only_selected_etfs_are_visible_and_empty_means_clear():
+    from src.domain import market_services
+
+    payload = {
+        "ok": True,
+        "items": [
+            {"security_code": "510300.SH", "name": "沪深300ETF"},
+            {"security_code": "159915.SZ", "name": "创业板ETF"},
+        ],
+    }
+    with patch("src.domain.core_services.load_tenant_market_display_settings", return_value={
+        "configured": True, "etf_codes": ["159915.SZ"]
+    }):
+        selected = market_services._apply_tenant_etf_selection(payload, "laowang")
+    assert [item["security_code"] for item in selected["items"]] == ["159915.SZ"]
+
+    with patch("src.domain.core_services.load_tenant_market_display_settings", return_value={
+        "configured": True, "etf_codes": []
+    }):
+        cleared = market_services._apply_tenant_etf_selection(payload, "laowang")
+    assert cleared["items"] == []
 
 
 def test_given_dav_publishes_selection_when_follower_reads_h5_market_api_then_same_tenant_is_used():
@@ -182,11 +211,15 @@ def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfac
     assert "renderFeedMarketEconomy(sectors.items" in fundamental_panel
     assert "feed-watchlist-chart" in h5
     assert 'data-h5-market-picker="macro"' in h5
+    assert 'data-h5-market-picker="etf"' in h5
+    assert 'toggleH5MarketDraftSelection' in h5 and '最多选择' not in h5
     assert "toggleH5MarketDisplaySummary" in h5
     assert 'id="kw-market-layout-modal"' in web
     assert 'data-kw-market-picker=' in web
     assert 'data-kw-market-picker-tile=' in web
     assert 'data-kw-market-picker="macro"' in web
+    assert 'data-kw-market-picker="etf"' in web
+    assert 'toggleKwMarketDraftSelection' in web and '最多选择' not in web
     assert "toggleKwMarketDisplaySummary" in web
     assert "配置粉丝端行情版面" in web
     assert "已发布给本租户粉丝" in web

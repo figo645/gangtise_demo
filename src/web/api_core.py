@@ -572,6 +572,18 @@ def api_market():
     return jsonify(gen_market_data())
 
 
+@app.route("/api/etf-overview")
+def api_etf_overview():
+    """Return the read-only ETF market tab backed by real daily candles."""
+    try:
+        return jsonify(build_etf_overview_payload(tenant_slug=_resolve_market_snapshot_tenant()))
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load ETF overview")
+        return jsonify({"ok": False, "error": "etf_overview_failed"}), 502
+
+
 @app.route("/api/market-overview")
 def api_market_overview():
     try:

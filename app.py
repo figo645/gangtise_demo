@@ -145,5 +145,11 @@ if __name__ == "__main__":
         if _is_enabled(os.environ.get("WEB_PRELOAD"), default=True):
             gunicorn_args.insert(-1, "--preload")
         os.execv(sys.executable, gunicorn_args)
+    # The legacy single-process mode remains available for local and low
+    # traffic deployments. Its background loops live in this process, so the
+    # shell launcher must not start dedicated sidecars in the same mode.
     startup_bootstrap(start_background=True)
+    server_options["threaded"] = _is_enabled(
+        os.environ.get("FLASK_THREADED"), default=True
+    )
     app.run(**server_options)

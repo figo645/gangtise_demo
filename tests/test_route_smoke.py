@@ -223,19 +223,77 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn('id="market-sector-tab"', html)
         self.assertIn('id="market-macro-tab"', html)
         self.assertIn('id="market-watchlist-tab"', html)
+        self.assertIn('id="market-etf-tab"', html)
         self.assertIn('id="market-overview-list"', html)
         self.assertIn('id="market-sector-list"', html)
         self.assertIn('id="market-macro-list"', html)
+        self.assertIn('id="market-etf-panel"', html)
+        self.assertIn('id="market-etf-list"', html)
         self.assertIn("switchMarketView('overview')", html)
         self.assertIn("switchMarketView('sectors')", html)
         self.assertIn("switchMarketView('macro')", html)
         self.assertIn("switchMarketView('watchlist')", html)
+        self.assertIn("switchMarketView('etf')", html)
         self.assertLess(html.index('id="market-watchlist-tab"'), html.index('id="market-sector-tab"'))
         self.assertLess(html.index('id="market-sector-tab"'), html.index('id="market-overview-tab"'))
+        self.assertIn("/api/etf-overview", html)
         self.assertIn("renderColumn('涨幅', gains", html)
         self.assertIn("renderColumn('跌幅', losses", html)
         self.assertIn("candleLabel: `${data.name || '标的'} 日K线${data.kline_contains_intraday ? '（含盘中）' : ''}`", html)
         self.assertIn("data.annotation_key || data.indicator_code || data.code", html)
+
+    def test_web_market_reuses_the_same_etf_tab_contract(self):
+        response = self.client.get(f"/web?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="market-etf-tab"', html)
+        self.assertIn('id="market-etf-panel"', html)
+        self.assertIn("/api/etf-overview", html)
+
+    def test_etf_overview_api_uses_real_daily_data_and_never_fabricates_quotes(self):
+        from src.domain import market_services
+
+        with market_services._etf_overview_cache_lock:
+            market_services._etf_overview_cache["payload"] = None
+            market_services._etf_overview_cache["expires_at"] = 0
+
+        def fake_batch(security_codes, start_date="", end_date="", **_kwargs):
+            return {
+                code: {
+                    "ok": True,
+                    "provider": "Gangtise OpenAPI",
+                    "path": market_services.GANGTISE_SECURITY_KLINE_DAILY_PATH,
+                    "points": [
+                        {"date": "2026-10-07", "close": 1.0, "volume": 10000},
+                        {"date": "2026-10-08", "close": 1.1, "volume": 12000},
+                    ],
+                }
+                for code in security_codes
+            }
+
+        with patch.object(market_services, "fetch_gangtise_etf_kline_series", side_effect=fake_batch) as batch, \
+            patch.object(market_services, "fetch_akshare_stock_kline_series", side_effect=AssertionError("ETF must not call AKShare")):
+            response = self.client.get("/api/etf-overview")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(len(payload["items"]), 24)
+        self.assertEqual(payload["items"][0]["price"], 1.1)
+        self.assertEqual(payload["items"][0]["change_pct"], 10.0)
+        self.assertEqual(payload["items"][0]["data_source"], "Gangtise OpenAPI")
+        self.assertNotIn("全部", payload["categories"])
+        batch.assert_called_once()
+
+        with market_services._etf_overview_cache_lock:
+            market_services._etf_overview_cache["payload"] = None
+            market_services._etf_overview_cache["expires_at"] = 0
+        with patch.object(market_services, "fetch_gangtise_etf_kline_series", return_value={}):
+            unavailable = self.client.get("/api/etf-overview").get_json()["items"][0]
+        self.assertFalse(unavailable["available"])
+        self.assertIsNone(unavailable["price"])
+        self.assertIsNone(unavailable["change_pct"])
 
     def test_watchlist_data_is_not_persisted_in_browser_storage(self):
         h5_response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")

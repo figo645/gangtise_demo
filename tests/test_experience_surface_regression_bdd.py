@@ -53,8 +53,13 @@ BDD_SCENARIOS = (
         ('min-height:100dvh', 'env(safe-area-inset-bottom)', '@media (max-width:575.98px)'),
     ),
     _scenario(
-        "h5-market-tabs", "H5", "市场四分类切换", "用户位于市场页面。", "切换自选股、热门行业、市场一览和宏观经济。", "四个标签与对应面板都存在。",
-        ('market-watchlist-tab', 'market-sector-tab', 'market-overview-tab', 'market-macro-tab', 'market-watchlist-panel', 'market-sector-panel', 'market-overview-panel', 'market-macro-panel'),
+        "h5-market-tabs", "H5", "市场五分类切换", "用户位于市场页面。", "切换自选股、ETF、热门行业、市场一览和宏观经济。", "五个标签与对应面板都存在。",
+        ('market-watchlist-tab', 'market-etf-tab', 'market-sector-tab', 'market-overview-tab', 'market-macro-tab', 'market-watchlist-panel', 'market-etf-panel', 'market-sector-panel', 'market-overview-panel', 'market-macro-panel'),
+    ),
+    _scenario(
+        "h5-market-etf", "H5", "ETF真实行情看板", "用户位于自选股页面。", "点击 ETF 并按分类浏览。", "页面调用 ETF 行情接口；有真实日线才展示价格、涨跌和成交量，暂无数据时明确提示。",
+        ('market-etf-category-tabs', 'market-etf-list', "switchMarketView('etf')", "/api/etf-overview", '暂无真实行情'),
+        ('510300.SH', '750870000', '4.389'),
     ),
     _scenario(
         "h5-market-sources", "H5", "市场与宏观数据来源说明", "用户查看市场一览或宏观经济。", "阅读数据来源。", "页面明确只读取后台快照，不伪造实时值。",

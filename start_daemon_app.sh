@@ -10,6 +10,7 @@ SCHEDULER_PID_FILE="$SCRIPT_DIR/.app.daemon.scheduler.pid"
 WORKER_LOG_FILE="$SCRIPT_DIR/app.worker.log"
 SCHEDULER_LOG_FILE="$SCRIPT_DIR/app.scheduler.log"
 APP_PORT="${PORT:-5001}"
+APP_SERVER="${APP_SERVER:-gunicorn}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 AUTO_START_POSTGRES="${AUTO_START_POSTGRES:-1}"
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -47,6 +48,8 @@ esac
 cd "$SCRIPT_DIR"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/scripts/runtime_process_lib.sh"
+APP_SERVER="$(validate_app_server)"
+export APP_SERVER
 
 CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-$SCRIPT_DIR/.gangtise_postgres_credentials}"
 if [ -f "$CREDENTIALS_FILE" ]; then
@@ -113,19 +116,25 @@ if lsof -nP -iTCP:"$APP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   exit 1
 fi
 
-# Web workers intentionally do not host background loops. Start durable queue
-# and scheduler roles before the Gunicorn master so request traffic has its
-# supporting services from the first successful health probe.
-start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" worker "$WORKER_PID_FILE" "$WORKER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
-start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" scheduler "$SCHEDULER_PID_FILE" "$SCHEDULER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
+# Gunicorn mode keeps queue and scheduler roles outside the Web process.
+# Flask mode intentionally uses the legacy single-process lifecycle; starting
+# sidecars as well would create duplicate consumers and scheduler loops.
+if [[ "$APP_SERVER" == "gunicorn" ]]; then
+  start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" worker "$WORKER_PID_FILE" "$WORKER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
+  start_runtime_sidecar "$SCRIPT_DIR" "$PYTHON_BIN" scheduler "$SCHEDULER_PID_FILE" "$SCHEDULER_LOG_FILE" "$GANGTISE_RUNTIME_ENV"
+fi
 
-nohup env PORT="$APP_PORT" DEBUG=0 APP_SERVER=gunicorn PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" GANGTISE_RUNTIME_ROLE=web "$PYTHON_BIN" "$SCRIPT_DIR/app.py" \
+nohup env PORT="$APP_PORT" DEBUG=0 APP_SERVER="$APP_SERVER" PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" GANGTISE_RUNTIME_ROLE=web "$PYTHON_BIN" "$SCRIPT_DIR/app.py" \
   >"$LOG_FILE" 2>&1 < /dev/null &
 APP_PID=$!
 echo "$APP_PID" >"$PID_FILE"
 
-if wait_for_runtime_process "$APP_PID" "gunicorn" "${WEB_START_TIMEOUT_SECONDS:-30}"; then
-  echo "Started daemon Web service (Gunicorn)."
+EXPECTED_WEB_PROCESS="$SCRIPT_DIR/app.py"
+if [[ "$APP_SERVER" == "gunicorn" ]]; then
+  EXPECTED_WEB_PROCESS="gunicorn"
+fi
+if wait_for_runtime_process "$APP_PID" "$EXPECTED_WEB_PROCESS" "${WEB_START_TIMEOUT_SECONDS:-30}"; then
+  echo "Started daemon Web service ($APP_SERVER)."
   echo "PID: $APP_PID"
   echo "Port: $APP_PORT"
   echo "Log: $LOG_FILE"

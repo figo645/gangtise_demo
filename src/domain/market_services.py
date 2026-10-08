@@ -8,6 +8,7 @@ from email.utils import parsedate_to_datetime
 import shutil
 import subprocess
 import threading
+import time
 from zoneinfo import ZoneInfo
 
 def _parse_market_datetime(value):
@@ -575,6 +576,7 @@ GANGTISE_OPENAPI_LOGIN_PATH = "/application/auth/oauth/open/loginV2"
 # Gangtise distinguishes securities from indices.  Standard market indices
 # and Shenwan `.SWI` industry indices must never use the stock K-line path.
 GANGTISE_INDEX_KLINE_DAILY_PATH = "/application/open-quote/index/kline/daily"
+GANGTISE_SECURITY_KLINE_DAILY_PATH = "/application/open-quote/kline/daily"
 _gangtise_env_loaded = False
 _gangtise_token_lock = threading.Lock()
 _gangtise_token_cache = {"token": "", "fetched_at": 0.0}
@@ -1620,7 +1622,7 @@ def _clamp_gangtise_trade_end_date(value):
     return min(configured_date, _current_cn_market_date()) if configured_date else _current_cn_market_date()
 
 
-def normalize_gangtise_kline_points(response, max_trade_date=None):
+def normalize_gangtise_kline_points(response, max_trade_date=None, security_code=""):
     data = response.get("data") if isinstance(response, dict) else {}
     if not isinstance(data, dict):
         return []
@@ -1636,6 +1638,11 @@ def normalize_gangtise_kline_points(response, max_trade_date=None):
         if not isinstance(row, list):
             continue
         try:
+            if security_code and "securityCode" in field_index:
+                requested_code = str(security_code or "").strip().upper()
+                row_code = str(row[field_index["securityCode"]] or "").strip().upper()
+                if row_code != requested_code:
+                    continue
             trade_date = str(row[field_index["tradeDate"]] or "").strip()
             close_value = float(row[field_index["close"]])
         except Exception:
@@ -1648,6 +1655,7 @@ def normalize_gangtise_kline_points(response, max_trade_date=None):
         open_value = numeric_value(row[field_index["open"]]) if "open" in field_index else None
         high_value = numeric_value(row[field_index["high"]]) if "high" in field_index else None
         low_value = numeric_value(row[field_index["low"]]) if "low" in field_index else None
+        volume_value = numeric_value(row[field_index["volume"]]) if "volume" in field_index else None
         points.append(
             {
                 "date": trade_date,
@@ -1655,6 +1663,7 @@ def normalize_gangtise_kline_points(response, max_trade_date=None):
                 "high": close_value if high_value is None else high_value,
                 "low": close_value if low_value is None else low_value,
                 "close": close_value,
+                "volume": volume_value,
             }
         )
     points.sort(key=lambda item: item["date"])
@@ -1843,6 +1852,68 @@ def fetch_gangtise_market_kline_series(path, security_code, token="", start_date
         "response": response if isinstance(response, dict) else {},
         "message": message,
     }
+
+
+def fetch_gangtise_etf_kline_series(security_codes, start_date="", end_date="", limit=500, timeout=30):
+    """Fetch the ETF catalog in one Gangtise request and split rows by code.
+
+    The provider accepts a security list for the stock daily K-line endpoint.
+    Keeping this as one request avoids an uncontrolled per-ETF request fan-out
+    and avoids calling the native token/runtime layer from multiple threads.
+    """
+    codes = [str(code or "").strip().upper() for code in security_codes or []]
+    codes = list(dict.fromkeys(code for code in codes if code))
+    if not codes:
+        return {}
+    effective_start, effective_end = (
+        (str(start_date or "").strip(), str(end_date or "").strip())
+        if start_date and end_date else
+        resolve_gangtise_market_date_window(days=180)
+    )
+    effective_end = _clamp_gangtise_trade_end_date(effective_end).isoformat()
+    payload = build_gangtise_market_kline_payload(
+        security_code=codes[0],
+        start_date=effective_start,
+        end_date=effective_end,
+        limit=limit,
+    )
+    payload["securityList"] = codes
+    status, response, duration = post_gangtise_openapi_json(
+        GANGTISE_SECURITY_KLINE_DAILY_PATH,
+        payload,
+        timeout=timeout,
+    )
+    response_obj = response if isinstance(response, dict) else {}
+    success = is_gangtise_openapi_success(status, response_obj)
+    message = str(response_obj.get("msg") or response_obj.get("message") or "").strip()
+    data = response_obj.get("data") if isinstance(response_obj.get("data"), dict) else {}
+    headers = data.get("fieldList") if isinstance(data.get("fieldList"), list) else []
+    rows = data.get("list") if isinstance(data.get("list"), list) else []
+    grouped = {code: [] for code in codes}
+    security_index = headers.index("securityCode") if "securityCode" in headers else -1
+    if security_index >= 0:
+        for row in rows:
+            if not isinstance(row, list) or len(row) <= security_index:
+                continue
+            row_code = str(row[security_index] or "").strip().upper()
+            if row_code in grouped:
+                grouped[row_code].append(row)
+    elif len(codes) == 1:
+        grouped[codes[0]] = rows
+    result = {}
+    for code in codes:
+        scoped_response = {"data": {"fieldList": headers, "list": grouped.get(code) or []}}
+        points = normalize_gangtise_kline_points(scoped_response, max_trade_date=effective_end, security_code=code)
+        result[code] = {
+            "ok": bool(success and len(points) >= 2),
+            "provider": "Gangtise OpenAPI",
+            "path": GANGTISE_SECURITY_KLINE_DAILY_PATH,
+            "points": points,
+            "response": response_obj,
+            "duration_ms": int(duration or 0),
+            "message": "" if success and len(points) >= 2 else (message or "Gangtise ETF 日线暂不可用"),
+        }
+    return result
 
 
 def build_gangtise_market_runtime_diagnostic(probe_security_code="600519.SH"):
@@ -6762,6 +6833,7 @@ def _normalize_akshare_stock_daily_points(frame, start_date="", end_date=""):
     high_column = _akshare_column(frame, ("最高", "high", "High"))
     low_column = _akshare_column(frame, ("最低", "low", "Low"))
     close_column = _akshare_column(frame, ("收盘", "close", "Close"))
+    volume_column = _akshare_column(frame, ("成交量", "volume", "Volume"))
     if not date_column or not close_column:
         return []
     start_text = str(start_date or "")[:10]
@@ -6787,8 +6859,128 @@ def _normalize_akshare_stock_daily_points(frame, start_date="", end_date=""):
             "high": high_value if high_value is not None else close_value,
             "low": low_value if low_value is not None else close_value,
             "close": close_value,
+            "volume": _akshare_float(row.get(volume_column)) if volume_column else None,
         })
     return sorted({item["date"]: item for item in points}.values(), key=lambda item: item["date"])
+
+
+# This is a presentation catalog, not a price cache. Values are deliberately
+# absent here; all displayed quotes must come from the real daily K-line path.
+ETF_PRESENTATION_CATALOG = (
+    ("510300.SH", "沪深300ETF华泰柏瑞", "宽基指数"),
+    ("510500.SH", "中证500ETF南方", "宽基指数"),
+    ("159915.SZ", "创业板ETF易方达", "宽基指数"),
+    ("588000.SH", "科创50ETF华夏", "宽基指数"),
+    ("512100.SH", "中证1000ETF南方", "宽基指数"),
+    ("513100.SH", "纳指ETF国泰", "跨境指数"),
+    ("512000.SH", "券商ETF华宝", "行业主题"),
+    ("512800.SH", "银行ETF华宝", "行业主题"),
+    ("512480.SH", "半导体ETF国联安", "行业主题"),
+    ("515880.SH", "通信ETF国泰", "行业主题"),
+    ("512010.SH", "医药ETF易方达", "行业主题"),
+    ("512690.SH", "酒ETF鹏华", "行业主题"),
+    ("159928.SZ", "消费ETF汇添富", "行业主题"),
+    ("515030.SH", "新能源车ETF华夏", "行业主题"),
+    ("515790.SH", "光伏ETF华泰柏瑞", "行业主题"),
+    ("510880.SH", "红利ETF华泰柏瑞", "行业主题"),
+    ("159959.SZ", "央企ETF银华", "行业主题"),
+    ("515070.SH", "人工智能ETF华夏", "行业主题"),
+    ("159920.SZ", "恒生ETF华夏", "跨境指数"),
+    ("513130.SH", "恒生科技ETF华泰柏瑞", "跨境指数"),
+    ("511010.SH", "国债ETF国泰", "债券"),
+    ("511880.SH", "银华日利ETF", "债券"),
+    ("518880.SH", "黄金ETF华安", "商品"),
+    ("512400.SH", "有色金属ETF南方", "商品"),
+)
+
+_etf_overview_cache_lock = threading.Lock()
+_etf_overview_build_lock = threading.Lock()
+_etf_overview_cache = {"expires_at": 0.0, "payload": None}
+ETF_OVERVIEW_CACHE_TTL_SECONDS = 60
+
+
+def build_etf_overview_payload(tenant_slug=""):
+    """Build the ETF tab from real daily candles without creating fake quotes."""
+    now = time.monotonic()
+    with _etf_overview_cache_lock:
+        cached_payload = _etf_overview_cache.get("payload")
+        if cached_payload and now < float(_etf_overview_cache.get("expires_at") or 0):
+            return _apply_tenant_etf_selection(cached_payload, tenant_slug)
+    # Keep this provider call serialized. The Gangtise token/runtime layer is
+    # shared by the web process and must not be fan-out called per ETF.
+    with _etf_overview_build_lock:
+        now = time.monotonic()
+        with _etf_overview_cache_lock:
+            cached_payload = _etf_overview_cache.get("payload")
+            if cached_payload and now < float(_etf_overview_cache.get("expires_at") or 0):
+                return _apply_tenant_etf_selection(cached_payload, tenant_slug)
+        start_date, end_date = resolve_gangtise_market_date_window(days=180)
+        try:
+            series_by_code = fetch_gangtise_etf_kline_series(
+                [security_code for security_code, _, _ in ETF_PRESENTATION_CATALOG],
+                start_date=start_date,
+                end_date=end_date,
+            )
+        except Exception as exc:
+            app.logger.warning("Gangtise ETF daily quote batch unavailable: %s", exc)
+            series_by_code = {}
+        items = []
+        for security_code, name, category in ETF_PRESENTATION_CATALOG:
+            code, market = _akshare_stock_symbol(security_code)
+            result = series_by_code.get(security_code) or {
+                "ok": False,
+                "points": [],
+                "provider": "Gangtise OpenAPI",
+                "message": "Gangtise ETF 日线暂不可用",
+            }
+            points = result.get("points") or []
+            latest = points[-1] if points else {}
+            previous = points[-2] if len(points) > 1 else {}
+            close = numeric_value(latest.get("close"))
+            previous_close = numeric_value(previous.get("close"))
+            change = round(close - previous_close, 4) if close is not None and previous_close is not None else None
+            change_pct = round(change / previous_close * 100, 4) if change is not None and previous_close else None
+            items.append({
+                "code": code,
+                "security_code": security_code,
+                "name": name,
+                "market": market,
+                "category": category,
+                "available": close is not None and previous_close is not None,
+                "price": round(close, 4) if close is not None else None,
+                "change": change,
+                "change_pct": change_pct,
+                "volume": latest.get("volume"),
+                "updated_at": str(latest.get("date") or ""),
+                "data_source": str(result.get("provider") or "Gangtise OpenAPI"),
+                "message": "" if close is not None and previous_close is not None else str(result.get("message") or "Gangtise ETF 日线暂不可用"),
+            })
+        payload = {
+            "ok": True,
+            "items": items,
+            "categories": ["宽基指数", "行业主题", "跨境指数", "债券", "商品"],
+            "data_source": "Gangtise OpenAPI ETF 日线",
+            "updated_at": max((item["updated_at"] for item in items if item["updated_at"]), default=""),
+        }
+        with _etf_overview_cache_lock:
+            _etf_overview_cache["payload"] = copy.deepcopy(payload)
+            _etf_overview_cache["expires_at"] = time.monotonic() + ETF_OVERVIEW_CACHE_TTL_SECONDS
+        return _apply_tenant_etf_selection(payload, tenant_slug)
+
+
+def _apply_tenant_etf_selection(payload, tenant_slug=""):
+    result = copy.deepcopy(payload) if isinstance(payload, dict) else {"ok": True, "items": []}
+    if not tenant_slug:
+        return result
+    from src.domain.core_services import load_tenant_market_display_settings
+
+    settings = load_tenant_market_display_settings(tenant_slug)
+    items = result.get("items") if isinstance(result.get("items"), list) else []
+    if settings.get("configured"):
+        selected = {str(code).strip() for code in settings.get("etf_codes") or []}
+        result["items"] = [item for item in items if str(item.get("security_code") or "").strip() in selected]
+    result["tenant_display_config"] = settings
+    return result
 
 
 def fetch_akshare_stock_kline_series(security_code, start_date="", end_date="", ak=None):
@@ -7014,7 +7206,7 @@ def build_macro_economic_payload(tenant_slug=""):
             by_code = {str(item.get("indicator_code") or ""): item for item in items if isinstance(item, dict)}
             result["items"] = [by_code[code] for code in selected if code in by_code]
         result["tenant_display_config"] = settings
-        result["display_limit"] = len(MACRO_ECONOMIC_VISIBLE_CODES)
+        result["display_limit"] = len(result.get("items") or [])
         return result
 
     cached = _load_market_snapshot_payload("macro_economic", cache_key, MACRO_SNAPSHOT_REFRESH_TTL_SECONDS)
@@ -7428,7 +7620,7 @@ def request_market_snapshot_selection_refresh(market_codes=None, sector_names=No
 
 
 def _apply_tenant_market_display_selection(payload, tenant_slug, kind):
-    """Project the shared snapshot into one tenant's published 4/10 selection."""
+    """Project the shared snapshot into one tenant's published selection."""
     result = copy.deepcopy(payload) if isinstance(payload, dict) else {"ok": True, "items": []}
     items = result.get("items") if isinstance(result.get("items"), list) else []
     if not tenant_slug:
@@ -7446,7 +7638,7 @@ def _apply_tenant_market_display_selection(payload, tenant_slug, kind):
         # selection; the first explicit save turns this into a fixed list.
         result["items"] = items[:4 if kind == "market" else 10]
     result["tenant_display_config"] = settings
-    result["display_limit"] = 4 if kind == "market" else 10
+    result["display_limit"] = len(result.get("items") or [])
     return result
 
 
