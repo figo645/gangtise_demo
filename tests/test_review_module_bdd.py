@@ -1360,7 +1360,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         with patch(
             "src.domain.market_services._load_watchlist_cache",
             return_value={
-                "provider": "Gangtise OpenAPI",
+                "provider": "AKShare",
                 "points": [
                     {"date": "2026-08-04", "open": 3815.12, "high": 3828.0, "low": 3796.5, "close": 3815.12},
                     {"date": "2026-08-05", "open": 3815.12, "high": 3884.4, "low": 3815.12, "close": 3878.4296},
@@ -1370,10 +1370,10 @@ class ReviewModuleBddTest(unittest.TestCase):
             detail = market_services.build_live_gangtise_indicator_detail("source_shanghai_index")
 
         self.assertFalse(detail["data_unavailable"])
-        self.assertEqual(detail["provider"], "Gangtise OpenAPI")
+        self.assertEqual(detail["provider"], "AKShare")
         self.assertEqual(detail["history_series"][-1]["date"], "2026-08-05")
         self.assertEqual(detail["history_series"][-1]["value"], 3878.4296)
-        self.assertEqual(detail["source_defs"][0]["method"], "OpenAPI")
+        self.assertEqual(detail["source_defs"][0]["method"], "Python SDK")
 
     def test_given_standard_index_alias_when_normalizing_then_all_common_inputs_hit_same_registry(self):
         cases = {
@@ -1497,7 +1497,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         with patch(
             "src.domain.market_services._load_watchlist_cache",
             return_value={
-                "provider": "Gangtise OpenAPI",
+                "provider": "AKShare",
                 "points": [
                     {"date": "2026-08-07", "open": 4079.79, "high": 4088.10, "low": 4068.20, "close": 4080.30},
                     {"date": "2026-08-10", "open": 4080.30, "high": 4100.10, "low": 4078.50, "close": 4093.73},

@@ -598,20 +598,20 @@ class RouteSmokeTest(unittest.TestCase):
 
     def test_market_overview_reads_persisted_snapshot_without_provider_call(self):
         from src.domain import market_services
-        snapshot = {"ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-22 15:00:00", "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3500.2, "available": True}]}
+        snapshot = {"ok": True, "snapshot_version": 11, "source": "AKShare", "updated_at": "2026-09-22 15:00:00", "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3500.2, "available": True}]}
         with patch.object(market_services, "_load_market_snapshot_payload", return_value=snapshot), patch.object(market_services, "fetch_gangtise_market_index_history", side_effect=AssertionError("H5 must not call Gangtise")):
             payload = market_services.build_market_overview_payload()
 
         self.assertEqual(payload["items"], snapshot["items"])
-        self.assertEqual(payload["source"], "Gangtise OpenAPI")
+        self.assertEqual(payload["source"], "AKShare")
 
     def test_market_overview_hides_expired_snapshot_instead_of_rendering_it_as_current(self):
         from src.domain import market_services
 
         snapshot = {
             "ok": True,
-            "snapshot_version": 10,
-            "source": "Gangtise OpenAPI",
+            "snapshot_version": 11,
+            "source": "AKShare",
             "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3867.03, "available": True}],
         }
         with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, snapshot]), patch.object(
@@ -631,7 +631,7 @@ class RouteSmokeTest(unittest.TestCase):
         ):
             payload = market_services.build_market_overview_payload()
 
-        self.assertEqual(payload["source"], "Gangtise OpenAPI")
+        self.assertEqual(payload["source"], "AKShare")
         self.assertEqual(payload["items"], [])
 
     def test_fundamental_boards_use_the_same_industry_names_as_hot_industries(self):
@@ -758,7 +758,7 @@ class RouteSmokeTest(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertNotIn('onclick="refreshMarketSnapshot()"', html)
         self.assertNotIn('window.setTimeout(loadMarketSectors, 2500)', html)
-        self.assertIn('Gangtise OpenAPI 统一采集后写入共享快照', html)
+        self.assertIn('AKShare 统一采集后写入共享快照', html)
 
     def test_akshare_index_snapshot_uses_real_daily_values(self):
         from src.domain import market_services
@@ -774,16 +774,16 @@ class RouteSmokeTest(unittest.TestCase):
     def test_market_index_detail_reads_the_persisted_akshare_snapshot(self):
         from src.domain import market_services
 
-        history = {"provider": "Gangtise OpenAPI", "points": [{"date": "2026-08-07", "open": 3500.0, "high": 3515.0, "low": 3490.0, "close": 3510.0}, {"date": "2026-08-10", "open": 3512.0, "high": 3530.0, "low": 3505.0, "close": 3520.0}]}
+        history = {"provider": "AKShare", "points": [{"date": "2026-08-07", "open": 3500.0, "high": 3515.0, "low": 3490.0, "close": 3510.0}, {"date": "2026-08-10", "open": 3512.0, "high": 3530.0, "low": 3505.0, "close": 3520.0}]}
         with patch.object(market_services, "_load_watchlist_cache", return_value=history), patch.object(market_services, "build_live_gangtise_indicator_detail", side_effect=AssertionError("detail must not fall back to Gangtise")):
             detail = market_services.build_watchlist_indicator_detail("source_shanghai_index")
 
-        self.assertEqual(detail["data_source"], "Gangtise OpenAPI")
+        self.assertEqual(detail["data_source"], "AKShare")
         self.assertEqual(detail["price"], 3520.0)
 
     def test_market_sector_reads_persisted_snapshot_without_provider_call(self):
         from src.domain import market_services
-        snapshot = {"ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-22 15:00:00", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
+        snapshot = {"ok": True, "snapshot_version": 11, "source": "AKShare", "updated_at": "2026-09-22 15:00:00", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
         with patch.object(market_services, "_load_market_snapshot_payload", return_value=snapshot), patch.object(market_services, "fetch_gangtise_market_index_history", side_effect=AssertionError("H5 must not call Gangtise")):
             payload = market_services.build_market_sector_overview_payload()
 
@@ -826,7 +826,7 @@ class RouteSmokeTest(unittest.TestCase):
     def test_market_sector_hides_expired_snapshot_instead_of_rendering_it_as_current(self):
         from src.domain import market_services
 
-        snapshot = {"ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-22 15:00:00", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
+        snapshot = {"ok": True, "snapshot_version": 11, "source": "AKShare", "updated_at": "2026-09-22 15:00:00", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
         with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, snapshot]), patch.object(market_services, "is_cn_stock_market_open", return_value=False):
             payload = market_services.build_market_sector_overview_payload()
 

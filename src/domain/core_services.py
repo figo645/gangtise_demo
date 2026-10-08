@@ -3501,10 +3501,10 @@ def build_dashboard_base_indicator_options(tenant=None):
                 "unit": "",
                 "source_type": "market_index",
                 "source_type_label": (detail.get("source_type_label") if isinstance(detail, dict) else None) or "大盘指数",
-                "provider": "Gangtise OpenAPI",
+                "provider": "AKShare",
                 "source_defs": [],
-                "algorithm_detail": "由后台 Gangtise EDB 市场快照统一采集，用于市场一览展示。",
-                "interpretation": f"已读取 {indicator_name} Gangtise EDB 市场快照。",
+                "algorithm_detail": "由后台 AKShare 市场快照统一采集，用于市场一览展示。",
+                "interpretation": f"已读取 {indicator_name} AKShare 市场快照。",
                 "prompt_text": indicator_name,
                 "updated_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
                 "data_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
@@ -3592,7 +3592,7 @@ def build_hot_industry_indicator_catalog():
                 "source_type_label": "热门行业",
                 "provider": row.get("data_source") or "AKShare",
                 "source_defs": [],
-                "algorithm_detail": "与热门行业页面使用同一份 Gangtise EDB 申万一级行业快照。",
+                "algorithm_detail": "与热门行业页面使用同一份 AKShare 申万一级行业快照。",
                 "interpretation": f"已读取 {sector_name} 的热门行业快照。" if numeric_value is not None else f"{sector_name} 尚无可用的最新行业快照。",
                 "prompt_text": sector_name,
                 "selected_indicators": [{"indicator_code": indicator_code, "indicator_name": f"申万一级行业指数:{sector_name}"}],
@@ -10369,8 +10369,8 @@ def run_admin_task(task_code, trigger_mode="manual", force=False, tenant_slug=""
                     f"{details or 'provider_response_incomplete'}"
                 )
             summary = (
-                f"Gangtise 市场与行业快照同步完成：市场 {overview_count}/{expected_overview_count}，"
-                f"行业 {sector_count}/{expected_sector_count}"
+                f"AKShare 市场、行业与宏观快照同步完成：市场 {overview_count}/{expected_overview_count}，"
+                f"行业 {sector_count}/{expected_sector_count}，宏观 {int((result or {}).get('macro_count') or 0)}/{int((result or {}).get('expected_macro_count') or 0)}"
             )
         elif task["task_type"] == "sync_daily_finance_broadcast":
             summary = (

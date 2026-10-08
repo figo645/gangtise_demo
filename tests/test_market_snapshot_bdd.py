@@ -7,15 +7,14 @@ import psycopg2
 from src.runtime import app
 
 
-def test_gangtise_market_snapshot_uses_four_platform_schedule_slots():
+def test_akshare_market_snapshot_uses_four_platform_schedule_slots():
     from src.domain import market_services
 
     task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "market_snapshot_sync")
-    assert task["task_name"] == "Gangtise 市场与行业指标同步"
+    assert task["task_name"] == "AKShare 市场、行业与宏观指标同步"
     assert task["schedule_type"] == "daily"
     assert task["schedule_value"] == "09:30,12:00,14:00,15:30"
-    migration = (Path(__file__).resolve().parents[1] / "sql/postgres/135_use_gangtise_market_snapshots.sql").read_text(encoding="utf-8")
-    assert ".SWI" in migration
+    assert "AKShare" in task["description"]
 
 
 def test_gangtise_fixed_overseas_index_reads_the_reported_id_without_searching():
@@ -156,11 +155,11 @@ def test_closed_market_keeps_the_last_successful_market_and_industry_snapshots_v
     from src.domain import market_services
 
     overview = {
-        "ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "ok": True, "snapshot_version": 11, "source": "AKShare", "updated_at": "2026-09-18 10:37:30",
         "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3875.6, "available": True}],
     }
     sectors = {
-        "ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "ok": True, "snapshot_version": 11, "source": "AKShare", "updated_at": "2026-09-18 10:37:30",
         "items": [{"sector": "电子", "value": 1234.5, "change_pct": 1.2, "available": True}],
     }
     with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, overview, None, sectors]), patch.object(
@@ -176,35 +175,34 @@ def test_closed_market_keeps_the_last_successful_market_and_industry_snapshots_v
     assert "非交易时段" in market_payload["message"]
 
 
-def test_deployed_v8_market_snapshots_remain_readable_after_the_v10_upgrade():
-    """A production v8 payload has the same reader-facing item schema as v10."""
+def test_legacy_gangtise_market_snapshots_are_rejected_after_the_akshare_cutover():
     from src.domain import market_services
 
     overview = {
-        "ok": True, "snapshot_version": 8, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
         "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3875.6, "available": True}],
     }
     sectors = {
-        "ok": True, "snapshot_version": 8, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
         "items": [{"sector": "电子", "value": 1234.5, "change_pct": 1.2, "available": True}],
     }
-    with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[overview, sectors]), patch.object(
+    with patch.object(market_services, "_load_market_snapshot_payload", return_value=overview), patch.object(
         market_services, "_load_watchlist_cache", return_value=None
     ), patch.object(market_services, "is_cn_stock_market_open", return_value=False):
         market_payload = market_services.build_market_overview_payload()
         sector_payload = market_services.build_market_sector_overview_payload()
 
-    assert market_payload["items"] == overview["items"]
-    assert sector_payload["items"] == sectors["items"]
-    assert market_payload["snapshot_version"] == 8
-    assert sector_payload["snapshot_version"] == 8
+    assert market_payload["items"] == []
+    assert sector_payload["items"] == []
+    assert market_payload["source"] == "AKShare"
+    assert sector_payload["source"] == "AKShare"
 
 
 def test_open_market_hides_an_expired_snapshot_before_the_refresh_completes():
     from src.domain import market_services
 
     snapshot = {
-        "ok": True, "snapshot_version": 10, "source": "Gangtise OpenAPI", "updated_at": "2026-09-18 10:37:30",
+        "ok": True, "snapshot_version": 11, "source": "AKShare", "updated_at": "2026-09-18 10:37:30",
         "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3875.6, "available": True}],
     }
     with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, snapshot]), patch.object(

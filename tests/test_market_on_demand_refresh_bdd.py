@@ -9,8 +9,8 @@ from src.domain import market_services
 def _snapshot(updated_at):
     return {
         "ok": True,
-        "snapshot_version": 10,
-        "source": "Gangtise OpenAPI",
+        "snapshot_version": 11,
+        "source": "AKShare",
         "updated_at": updated_at,
         "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "available": True}],
     }

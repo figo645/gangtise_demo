@@ -174,14 +174,14 @@ def test_given_dav_adds_panel_indicators_when_publishing_then_only_new_indicator
     refresh.assert_called_once_with(market_codes={"source_hsi"}, sector_names={"银行"})
 
 
-def test_given_shared_market_task_when_scheduled_then_it_is_gangtise_and_runs_at_four_configured_times():
+def test_given_shared_market_task_when_scheduled_then_it_is_akshare_and_runs_at_four_configured_times():
     from src.domain import market_services
 
     task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "market_snapshot_sync")
-    assert task["task_name"] == "Gangtise 市场与行业指标同步"
+    assert task["task_name"] == "AKShare 市场、行业与宏观指标同步"
     assert task["schedule_type"] == "daily"
     assert task["schedule_value"] == "09:30,12:00,14:00,15:30"
-    assert ".SWI" in task["description"]
+    assert "AKShare" in task["description"]
 
 
 def test_given_four_daily_collection_slots_when_reading_between_slots_then_shared_snapshot_does_not_expire_in_six_minutes():
@@ -223,3 +223,18 @@ def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfac
     assert "toggleKwMarketDisplaySummary" in web
     assert "配置粉丝端行情版面" in web
     assert "已发布给本租户粉丝" in web
+
+
+def test_given_saved_watchlist_item_without_quote_when_rendering_h5_then_it_is_not_filtered_from_the_watchlist_board():
+    """Quote outages must not make a persisted user relation disappear."""
+    from pathlib import Path
+
+    h5 = (Path(__file__).resolve().parents[1] / "templates" / "h5.html").read_text(encoding="utf-8")
+    board_renderer = h5.split("function renderFundamentalWatchlistBoards", 1)[1].split(
+        "function renderFundamentalWatchlistChart", 1
+    )[0]
+
+    assert "A persisted watchlist relation must remain visible" in board_renderer
+    assert "if (!detail || !String(detail.code || '').trim()) return;" in board_renderer
+    assert "if (!available) return;" not in board_renderer
+    assert "暂无真实行情" in board_renderer

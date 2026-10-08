@@ -14,14 +14,14 @@ sys.path.insert(0, str(ROOT))
 from src.domain import core_services, market_services
 
 
-def test_market_top10_views_share_one_gangtise_edb_task():
+def test_market_top10_views_share_one_akshare_snapshot_task():
     task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "market_snapshot_sync")
     assert task["schedule_type"] == "daily"
     assert task["schedule_value"] == "09:30,12:00,14:00,15:30"
-    assert ".SWI" in task["description"]
+    assert "AKShare" in task["description"]
     assert "申万一级行业" in task["description"]
     assert "标准市场指数" in task["description"]
-    assert "按需获取并共享刷新" in task["description"]
+    assert "宏观经济" in task["description"]
     assert task["task_type"] == "sync_market_snapshot"
 
 
