@@ -26,7 +26,10 @@ def test_etf_batch_daily_kline_uses_gangtise_security_contract():
 
     assert post.call_args.args[0] == market_services.GANGTISE_SECURITY_KLINE_DAILY_PATH
     assert post.call_args.args[1]["securityList"] == ["510300.SH", "510500.SH"]
+    assert post.call_args.args[1]["Limit"] == 500
+    assert "limit" not in post.call_args.args[1]
     assert post.call_args.args[1]["fieldList"][-1] == "volume"
+    assert "securityName" not in post.call_args.args[1]["fieldList"]
     assert result["510300.SH"]["provider"] == "Gangtise OpenAPI"
     assert result["510300.SH"]["points"][-1]["close"] == 1.1
     assert result["510300.SH"]["points"][-1]["volume"] == 12000

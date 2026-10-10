@@ -1797,8 +1797,13 @@ def build_gangtise_market_kline_payload(security_code, start_date, end_date, lim
         "securityList": [str(security_code or "").strip().upper()],
         "startDate": str(start_date or "").strip(),
         "endDate": str(end_date or "").strip(),
-        "limit": max(20, min(int(limit or 300), 500)),
-        "fieldList": ["securityCode", "securityName", "tradeDate", "open", "high", "low", "close", "volume"],
+        # Gangtise's open-quote contract uses a capitalized Limit field.
+        # The API may still return HTTP 200 for the lowercase variant while
+        # omitting the requested daily rows, which makes every ETF look empty.
+        "Limit": max(20, min(int(limit or 300), 500)),
+        # securityName is not an allowed field for Gangtise's daily quote
+        # endpoint. The security identity is already carried by securityCode.
+        "fieldList": ["securityCode", "tradeDate", "open", "high", "low", "close", "volume"],
     }
 
 
