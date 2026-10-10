@@ -85,7 +85,7 @@ class GangtiseCredentialsTest(unittest.TestCase):
         self.assertEqual(config["secret_key"], "environment-secret")
         self.assertEqual(config["long_token"], "")
 
-    def test_given_environment_credentials_when_postgres_has_other_credentials_then_runtime_keeps_environment_first(self):
+    def test_given_postgres_credentials_when_environment_also_has_credentials_then_runtime_uses_postgres_first(self):
         market_services._gangtise_env_loaded = True
         with patch.object(
             market_services,
@@ -96,8 +96,8 @@ class GangtiseCredentialsTest(unittest.TestCase):
         ):
             config = market_services.get_gangtise_openapi_config()
 
-        self.assertEqual(config["access_key"], "environment-access")
-        self.assertEqual(config["secret_key"], "environment-secret")
+        self.assertEqual(config["access_key"], "database-access")
+        self.assertEqual(config["secret_key"], "database-secret")
 
     def test_given_missing_runtime_credentials_when_token_is_requested_then_reason_identifies_database_state(self):
         with patch.object(market_services, "get_gangtise_openapi_config", return_value={"base_url": "https://openapi.gangtise.com", "access_key": "", "secret_key": "", "long_token": ""}), patch.object(

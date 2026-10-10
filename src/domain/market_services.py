@@ -886,8 +886,21 @@ def _ensure_gangtise_env_loaded():
 
 
 def get_gangtise_openapi_config():
-    """Use the proven runtime credentials first, then PostgreSQL as migration fallback."""
+    """Load shared Gangtise credentials from PostgreSQL before local fallbacks.
+
+    PostgreSQL is the cross-environment source of truth. The project credential
+    file and environment variables remain development fallbacks for a database
+    that is unavailable or has not been configured yet; they must not override
+    a valid production database record.
+    """
     _ensure_gangtise_env_loaded()
+    database_credentials = load_gangtise_openapi_credentials()
+    if database_credentials and (
+        (database_credentials.get("access_key") and database_credentials.get("secret_key"))
+        or database_credentials.get("long_token")
+    ):
+        return database_credentials
+
     environment_credentials = {
         "base_url": str(os.environ.get("GANGTISE_API_BASE_URL") or "").strip().rstrip("/"),
         "access_key": str(os.environ.get("GANGTISE_ACCESS_KEY") or "").strip(),
@@ -900,12 +913,6 @@ def get_gangtise_openapi_config():
     ):
         environment_credentials["base_url"] = environment_credentials["base_url"] or GANGTISE_OPENAPI_DEFAULT_BASE_URL
         return environment_credentials
-    database_credentials = load_gangtise_openapi_credentials()
-    if database_credentials and (
-        (database_credentials.get("access_key") and database_credentials.get("secret_key"))
-        or database_credentials.get("long_token")
-    ):
-        return database_credentials
     return {
         "base_url": environment_credentials["base_url"] or GANGTISE_OPENAPI_DEFAULT_BASE_URL,
         "access_key": "",
