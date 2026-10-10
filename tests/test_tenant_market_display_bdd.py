@@ -116,6 +116,12 @@ def test_given_dav_posts_more_than_the_legacy_selection_limits_when_saving_then_
     assert len(payload["settings"]["market_overview_codes"]) == 5
     assert len(payload["settings"]["sector_names"]) == 11
     assert len(payload["settings"]["etf_codes"]) == len(market_services.ETF_PRESENTATION_CATALOG)
+    catalog = payload["catalog"]["etf"]
+    assert len(catalog) == len(market_services.ETF_PRESENTATION_CATALOG)
+    assert [(item["code"], item["category"]) for item in catalog] == [
+        (code, category) for code, _name, category in market_services.ETF_PRESENTATION_CATALOG
+    ]
+    assert {item["category"] for item in catalog} == {"宽基指数", "行业主题", "跨境指数", "债券", "商品"}
 
 
 def test_given_configured_tenant_when_reading_etf_overview_then_only_selected_etfs_are_visible_and_empty_means_clear():
@@ -212,6 +218,8 @@ def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfac
     assert "feed-watchlist-chart" in h5
     assert 'data-h5-market-picker="macro"' in h5
     assert 'data-h5-market-picker="etf"' in h5
+    assert 'data-h5-market-picker-etf-categories="true"' in h5
+    assert "etfRows.filter" in h5
     assert 'toggleH5MarketDraftSelection' in h5 and '最多选择' not in h5
     assert "toggleH5MarketDisplaySummary" in h5
     assert 'id="kw-market-layout-modal"' in web
@@ -219,6 +227,8 @@ def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfac
     assert 'data-kw-market-picker-tile=' in web
     assert 'data-kw-market-picker="macro"' in web
     assert 'data-kw-market-picker="etf"' in web
+    assert 'data-kw-market-picker-etf-categories="true"' in web
+    assert "etfRows.filter" in web
     assert 'toggleKwMarketDraftSelection' in web and '最多选择' not in web
     assert "toggleKwMarketDisplaySummary" in web
     assert "配置粉丝端行情版面" in web

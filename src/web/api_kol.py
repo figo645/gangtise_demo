@@ -9,7 +9,7 @@ from src.domain.core_services import (
     restart_admin_task,
     set_tenant_published_insight_pin,
 )
-from src.domain.market_services import request_market_snapshot_selection_refresh
+from src.domain.market_services import ETF_PRESENTATION_CATALOG, request_market_snapshot_selection_refresh
 
 
 def _knowledge_feature_disabled_response():
@@ -205,7 +205,17 @@ def api_tenant_market_display_config(tenant_slug):
                 "market_overview": [{"code": code, "name": market_names.get(code) or code} for code in market_codes],
                 "hot_industries": list(sector_names),
                 "macro_economic": [{"code": code, "name": macro_names.get(code) or code} for code in macro_codes],
-                "etf": [{"code": code, "name": etf_names.get(code) or code} for code in etf_codes],
+                "etf": [
+                    {
+                        "code": code,
+                        "name": etf_names.get(code) or code,
+                        "category": next(
+                            (category for catalog_code, _name, category in ETF_PRESENTATION_CATALOG if catalog_code == code),
+                            "ETF",
+                        ),
+                    }
+                    for code in etf_codes
+                ],
             },
         })
     except ValueError as exc:
