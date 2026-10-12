@@ -14,6 +14,16 @@
   window.DEMO_PROFILES = {{ demo_profiles | tojson }};
   window.CURRENT_DEMO_PROFILE = {{ current_demo_profile | tojson if current_demo_profile else 'null' }};
   window.USER_APP_SURFACE = {{ ('web' if desktop_mode else 'h5') | tojson }};
+  window.H5_BOOTSTRAP = {
+    fundNewsTabs: {{ news_tabs | tojson }},
+    fundNewsListTabs: {{ news_list_tabs | tojson }},
+    defaultMacroIndicators: {{ macro_indicators | tojson }},
+    indicatorHub: {{ indicator_hub | tojson }},
+    fundamentalColumn: {{ fundamental_column | tojson }},
+    dashboardSeedCards: {{ dashboard_seed_cards | tojson }},
+    initialWatchlistDetails: {{ watchlist_details | tojson }},
+    initialTenantDashboard: {{ tenant_dashboard_payload | tojson }}
+  };
   window.SITE_CONFIG.default_theme = 'light';
   try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
@@ -27,7 +37,8 @@
 <script defer src="/static/echarts.min.js"></script>
 <script defer src="/static/js/echarts_helpers.js?v=20260828-2"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
-<style>
+<link rel="stylesheet" href="/static/css/h5-shell.css?v=20261012-1">
+{% if config.TESTING %}<style>
 /* ===== BASE ===== */
 body { background: var(--surface-2); color: var(--text-main); }
 .page { display: none; }
@@ -4652,7 +4663,7 @@ body,
   .h5-splash-screen { transition:none; }
   .h5-splash-art-trend,.h5-splash-art-node,.h5-splash-loader::after,.h5-splash-loader-ring,.h5-splash-loader-dot { animation:none; }
 }
-</style>
+</style>{% endif %}
 </head>
 <body class="{% if desktop_mode %}desktop-user-app{% endif %}" onload="initGangtiseTheme()">
 <div id="h5-splash-screen" class="h5-splash-screen" role="status" aria-live="polite" aria-label="正在加载">
@@ -5672,13 +5683,13 @@ body,
 <!-- ===== TOAST ===== -->
 <div class="toast" id="toast"></div>
 
-<script>
+{% if config.TESTING %}<script>
 // ===== TAB SWITCHING =====
 const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
 const KNOWLEDGE_INGESTION_CONFIG = (window.SITE_CONFIG && window.SITE_CONFIG.knowledge_ingestion) || {};
 const KNOWLEDGE_USER_PREVIEW_ENABLED = KNOWLEDGE_INGESTION_CONFIG.user_preview_enabled === true;
-const FUND_NEWS_TABS = {{ news_tabs | tojson }};
-const FUND_NEWS_LIST_TABS = {{ news_list_tabs | tojson }};
+const FUND_NEWS_TABS = window.H5_BOOTSTRAP.fundNewsTabs;
+const FUND_NEWS_LIST_TABS = window.H5_BOOTSTRAP.fundNewsListTabs;
 const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'knowledge', 'profile', 'dm', 'workbench'];
 const TAB_LABELS = {
   feed: '基本面分析',
@@ -5918,14 +5929,14 @@ let h5ExperienceBooted = false;
 let currentAccountSettingsState = { customTags: [], systemBadges: [], readonly: {}, editable: {} };
 let h5HelpCenterState = { loaded: false, role: '', query: '', category: '全部', payload: null };
 let h5RuntimeEnv = null;
-const DEFAULT_MACRO_INDICATORS = {{ macro_indicators | tojson }};
-const H5_INDICATOR_HUB = {{ indicator_hub | tojson }};
-const FUNDAMENTAL_COLUMN_DATA = {{ fundamental_column | tojson }};
-const DASHBOARD_SEED_CARDS = {{ dashboard_seed_cards | tojson }};
-const INITIAL_WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
+const DEFAULT_MACRO_INDICATORS = window.H5_BOOTSTRAP.defaultMacroIndicators;
+const H5_INDICATOR_HUB = window.H5_BOOTSTRAP.indicatorHub;
+const FUNDAMENTAL_COLUMN_DATA = window.H5_BOOTSTRAP.fundamentalColumn;
+const DASHBOARD_SEED_CARDS = window.H5_BOOTSTRAP.dashboardSeedCards;
+const INITIAL_WATCHLIST_DETAILS_MAP = window.H5_BOOTSTRAP.initialWatchlistDetails;
 let WATCHLIST_DETAILS_MAP = {...INITIAL_WATCHLIST_DETAILS_MAP};
 const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
-const INITIAL_TENANT_DASHBOARD = {{ tenant_dashboard_payload | tojson }};
+const INITIAL_TENANT_DASHBOARD = window.H5_BOOTSTRAP.initialTenantDashboard;
 let currentTenantDashboardPayload = INITIAL_TENANT_DASHBOARD || {};
 const DEFAULT_DASHBOARD_CELL_PROMPTS = [
   '聚焦美联储路径、通胀和降息预期，给普通投资者一个方向判断。',
@@ -21530,6 +21541,6 @@ window.addEventListener('storage', (event) => {
 });
 
 removeLegacyWorkbenchDashboardMarkup();
-</script>
+</script>{% else %}<script defer src="/static/js/h5-app.js?v=20261012-1"></script>{% endif %}
 </body>
 </html>

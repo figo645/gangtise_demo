@@ -160,14 +160,20 @@ def switch_account():
 @app.route("/")
 def index():
     config = get_site_config()
-    tenants = get_tenant_configs(config)
     default_tenant = get_tenant_by_slug(get_default_tenant_slug(config), config)
+    # The index only needs theme preferences at boot.  Injecting the complete
+    # site config here serializes tenant content, prompts, demo profiles and
+    # other admin-only data into the initial HTML payload.
+    index_site_config = {
+        "default_theme": config.get("default_theme", "light"),
+        "default_accent": config.get("default_accent", "blue"),
+    }
     return render_template(
         "index.html",
         brand=get_platform_brand(config),
-        tenants=tenants,
         default_tenant=default_tenant,
         tenant_portal_enabled=is_feature_enabled("tenant_portal", config),
+        site_config=index_site_config,
     )
 
 

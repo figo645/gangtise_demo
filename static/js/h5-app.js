@@ -1,0 +1,15857 @@
+// ===== TAB SWITCHING =====
+const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
+const KNOWLEDGE_INGESTION_CONFIG = (window.SITE_CONFIG && window.SITE_CONFIG.knowledge_ingestion) || {};
+const KNOWLEDGE_USER_PREVIEW_ENABLED = KNOWLEDGE_INGESTION_CONFIG.user_preview_enabled === true;
+const FUND_NEWS_TABS = window.H5_BOOTSTRAP.fundNewsTabs;
+const FUND_NEWS_LIST_TABS = window.H5_BOOTSTRAP.fundNewsListTabs;
+const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'knowledge', 'profile', 'dm', 'workbench'];
+const TAB_LABELS = {
+  feed: '基本面分析',
+  market: '自选股',
+  review: '洞见',
+  knowledge: '知识专区',
+  community: '社区',
+  hermes: 'Hermes',
+  dm: '消息',
+  profile: '我的',
+  workbench: '大V投顾工作台',
+};
+const TAB_HINTS = {
+  feed: '优先承接洞见、知识、基本面和自选股诊断四类高频动作',
+  market: '仅保留首发阶段的自选股跟踪能力',
+  review: '大V发布洞见，系统再按自选股和阶段行情补充智能解读',
+  knowledge: '把可复用的方法、框架和资料沉淀为长期知识资产',
+  community: '社区功能默认可由后台按需开放',
+  hermes: '以证据链、来源条目和置信度输出研究结论',
+  dm: '消息与对话入口集中放在底部导航',
+  profile: '账号、偏好与个人中心设置',
+  workbench: '面向大V投顾与平台运营角色的协同工作区',
+};
+
+function isDavCapableUser(user) {
+  const role = String((user || {}).role || '').trim().toLowerCase();
+  return hasRoleCapability(user, 'dav');
+}
+
+function hasRoleCapability(user, capability) {
+  const role = String((user || {}).role || '').trim().toLowerCase();
+  const target = String(capability || '').trim().toLowerCase();
+  const grants = (window.SITE_CONFIG && window.SITE_CONFIG.role_capabilities) || {};
+  const capabilities = Array.isArray(grants[role]) ? grants[role] : [];
+  return capabilities.map(item => String(item || '').trim().toLowerCase()).includes(target);
+}
+
+function isFeatureEnabled(featureName) {
+  const siteFeatures = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
+  if (!featureName) return true;
+  if (featureName === 'workbench') {
+    const activeUser = getActiveDemoUser();
+    return hasRoleCapability(activeUser, 'workbench');
+  }
+  if (featureName === 'hermes') {
+    const activeUser = getActiveDemoUser() || {};
+    const hermesSettings = (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
+    if (siteFeatures.hermes === false) return false;
+    if (!hasRoleCapability(activeUser, 'hermes')) return false;
+    if (isDavCapableUser(activeUser)) return hermesSettings.dav_access_enabled !== false;
+    if (hasRoleCapability(activeUser, 'investor')) return hermesSettings.investor_access_enabled !== false;
+    return true;
+  }
+  if (featureName === 'dm') {
+    return siteFeatures.dm !== false || siteFeatures.fan_interaction !== false;
+  }
+  if (featureName === 'knowledge') {
+    return siteFeatures.knowledge === true && siteFeatures.knowledge_module_enabled === true;
+  }
+  if (featureName === 'core_indicators') return siteFeatures.core_indicators === true;
+  return siteFeatures[featureName] !== false;
+}
+
+function getH5WatermarkDate() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function renderH5Watermark() {
+  const layer = document.getElementById('h5-watermark-layer');
+  if (!layer) return;
+  const featureEnabled = isFeatureEnabled('h5_watermark');
+  const profile = window.CURRENT_DEMO_PROFILE || getActiveDemoUser() || {};
+  const username = String(profile.username || '').trim();
+  const loggedIn = hasLoggedInH5User() && !document.querySelector('.h5-wrap')?.classList.contains('is-logged-out');
+  if (!featureEnabled || !loggedIn || !username) {
+    layer.replaceChildren();
+    layer.classList.remove('is-visible');
+    return;
+  }
+  const label = `${username} · ${getH5WatermarkDate()}`;
+  const fragment = document.createDocumentFragment();
+  for (let index = 0; index < 6; index += 1) {
+    const item = document.createElement('span');
+    item.className = 'h5-watermark-item';
+    item.textContent = label;
+    fragment.appendChild(item);
+  }
+  layer.replaceChildren(fragment);
+  layer.classList.add('is-visible');
+}
+
+function isStockForecastEnabled() {
+  return isFeatureEnabled('stock_forecast');
+}
+
+function getFirstEnabledTab() {
+  const priority = [
+    ['feed', 'fundamental_analysis'],
+    ['market', 'watchlist'],
+    ['review', 'daily_review'],
+    ['knowledge', 'knowledge'],
+    ['profile', null],
+    ['community', 'community'],
+    ['hermes', 'hermes'],
+  ];
+  const hit = priority.find(([_, feature]) => isFeatureEnabled(feature));
+  return hit ? hit[0] : 'profile';
+}
+
+function applySiteFeatureFlags() {
+  document.querySelectorAll('[data-feature]').forEach(el => {
+    const featureName = el.dataset.feature;
+    el.style.display = isFeatureEnabled(featureName) ? '' : 'none';
+  });
+  if (currentWatchlistDetail) {
+    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection || 'overview');
+  }
+  const activePage = document.querySelector('.page.active');
+  if (activePage && activePage.dataset.feature && !isFeatureEnabled(activePage.dataset.feature)) {
+    switchTab(getFirstEnabledTab());
+  }
+  renderH5Watermark();
+}
+
+async function refreshH5SiteConfig(options = {}) {
+  try {
+    const res = await fetch(`/api/site-config?surface=${encodeURIComponent(window.USER_APP_SURFACE || 'h5')}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('load_site_config_failed');
+    const data = await res.json();
+    if (!data || typeof data !== 'object') throw new Error('invalid_site_config');
+    window.SITE_CONFIG = data;
+    H5_AUTH_SETTINGS = JSON.parse(JSON.stringify((data && data.auth_settings) || H5_AUTH_SETTINGS || {}));
+    applySiteFeatureFlags();
+    if (!hasLoggedInH5User()) {
+      refreshH5AuthOptions({ silent: true, render: true });
+    }
+  } catch (error) {
+    if (!options.silent) {
+      showToast('前台功能配置刷新失败');
+    }
+  }
+}
+
+function syncPublishedReviewStateToH5(tenantSlug, result) {
+  const normalizedSlug = String(tenantSlug || '').trim().toLowerCase();
+  const payload = result && typeof result === 'object' ? result : {};
+  if (!normalizedSlug) return;
+  const nextState = {};
+  if (Array.isArray(payload.snapshots)) nextState.review_snapshots = payload.snapshots.slice(0, 200);
+  if (payload.message_center_state && typeof payload.message_center_state === 'object') {
+    nextState.message_center_state = payload.message_center_state;
+  }
+  if (!Object.keys(nextState).length) return;
+  if (window.SITE_CONFIG && Array.isArray(window.SITE_CONFIG.tenants)) {
+    window.SITE_CONFIG.tenants = window.SITE_CONFIG.tenants.map((tenant) => {
+      const tenantSlugValue = String((tenant && tenant.slug) || '').trim().toLowerCase();
+      return tenantSlugValue === normalizedSlug ? { ...tenant, ...nextState } : tenant;
+    });
+  }
+  if (window.ACTIVE_TENANT && String(window.ACTIVE_TENANT.slug || '').trim().toLowerCase() === normalizedSlug) {
+    window.ACTIVE_TENANT = { ...window.ACTIVE_TENANT, ...nextState };
+  }
+  const dashboardTenantSlug = String((((currentTenantDashboardPayload || {}).tenant || {}).slug) || '').trim().toLowerCase();
+  if (Array.isArray(payload.snapshots) && dashboardTenantSlug === normalizedSlug) {
+    currentTenantDashboardPayload = { ...currentTenantDashboardPayload, reviews: payload.snapshots.slice(0, 200) };
+  }
+  DEMO_PROFILE_USERS = DEMO_PROFILE_USERS.map((user) => {
+    const tenant = user && user.tenant && typeof user.tenant === 'object' ? user.tenant : {};
+    const tenantSlugValue = String(tenant.slug || '').trim().toLowerCase();
+    return tenantSlugValue === normalizedSlug
+      ? { ...user, tenant: { ...tenant, ...nextState } }
+      : user;
+  });
+  if (window.CURRENT_DEMO_PROFILE && window.CURRENT_DEMO_PROFILE.tenant) {
+    const currentTenantSlug = String(window.CURRENT_DEMO_PROFILE.tenant.slug || '').trim().toLowerCase();
+    if (currentTenantSlug === normalizedSlug) {
+      window.CURRENT_DEMO_PROFILE = {
+        ...window.CURRENT_DEMO_PROFILE,
+        tenant: { ...window.CURRENT_DEMO_PROFILE.tenant, ...nextState },
+      };
+    }
+  }
+  if (currentDemoUser && currentDemoUser.tenant) {
+    const currentTenantSlug = String(currentDemoUser.tenant.slug || '').trim().toLowerCase();
+    if (currentTenantSlug === normalizedSlug) {
+      currentDemoUser = {
+        ...currentDemoUser,
+        tenant: { ...currentDemoUser.tenant, ...nextState },
+      };
+    }
+  }
+}
+
+function chooseTheme(mode) {
+  setGangtiseTheme('light');
+}
+
+function chooseAccent(accent) {
+  setGangtiseAccent(accent);
+}
+
+let DEMO_PROFILE_USERS = Array.isArray(window.DEMO_PROFILES) ? JSON.parse(JSON.stringify(window.DEMO_PROFILES)) : [];
+let currentDemoUser = null;
+let h5LoginPendingUser = '';
+let h5PasswordLoginPending = false;
+let h5LoginMode = new URLSearchParams(window.location.search || '').get('login_mode') === 'register' ? 'register' : 'login';
+let h5PasswordDraftUsername = '';
+let h5PasswordDraftDisplayName = '';
+let h5RememberPassword = false;
+function getH5PostLoginTarget() {
+  const target = new URLSearchParams(window.location.search || '').get('login_next') || '';
+  return target.startsWith('/') ? target : '';
+}
+
+function continueAfterH5Login() {
+  const target = getH5PostLoginTarget();
+  if (target) window.location.href = target;
+}
+let H5_AUTH_SETTINGS = JSON.parse(JSON.stringify((window.SITE_CONFIG && window.SITE_CONFIG.auth_settings) || {}));
+const H5_WECHAT_RUNTIME_QUERY_KEY = 'wx_env';
+const H5_LOGIN_HISTORY_STORAGE_KEY = 'gangtise_h5_login_history_v1';
+let h5OnboardingState = {
+  required: false,
+  selected_channel: '',
+  compliance_acknowledged_at: '',
+  compliance_version: '',
+  onboarding_completed_at: '',
+  channels: [],
+  notice: null,
+  agreed: false,
+  submitting: false,
+};
+let h5ExperienceBooted = false;
+let currentAccountSettingsState = { customTags: [], systemBadges: [], readonly: {}, editable: {} };
+let h5HelpCenterState = { loaded: false, role: '', query: '', category: '全部', payload: null };
+let h5RuntimeEnv = null;
+const DEFAULT_MACRO_INDICATORS = window.H5_BOOTSTRAP.defaultMacroIndicators;
+const H5_INDICATOR_HUB = window.H5_BOOTSTRAP.indicatorHub;
+const FUNDAMENTAL_COLUMN_DATA = window.H5_BOOTSTRAP.fundamentalColumn;
+const DASHBOARD_SEED_CARDS = window.H5_BOOTSTRAP.dashboardSeedCards;
+const INITIAL_WATCHLIST_DETAILS_MAP = window.H5_BOOTSTRAP.initialWatchlistDetails;
+let WATCHLIST_DETAILS_MAP = {...INITIAL_WATCHLIST_DETAILS_MAP};
+const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
+const INITIAL_TENANT_DASHBOARD = window.H5_BOOTSTRAP.initialTenantDashboard;
+let currentTenantDashboardPayload = INITIAL_TENANT_DASHBOARD || {};
+const DEFAULT_DASHBOARD_CELL_PROMPTS = [
+  '聚焦美联储路径、通胀和降息预期，给普通投资者一个方向判断。',
+  '只看南向/北向资金与成交量变化，判断今天是否有增量资金验证。',
+  '跟踪 AI、算力、半导体订单兑现，提醒是叙事驱动还是业绩驱动。',
+  '关注港股互联网财报、回购和利润率，说明估值修复是否还能持续。',
+  '围绕消费复苏、可选消费和渠道反馈，判断需求是真回暖还是脉冲反弹。',
+  '聚焦地产链、政策托底和信用扩张，判断风险是否继续收敛。',
+  '跟踪新能源排产、价格和补库节奏，判断景气是否触底。',
+  '观察人民币汇率、美元强弱和海外风险偏好，提示对港股和成长板块的影响。',
+];
+const H5_DASHBOARD_SEGMENTS = {
+  market: {
+    title: '市场进攻意愿卡',
+    shortTitle: '进攻意愿',
+    subtitle: '回答今天资金是在追高弹性方向，还是转向防守资产。',
+    editorTitle: '编辑市场进攻意愿格子',
+    detailTitle: '市场进攻意愿详情',
+    note: '这一层优先回答今天市场整体更偏进攻还是防守。',
+    detailNote: 'A股全市场口径。先把各因子映射为 0-100 分，再按权重合成总分，防御因子作为扣分项。',
+    question: '今天市场是在追逐高弹性方向，还是更偏向防守？',
+    scope: '适用范围：A股全市场',
+    sources: ['上涨/下跌家数、站上MA20占比、新高/新低差', '北向/南向净流入强度与连续性', '主线行业成交占比、5日变化、拥挤度', '银行/红利相对成长超额收益、低波ETF净流入'],
+    formula: '总分 = 35%广度改善分 + 25%资金回流分 + 25%主线参与分 - 15%防御压力分',
+    scoreMethod: '先标准化为 0-100 分，再按权重合成；防御因子作为扣分项，不直接把原始金额和家数相加。',
+    factorRules: ['广度改善分 = 40%上涨/下跌家数 + 35%站上MA20占比 + 25%新高-新低差', '资金回流分 = 50%净流入占成交比 + 30%3日累计净流入 + 20%连续净流入天数', '主线参与分 = 45%主线成交占比 + 35%5日变化 + 20%拥挤度惩罚', '防御压力分 = 50%银行/红利相对成长超额 + 30%高股息超额 + 20%低波ETF净流入'],
+    thresholds: ['>=70 偏进攻', '55-69 中性偏进攻', '45-54 中性', '30-44 中性偏防守', '<30 偏防守'],
+    outputExplain: '输出的是偏进攻 / 中性 / 偏防守，不直接给买卖指令。',
+    promptPlaceholder: '例如：回答今天市场是在追逐高弹性方向，还是更偏向防守，并说明使用哪些真实指标来给出总分。',
+    cards: [
+      { name: '市场进攻意愿', value: '偏进攻', assessment: '高弹性方向承接更顺，说明今天资金更愿意做进攻而不是回避风险。', status: 'good', alert: '继续盯增量资金是否延续', hint: '核心问题不是“风险偏好是否扩张”，而是“今天资金是否更愿意做进攻”。'},
+      { name: '资金回流强度', value: '回暖', assessment: '北向与南向的回流强度都在修复，但还没到全面扩散。', status: 'good', alert: '留意是否只是单一主线放量', hint: '净流入额要结合占成交比和连续性一起看。'},
+      { name: '主线参与度', value: '提升', assessment: '主线行业成交占比提升，说明市场正在围绕少数方向形成共识。', status: 'attention', alert: '若拥挤度过高要防止抱团末期', hint: '成交集中本身不是利好，要同时看是否过度拥挤。'},
+      { name: '防御压力', value: '下降', assessment: '银行、红利和低波方向相对走弱，说明防守需求正在回落。', status: 'good', alert: '若防御重新走强需降乐观程度', hint: '防御风格走强在这张卡里是扣分项。'},
+      { name: '广度扩散', value: '扩散', assessment: '上涨不再只集中在抱团龙头，市场广度在改善。', status: 'good', alert: '如果广度再度收缩，需降预期', hint: '广度改善比单一龙头走强更能说明市场环境。'},
+      { name: '风格切换', value: '成长占优', assessment: '成长方向相对红利和防御更强，说明短线愿意承担更多波动。', status: 'attention', alert: '风格切换速度仍偏快', hint: '成长跑赢防御是进攻意愿抬升的重要证据。'},
+      { name: '波动承受度', value: '可控', assessment: '市场能接受一定波动，说明今天不是纯粹的避险交易。', status: 'attention', alert: '若波动继续放大需降仓位', hint: '波动可控才适合把结论写得更积极。'},
+      { name: '主线拥挤度', value: '中性', assessment: '主线聚焦但还没拥挤到极端，说明进攻意愿并未失真。', status: 'good', alert: '若拥挤度快速抬升需警惕回撤', hint: '主线拥挤度过高时会吞噬进攻意愿的质量。'},
+    ],
+  },
+  industry: {
+    title: '行业景气验证卡',
+    shortTitle: '行业',
+    subtitle: '回答这条主线是不是基本面在继续验证，而不只是消息热度高。',
+    editorTitle: '编辑行业景气验证格子',
+    detailTitle: '行业景气验证详情',
+    note: '这一层优先回答一条主线到底是真景气，还是只是短期情绪。',
+    detailNote: '先把订单、价格、库存、政策和资本开支分别打成 0-100 分，再按权重合成景气总分。',
+    question: '这条主线是基本面继续验证，还是只有情绪热度？',
+    scope: '适用范围：单一行业 / 单一主题链条',
+    sources: ['新增订单同比、在手订单覆盖、开工率', '产品价格指数、价差、提价持续性', '库存天数、主动/被动补库、去库斜率', '政策热度、落地级别、持续性', 'Capex指引、扩产计划、设备招标'],
+    formula: '总分 = 30%订单景气分 + 25%价格景气分 + 20%库存去化分 + 15%政策催化分 + 10%资本开支确认分',
+    scoreMethod: '行业各因子先转为 0-100 分，订单和价格权重更高，因为它们更接近真实需求。',
+    factorRules: ['订单景气分 = 新增订单同比 + 在手订单覆盖 + 开工率', '价格景气分 = 产品价格指数 + 价差 + 提价持续性', '库存去化分 = 库存天数 + 去库斜率 + 主动/被动补库状态', '政策催化分 = 政策热度 + 落地级别 + 持续性', '资本开支确认分 = Capex指引 + 扩产计划 + 设备招标进展'],
+    thresholds: ['>=70 景气上行', '55-69 景气验证中', '45-54 中性观察', '30-44 景气转弱', '<30 仅剩情绪热度'],
+    outputExplain: '输出的是景气上行 / 景气验证中 / 仅剩情绪热度，不直接替代行业研究报告。',
+    promptPlaceholder: '例如：回答这条主线是基本面继续验证，还是只有情绪热度，并列出订单、价格、库存、政策和资本开支的证据。',
+    cards: [
+      { name: '行业景气验证', value: '成立', assessment: '订单、价格和库存三项已经形成同向验证，不只是消息面在推动。', status: 'good', alert: '继续盯高频月度数据是否延续', hint: '核心问题是“景气有没有被验证”，不是“情绪热不热”。'},
+      { name: '订单景气分', value: '改善', assessment: '新增订单和在手覆盖都有修复，说明需求不是纯预期。', status: 'good', alert: '继续盯高频订单是否延续', hint: '订单是行业景气最先看的验证指标。'},
+      { name: '价格景气分', value: '温和上行', assessment: '价格信号不算爆发，但已经脱离最弱区间。', status: 'attention', alert: '若价格回落则景气需要降级', hint: '价格比消息更能说明供需关系。'},
+      { name: '库存去化分', value: '去化中', assessment: '库存压力开始释放，对利润率形成正向支撑。', status: 'good', alert: '看是否重新进入被动累库', hint: '库存变化决定景气持续性。'},
+      { name: '政策催化分', value: '持续', assessment: '政策与新闻催化仍在，为行业预期提供外部支撑。', status: 'attention', alert: '催化若中断要警惕回撤', hint: '催化只能放大，不能替代基本面。'},
+      { name: '资本开支确认分', value: '恢复', assessment: '扩产和招标计划在恢复，说明企业端判断更积极。', status: 'good', alert: '若开支恢复不及预期，景气要打折', hint: '资本开支是偏中期的确认项。'},
+      { name: '竞争格局', value: '稳定', assessment: '价格竞争暂未恶化，行业利润修复更容易兑现。', status: 'attention', alert: '若竞争恶化，景气修复难以兑现', hint: '格局稳定时利润率更有弹性。'},
+      { name: '上下游传导', value: '顺畅', assessment: '上游到下游传导关系改善，说明景气不只停留在局部。', status: 'good', alert: '若传导断裂，景气只会停留在局部', hint: '景气能否传导决定主线厚度。'},
+    ],
+  },
+  'signal-stock': {
+    title: '主线信号个股卡',
+    shortTitle: '信号个股',
+    subtitle: '不是给粉丝推票，而是用关键个股去验证更大的行业或主题判断。',
+    editorTitle: '编辑主线信号个股格子',
+    detailTitle: '主线信号个股详情',
+    note: '这一层优先回答哪些个股正在验证主线，而不是直接给出买卖动作。',
+    detailNote: '先看这些个股能不能继续验证主线，不讨论买卖点。个股维度同样先转 0-100 分，再做权重合成。',
+    question: '哪些个股还在验证主线，哪些已经开始掉队？',
+    scope: '适用范围：单个行业龙头 / 主线代表个股',
+    sources: ['相对行业超额收益、回撤控制、成交额排名', '营收/利润兑现率、指引上修、订单兑现', '回调缩量、尾盘净流入、换手承接', 'PE/PS分位、PEG、相对历史分位'],
+    formula: '总分 = 35%龙头强度分 + 30%业绩兑现分 + 20%资金承接分 + 15%估值安全分',
+    scoreMethod: '龙头强度和业绩兑现权重更高，因为它们决定这只个股是否还有资格当主线信号。',
+    factorRules: ['龙头强度分 = 相对行业超额收益 + 回撤控制 + 成交额排名', '业绩兑现分 = 营收/利润兑现率 + 指引上修 + 订单兑现', '资金承接分 = 回调缩量 + 尾盘净流入 + 换手承接', '估值安全分 = PE/PS分位 + PEG + 相对历史分位'],
+    thresholds: ['>=70 强验证个股', '55-69 可继续跟踪', '45-54 中性观察', '30-44 信号转弱', '<30 已掉队'],
+    outputExplain: '输出的是“是否还适合作为主线信号个股”，不是荐股结论。',
+    promptPlaceholder: '例如：回答哪些个股还在验证主线，哪些开始掉队，并说明强度、业绩、承接和估值证据。',
+    cards: [
+      { name: '主线信号个股', value: '强验证', assessment: '这类个股仍在验证主线，没有从高频强势转成纯情绪脉冲。', status: 'good', alert: '若龙头走弱，主线判断要降级', hint: '这里看的是“还能不能当主线信号”，不是直接荐股。'},
+      { name: '龙头强度分', value: '突出', assessment: '龙头股仍有相对强度，说明主线没有完全瓦解。', status: 'good', alert: '若龙头走弱，主线判断要降级', hint: '先看龙头，再看板块整体。'},
+      { name: '业绩兑现分', value: '待验证', assessment: '业绩兑现仍是关键变量，适合继续跟踪而非重仓叙事。', status: 'warning', alert: '财报若不及预期，回撤会更快', hint: '兑现弱时只能把它当信号，不当结论。'},
+      { name: '资金承接分', value: '稳定', assessment: '回调时资金承接尚可，说明并非纯情绪脉冲。', status: 'good', alert: '若承接消失，则需降热度判断', hint: '承接比上涨更重要。'},
+      { name: '估值安全分', value: '可接受', assessment: '估值不算便宜，但仍未透支全部中期预期。', status: 'attention', alert: '若估值透支过快，需要降风险偏好', hint: '估值决定容错率。'},
+      { name: '催化窗口', value: '存在', assessment: '近期存在可验证催化，适合做信号跟踪。', status: 'attention', alert: '催化落空时容易快速回吐', hint: '催化是节奏，不是基本面本身。'},
+      { name: '相对行业', value: '领先', assessment: '个股相对行业更强，说明它更适合作为前瞻信号。', status: 'good', alert: '若开始落后行业，信号价值下降', hint: '领先个股更适合拿来验证主线。'},
+      { name: '风险边界', value: '需盯住', assessment: '若高频催化落空，这类个股回撤速度也会更快。', status: 'warning', alert: '风险项需要在文案里明确写出', hint: '这类个股必须附带风险边界。'},
+    ],
+  },
+};
+function getActiveTenantProfile() {
+  const tenant = window.ACTIVE_TENANT || {};
+  return {
+    id: tenant.id || 'tenant_default',
+    name: tenant.name || '默认租户',
+    advisor: tenant.advisor || '主理投顾',
+    focus: tenant.focus || '研究方向',
+    rights: tenant.rights || '租户权益',
+    desc: tenant.description || '当前租户的独立服务空间。',
+  };
+}
+
+function syncDemoUsersWithActiveTenant() {
+  const tenantProfile = getActiveTenantProfile();
+  DEMO_PROFILE_USERS.forEach((user) => {
+    const userTenant = user.tenant && user.tenant.id ? user.tenant : tenantProfile;
+    user.tenant = {
+      ...tenantProfile,
+      ...userTenant,
+      desc: userTenant.desc || (user.role === 'dav'
+        ? '当前租户的独立管理空间，负责粉丝、内容与知识资产经营。'
+        : '当前租户的独立服务空间，仅开放租户内投顾互动。'),
+    };
+    user.workbenchLabel = user.role === 'dav' ? '进入我的大V工作台' : `查看${tenantProfile.advisor}工作台（demo）`;
+  });
+}
+
+let currentWorkbenchDashboardLayout = '2x2';
+let currentWorkbenchDashboardSlots = [];
+let currentWorkbenchDashboardSourceVersion = '';
+let currentWorkbenchDashboardMode = 'market';
+let dashboardCellEditingIndex = -1;
+let dashboardCellDraftMode = 'market';
+let currentFundMetricDetail = null;
+let workbenchDashboardAction = '';
+let workbenchDashboardActionTimer = null;
+// `day` remains the internal compatibility key for existing review records.
+const REVIEW_PERIOD_CONFIG = {
+  day: { label: '洞见', shortLabel: '洞见', prompt: '', marketFocus: '', aiLabel: '自选股 + 市场行情' },
+};
+const REVIEW_SOURCE_OPTIONS = [
+  { value: 'voice', icon: '🎙️', label: '语音口述', desc: '收盘后直接口述盘面、行业和个股判断。' },
+  { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接写完整洞见正文，再统一发布为前台文章。' },
+  { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
+  { value: 'url', icon: '🔗', label: '网页 URL', desc: '抓取公开网页资料，提炼后继续编辑。' },
+];
+function getAvailableReviewSourceOptions() {
+  return REVIEW_SOURCE_OPTIONS.filter((item) => (
+    item.value === 'voice' ? isFeatureEnabled('review_voice_input')
+      : (item.value === 'url' ? isFeatureEnabled('review_url_input') : true)
+  ));
+}
+const REVIEW_PARAGRAPH_OPTIONS = [
+  { value: 'manual', label: '沿用手写正文', desc: '直接沿用你已经写好的完整洞见正文。' },
+  { value: 'ai', label: '智能整理正文', desc: '只提供资料和判断，再补一句修改规则，由系统先生成完整洞见草稿。' },
+];
+let currentReviewPeriod = 'day';
+let reviewView = 'home';
+let reviewDetailArticleId = '';
+let reviewSearchKeyword = '';
+let reviewSearchResolvedAliases = [];
+let reviewSearchRequestSeq = 0;
+let reviewSearchTimer = null;
+let reviewDirectorySearchPending = false;
+const REVIEW_DIRECTORY_PAGE_SIZE = 30;
+let reviewDirectoryState = {
+  tenantSlug: '',
+  searchSignature: '',
+  items: [],
+  total: 0,
+  offset: 0,
+  hasMore: false,
+  loaded: false,
+  loading: false,
+  error: '',
+  requestSeq: 0,
+};
+let reviewTriggerDraft = {
+  period: 'day',
+  reviewTitle: '',
+  accessMode: 'public',
+  sourceMode: 'manual',
+  paragraphMode: 'manual',
+  skipAiProcessing: true,
+  flowStage: 'intake',
+  optimizeRuleMode: 'default',
+  useVoiceLlmEnhancement: true,
+  selectedWatchlist: [],
+  watchlistDecision: '',
+  voiceTranscript: '',
+  manualHtml: '',
+  fileText: '',
+  fileName: '',
+  urlValue: '',
+  urlTitle: '',
+  urlText: '',
+  aiPrompt: '',
+  promptTags: [],
+  sectorSummaryRule: '',
+  generatedPreviewText: '',
+  draftReviewText: '',
+  draftReviewHtml: '',
+  previewReady: false,
+};
+const reviewRuntimeStore = {};
+let reviewProductionPage = false;
+let insightDraftLibraryView = false;
+let reviewActiveJobs = [];
+let reviewActiveJobsTimer = null;
+let reviewActiveJobsLoading = false;
+const REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风险提示', '适合粉丝阅读', '分成短段落'];
+let reviewStructuredPreview = null;
+let reviewPreviewGenerating = false;
+let reviewPreviewJobState = null;
+
+function normalizeReviewStructuredPreview(payload) {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  const userInputSection = source.user_input_section && typeof source.user_input_section === 'object'
+    ? { ...source.user_input_section }
+    : {};
+  const watchlistAnalysisSection = source.watchlist_analysis_section && typeof source.watchlist_analysis_section === 'object'
+    ? { ...source.watchlist_analysis_section }
+    : {};
+  return {
+    ...source,
+    review_summary: String(source.review_summary || '').trim(),
+    user_input_section: {
+      source_mode: String(userInputSection.source_mode || reviewTriggerDraft.sourceMode || 'manual').trim().toLowerCase() || 'manual',
+      source_mode_label: String(userInputSection.source_mode_label || (REVIEW_SOURCE_OPTIONS.find((item) => item.value === reviewTriggerDraft.sourceMode) || {}).label || '用户输入').trim(),
+      display_text: String(userInputSection.display_text || reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText()).trim(),
+      summary_source: String(userInputSection.summary_source || 'llm_user_input_only').trim(),
+    },
+    watchlist_analysis_section: {
+      sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
+      sector_summary_rule: String(watchlistAnalysisSection.sector_summary_rule || '').trim(),
+      raw_text: String(watchlistAnalysisSection.raw_text || source.raw_text || '').trim(),
+      combined_text: String(watchlistAnalysisSection.combined_text || watchlistAnalysisSection.raw_text || source.raw_text || source.partial_text || '').trim(),
+      sector_profiles: Array.isArray(watchlistAnalysisSection.sector_profiles) ? watchlistAnalysisSection.sector_profiles.map((item) => ({
+        sector: String((item || {}).sector || '').trim(),
+        stock_names: Array.isArray((item || {}).stock_names) ? item.stock_names.slice(0) : [],
+        representative_description: String((item || {}).representative_description || '').trim(),
+      })) : [],
+      items: Array.isArray(watchlistAnalysisSection.items) ? watchlistAnalysisSection.items.map((item) => ({
+        stock_name: String((item || {}).stock_name || '').trim(),
+        stock_code: String((item || {}).stock_code || '').trim(),
+        sector: String((item || {}).sector || '').trim(),
+        board_role: String((item || {}).board_role || '').trim(),
+        analysis_text: String((item || {}).analysis_text || '').trim(),
+        evidence: Array.isArray((item || {}).evidence) ? item.evidence.slice(0) : [],
+      })) : [],
+      annotation_evidence: Array.isArray(watchlistAnalysisSection.annotation_evidence) ? watchlistAnalysisSection.annotation_evidence.map((item) => ({
+        annotation_id: (item || {}).annotation_id,
+        stock_name: String((item || {}).stock_name || '').trim(),
+        stock_code: String((item || {}).stock_code || '').trim(),
+        date_label: String((item || {}).date_label || '').trim(),
+        content: String((item || {}).content || '').trim(),
+        title: String((item || {}).title || '').trim(),
+        note: String((item || {}).note || '').trim(),
+        trigger: String((item || {}).trigger || '').trim(),
+      })) : [],
+    },
+    llm_models: Array.isArray(source.llm_models) ? source.llm_models.slice(0) : [],
+  };
+}
+
+function buildReviewWatchlistAnalysisText(section) {
+  const payload = section && typeof section === 'object' ? section : {};
+  const combinedText = String(payload.combined_text || '').trim();
+  const sectorSummary = String(payload.sector_summary || '').trim();
+  return [combinedText || String(payload.raw_text || payload.partial_text || '').trim(), sectorSummary ? `板块归纳：${sectorSummary}` : '']
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+function buildReviewStructuredFinalText(payload) {
+  const normalized = normalizeReviewStructuredPreview(payload);
+  return [
+    normalized.review_summary ? `【摘要】\n${normalized.review_summary}` : '',
+    normalized.user_input_section.display_text ? `【用户洞见】\n${normalized.user_input_section.display_text}` : '',
+  ].filter(Boolean).join('\n\n').trim();
+}
+const KNOWLEDGE_INPUT_TYPES = {
+  voice: {
+    label: '语音输入',
+    icon: '🎙️',
+    desc: '适合把直播口播、电话会录音或临场观点快速录入为可清洗的知识素材。',
+    placeholder: '例如：把这段语音里的 3 个核心判断、验证节点和风险点整理成长期知识卡。',
+    defaultTitle: '最新语音纪要整理',
+    defaultTags: ['语音纪要', '方法框架'],
+  },
+  file: {
+    label: '文件上传',
+    icon: '📄',
+    desc: '适合上传 PDF、纪要、研报和内部框架文档，进入租户知识队列统一整理。',
+    placeholder: '例如：这份 PDF 重点保留估值带、催化条件和不确定项，供后续 Hermes 调用。',
+    defaultTitle: '最新文件资料整理',
+    defaultTags: ['PDF', '框架资料'],
+  },
+  url: {
+    label: '网页 URL',
+    icon: '🔗',
+    desc: '适合把行业网页、公告页面和外部资料链接转成结构化知识卡。',
+    placeholder: '例如：抓取网页里的行业主线、关键数据和引用边界，沉淀为长期知识。',
+    defaultTitle: '最新网页资料整理',
+    defaultTags: ['网页资料', '外部来源'],
+  },
+  manual: {
+    label: '纯文本编写',
+    icon: '✍️',
+    desc: '适合直接输入观点、框架和验证节点，不依赖语音、文件或外部链接。',
+    placeholder: '例如：先写观点，再写证据、验证节点和风险边界，作为长期知识卡沉淀。',
+    defaultTitle: '最新文本知识整理',
+    defaultTags: ['手动编写', '观点沉淀'],
+  },
+};
+let knowledgeIntakeType = 'voice';
+let knowledgeRecording = false;
+let knowledgeUploadSamples = [];
+let knowledgeUploadBodies = [];
+let knowledgeUploadMeta = [];
+let knowledgeUrlPreview = null;
+let knowledgeDraft = { title: '', summary: '', body: '', url: '', processingMode: 'algorithm', useVoiceLlmEnhancement: true };
+let knowledgeEditingId = '';
+let knowledgeStructureState = {
+  tenantSlug: '',
+  loading: false,
+  loaded: false,
+  error: '',
+  payload: null,
+  activeTab: 'overview',
+};
+let knowledgeEntrySeq = 4;
+let knowledgeEntryStore = [
+  {
+    id: 'kb-1',
+    tenantId: 'tenant_lw',
+    type: 'file',
+    title: '港股互联网估值框架',
+    source: '文件上传',
+    sourceDetail: '来源：上传 PDF · 12页',
+    summary: '拆出回购强度、估值带与催化条件，已关联腾讯 / 美团 / 阿里。',
+    status: 'ready',
+    time: '12分钟前',
+    tags: ['估值框架', '港股互联网'],
+    destination: '已同步知识专区',
+    files: ['港股互联网估值框架.pdf'],
+  },
+  {
+    id: 'kb-2',
+    tenantId: 'tenant_lw',
+    type: 'voice',
+    title: '5月产业电话会录音整理',
+    source: '语音输入',
+    sourceDetail: '来源：语音转写 · 28分钟',
+    summary: '提炼固态电池、订单验证和量产节点，已可被 Hermes 直接调用。',
+    status: 'ready',
+    time: '26分钟前',
+    tags: ['电话会', '新能源'],
+    destination: '已进入 Hermes 上下文',
+    voiceMinutes: 28,
+  },
+  {
+    id: 'kb-3',
+    tenantId: 'tenant_lw',
+    type: 'url',
+    title: '半导体景气验证节点',
+    source: '网页 URL',
+    sourceDetail: '来源：网页解析 · 3篇行业资料',
+    summary: '整理产能利用率、成熟制程价格与资本开支节奏，当前正在同步到知识专区。',
+    status: 'syncing',
+    time: '刚刚',
+    tags: ['半导体', '网页资料'],
+    destination: '同步中',
+    url: 'https://example.com/semiconductor-cycle',
+  },
+];
+// Dashboard state is owned by PostgreSQL through the tenant dashboard API.
+// Keep this object only as an in-memory render state; browser storage is not a
+// fallback fact source because it can drift across devices and tabs.
+let tenantFundDashboardState = {};
+let tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(INITIAL_TENANT_DASHBOARD);
+
+function loadTenantFundDashboardState() {
+  return {};
+}
+
+function normalizeInitialRemoteDashboardState(payload) {
+  const dashboard = payload && typeof payload === 'object' ? payload : {};
+  const state = dashboard.fund_dashboard_state && typeof dashboard.fund_dashboard_state === 'object'
+    ? dashboard.fund_dashboard_state
+    : { published: dashboard.fund_dashboard || null, draft: null };
+  return {
+    published: state.published ? hydrateDashboardConfig(state.published) : null,
+    draft: state.draft ? hydrateDashboardConfig(state.draft) : null,
+  };
+}
+
+async function refreshTenantDashboardRemoteState(options) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!tenantSlug) return null;
+  const opts = options || {};
+  const loadedTenantSlug = String(((currentTenantDashboardPayload || {}).tenant || {}).slug || '').trim();
+  // The full dashboard is already serialized into the first H5 response.
+  // Re-fetch only after a tenant change or an explicit caller request.
+  if (!opts.force && loadedTenantSlug === String(tenantSlug).trim()) {
+    if (opts.rerenderFeed) renderFundMacroDashboard();
+    if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
+    if (opts.rerenderReviews) renderReviewExperience();
+    return { dashboard: currentTenantDashboardPayload, cached: true };
+  }
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`);
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_fetch_failed');
+    currentTenantDashboardPayload = payload.dashboard || {};
+    tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
+    tenantState.published = tenantFundDashboardRemoteState.published;
+    tenantState.draft = tenantFundDashboardRemoteState.draft;
+    if (opts.rerenderFeed) renderFundMacroDashboard();
+    if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
+    if (opts.rerenderReviews) renderReviewExperience();
+    renderWorkbenchOpsStats();
+    renderFanStockSectorChart();
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
+
+function persistTenantFundDashboardState() {
+  // Deliberately empty: dashboard drafts and published state are persisted by
+  // the tenant dashboard API, not by the browser.
+}
+
+function cloneDashboardConfig(config) {
+  return config ? JSON.parse(JSON.stringify(config)) : null;
+}
+
+function getFundStatusLabel(status) {
+  if (status === 'warning') return '需报警';
+  if (status === 'attention') return '需关注';
+  return '正常';
+}
+
+function normalizeDashboardLayout(layout) {
+  if (layout === '3x3') return '2x3';
+  if (layout === '4x4' || layout === '2x4') return '4x2';
+  if (layout === '2x5') return '5x2';
+  if (layout === '2x2' || layout === '2x3' || layout === '4x2' || layout === '5x2') return layout;
+  return '2x2';
+}
+
+function normalizeDashboardMode(mode) {
+  if (mode === 'market' || mode === 'industry' || mode === 'signal-stock') return mode;
+  return 'market';
+}
+
+function getDashboardSegmentConfig(mode) {
+  return H5_DASHBOARD_SEGMENTS[normalizeDashboardMode(mode)] || H5_DASHBOARD_SEGMENTS.market;
+}
+
+function getDashboardComponentLibrary(mode) {
+  const resolvedMode = normalizeDashboardMode(mode);
+  const libraries = {
+    market: [
+      { id: 'market_breadth', label: '广度改善分', source: '全市场行情库', metric: '上涨/下跌家数、站上MA20占比、新高-新低差', window: '1D', aggregation: '0-100评分', defaultWeight: 0.35, defaultOperator: 'base', defaultSelected: true },
+      { id: 'northbound_flow', label: '资金回流分', source: '北向/南向资金库', metric: '净流入占成交比、3日累计、连续净流入天数', window: '1D / 3D', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'turnover_structure', label: '主线参与分', source: '成交结构库', metric: '主线成交占比、5日变化、拥挤度惩罚', window: '1D / 5D', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'style_rotation', label: '防御压力分', source: '风格因子库', metric: '银行/红利相对成长超额、低波ETF净流入', window: '1D / 5D', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '-', defaultSelected: true },
+      { id: 'policy_heat', label: '政策温度参考分', source: '政策新闻流', metric: '宏观政策热度与边际变化', window: '3D', aggregation: '辅助评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: false },
+    ],
+    industry: [
+      { id: 'industry_orders', label: '订单景气分', source: '行业指标库', metric: '新增订单同比、在手订单覆盖、开工率', window: '1W / 1M', aggregation: '0-100评分', defaultWeight: 0.3, defaultOperator: 'base', defaultSelected: true },
+      { id: 'industry_price', label: '价格景气分', source: '产业链价格库', metric: '产品价格指数、价差、提价持续性', window: '1W / 1M', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_inventory', label: '库存去化分', source: '行业库存库', metric: '库存天数、主动/被动补库、去库斜率', window: '1M', aggregation: '0-100评分', defaultWeight: 0.2, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_policy', label: '政策催化分', source: '行业新闻流', metric: '政策热度、落地级别、持续性', window: '5D / 20D', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_capex', label: '资本开支确认分', source: '财报与经营数据', metric: 'Capex指引、扩产计划、设备招标', window: '1Q', aggregation: '0-100评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: true },
+    ],
+    'signal-stock': [
+      { id: 'leader_strength', label: '龙头强度分', source: '个股行情库', metric: '相对行业超额收益、回撤控制、成交额排名', window: '5D / 20D', aggregation: '0-100评分', defaultWeight: 0.35, defaultOperator: 'base', defaultSelected: true },
+      { id: 'earnings_delivery', label: '业绩兑现分', source: '财报与预期库', metric: '营收/利润兑现率、指引上修、订单兑现', window: '1Q', aggregation: '0-100评分', defaultWeight: 0.3, defaultOperator: '+', defaultSelected: true },
+      { id: 'support_flow', label: '资金承接分', source: '盘口与成交数据', metric: '回调缩量、尾盘净流入、换手承接', window: '3D / 5D', aggregation: '0-100评分', defaultWeight: 0.2, defaultOperator: '+', defaultSelected: true },
+      { id: 'valuation_band', label: '估值安全分', source: '估值与财报库', metric: 'PE/PS分位、PEG、相对历史分位', window: '1Q / 3Y', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '+', defaultSelected: true },
+      { id: 'catalyst_window', label: '催化窗口参考分', source: '公司新闻流', metric: '新品、财报、订单公告、政策催化时点', window: '10D / 30D', aggregation: '辅助评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: false },
+    ],
+  };
+  return JSON.parse(JSON.stringify(libraries[resolvedMode] || libraries.market));
+}
+
+function buildDefaultDashboardComponents(mode) {
+  return getDashboardComponentLibrary(mode).filter(item => item.defaultSelected !== false).slice(0, 5).map((item, index) => ({
+    id: item.id,
+    label: item.label,
+    source: item.source,
+    metric: item.metric,
+    window: item.window,
+    aggregation: item.aggregation,
+    weight: item.defaultWeight,
+    operator: item.defaultOperator || (index === 0 ? 'base' : '+'),
+  }));
+}
+
+function normalizeDashboardComponents(components, mode) {
+  const library = getDashboardComponentLibrary(mode);
+  const libraryMap = Object.fromEntries(library.map(item => [item.id, item]));
+  const rawList = Array.isArray(components) && components.length ? components : buildDefaultDashboardComponents(mode);
+  return rawList.slice(0, 6).map((item, index) => {
+    const raw = item && typeof item === 'object' ? item : {};
+    const template = libraryMap[raw.id || raw.componentId] || library[Math.min(index, library.length - 1)];
+    const nextWeight = Number(raw.weight);
+    return {
+      id: template.id,
+      label: String(raw.label || template.label || '').trim() || template.label,
+      source: String(raw.source || template.source || '').trim() || template.source,
+      metric: String(raw.metric || template.metric || '').trim() || template.metric,
+      window: String(raw.window || template.window || '').trim() || template.window,
+      aggregation: String(raw.aggregation || template.aggregation || '').trim() || template.aggregation,
+      weight: Number.isFinite(nextWeight) ? Number(nextWeight.toFixed(2)) : template.defaultWeight,
+      operator: String(raw.operator || template.defaultOperator || (index === 0 ? 'base' : '+')).trim() || (index === 0 ? 'base' : '+'),
+    };
+  });
+}
+
+function buildDashboardFormulaText(mode, components) {
+  const list = Array.isArray(components) ? components : [];
+  const fallback = getDashboardSegmentConfig(mode).formula || '';
+  if (!list.length) return fallback;
+  return list.map((item, index) => {
+    const weightText = Math.abs(Number(item.weight || 1) - 1) < 0.01 ? '' : ` x ${Number(item.weight || 1)}`;
+    const prefix = index > 0 && item.operator && item.operator !== 'base' ? ` ${item.operator} ` : '';
+    return `${prefix}${item.label || `组件 ${index + 1}`}${weightText}`;
+  }).join('').trim() || fallback;
+}
+
+function buildDashboardSourceList(mode, components, explicitSources) {
+  const deduped = [];
+  const pushSource = (source) => {
+    const text = String(source || '').trim();
+    if (text && !deduped.includes(text)) deduped.push(text);
+  };
+  (Array.isArray(explicitSources) ? explicitSources : []).forEach(pushSource);
+  (Array.isArray(components) ? components : []).forEach(item => pushSource(item.source));
+  if (!deduped.length) {
+    getDashboardComponentLibrary(mode).slice(0, 3).forEach(item => pushSource(item.source));
+  }
+  return deduped;
+}
+
+function buildDashboardMetricSummaryList(components, limit) {
+  const list = Array.isArray(components) ? components : [];
+  const maxItems = Number(limit || 2);
+  return list.slice(0, maxItems).map((item) => ({
+    label: item.label || '组件',
+    metric: item.metric || '--',
+  }));
+}
+
+function buildDashboardMetricCompactText(components, limit) {
+  const list = Array.isArray(components) ? components : [];
+  if (!list.length) return '点击查看详细指标构成';
+  const maxItems = Number(limit || 2);
+  const names = list.slice(0, maxItems).map((item) => item.label || '组件');
+  const suffix = list.length > maxItems ? `等${list.length}项` : '';
+  return `指标：${names.join('、')}${suffix}`;
+}
+
+function getDefaultDashboardCardMode(index) {
+  const sequence = ['market', 'industry', 'signal-stock', 'signal-stock', 'market', 'industry', 'signal-stock', 'market'];
+  return sequence[index % sequence.length];
+}
+
+function inferDashboardCardMode(card, fallbackMode) {
+  const raw = card && typeof card === 'object' ? card : {};
+  const explicit = raw.mode || raw.segmentId;
+  if (explicit) return normalizeDashboardMode(explicit);
+  const combined = [
+    raw.name,
+    raw.title,
+    raw.prompt,
+    raw.assessment,
+    raw.hint,
+    raw.alert,
+  ].map(item => String(item || '').trim()).join(' ');
+  if (/行业景气|行业订单|价格景气|库存节奏|景气验证|资本开支|竞争格局/.test(combined)) return 'industry';
+  if (/信号个股|龙头强度|业绩兑现|相对行业|催化临近|资金承接|估值位置/.test(combined)) return 'signal-stock';
+  if (/风险偏好|流动性|政策温度|市场广度|风格轮动|波动压力|主线热度/.test(combined)) return 'market';
+  return normalizeDashboardMode(fallbackMode || 'market');
+}
+
+function buildDashboardModeBreakdown(cards) {
+  const list = Array.isArray(cards) ? cards : [];
+  const counts = { market: 0, industry: 0, 'signal-stock': 0 };
+  list.forEach((card, index) => {
+    const mode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+    counts[mode] += 1;
+  });
+  return counts;
+}
+
+function getDashboardPrimaryMode(cards) {
+  const counts = buildDashboardModeBreakdown(cards);
+  const ordered = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  return ordered[0] && ordered[0][1] ? ordered[0][0] : 'market';
+}
+
+function isMixedDashboardModes(cards) {
+  return Object.values(buildDashboardModeBreakdown(cards)).filter(Boolean).length > 1;
+}
+
+function buildDashboardCompositionSummary(cards) {
+  const counts = buildDashboardModeBreakdown(cards);
+  return Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([mode, count]) => `${getDashboardSegmentConfig(mode).shortTitle} ${count}`)
+    .join(' · ') || '市场 0';
+}
+
+function inferDashboardMode(source) {
+  const raw = source && typeof source === 'object' ? source : {};
+  const explicit = normalizeDashboardMode(raw.mode || raw.segmentId || '');
+  if (raw.mode || raw.segmentId) return explicit;
+  if (Array.isArray(raw.cards) && raw.cards.length) return getDashboardPrimaryMode(raw.cards);
+  const title = String(raw.title || '').trim();
+  const note = String(raw.note || '').trim();
+  const cardNames = Array.isArray(raw.cards) ? raw.cards.map(item => String(item && item.name || '').trim()).join(' ') : '';
+  const combined = `${title} ${note} ${cardNames}`;
+  if (/行业景气|行业订单|价格景气|库存节奏|景气验证|资本开支|竞争格局/.test(combined)) return 'industry';
+  if (/信号个股|龙头强度|业绩兑现|相对行业|催化临近|资金承接|估值位置/.test(combined)) return 'signal-stock';
+  return 'market';
+}
+
+function syncDashboardWorkbenchHeader(config) {
+  const titleEl = document.getElementById('wb-dashboard-section-title');
+  const descEl = document.getElementById('wb-dashboard-section-desc');
+  if (titleEl) titleEl.textContent = '智能仪表盘格子编排';
+  if (descEl) descEl.textContent = '每个格子都可以单独选择市场状态卡、行业景气卡或信号个股卡，自由混搭后再发布到基本面首页。';
+}
+
+function renderDashboardModeRow() {
+  const host = document.getElementById('wb-dashboard-mode-row');
+  if (!host) return;
+  const cards = [
+    { id: 'market', kicker: 'Macro' },
+    { id: 'industry', kicker: 'Industry' },
+    { id: 'signal-stock', kicker: 'Signal Stock' },
+  ];
+  host.innerHTML = cards.map((item) => {
+    const segment = getDashboardSegmentConfig(item.id);
+    return `
+      <button class="wb-dashboard-mode-card ${currentWorkbenchDashboardMode === item.id ? 'active' : ''}" type="button" onclick="selectFundDashboardMode('${item.id}')">
+        <div class="wb-dashboard-mode-kicker">${escapeHtml(item.kicker)}</div>
+        <div class="wb-dashboard-mode-title">${escapeHtml(segment.title)}</div>
+        <div class="wb-dashboard-mode-desc">${escapeHtml(segment.subtitle)} 当前作为新格子的默认类型。</div>
+      </button>
+    `;
+  }).join('');
+}
+
+function getDashboardCardTarget(layout) {
+  if (layout === '2x3') return 6;
+  if (layout === '4x2') return 8;
+  if (layout === '5x2') return 10;
+  return 4;
+}
+
+function getDashboardKeywordCards(promptText) {
+  const normalizedPrompt = String(promptText || '');
+  return [
+    {
+      hit: /美联储|降息|通胀|非农|就业|联储/i.test(normalizedPrompt),
+      card: {
+        name: '美联储路径',
+        value: '偏鸽',
+        assessment: '若通胀继续回落，全球风险资产承压会减轻。',
+        status: 'good',
+        alert: '重点盯非农与 CPI 是否反复',
+        hint: '适合作为港股科技和成长板块的方向锚。',
+      },
+    },
+    {
+      hit: /南向|北向|资金|流入|流出/i.test(normalizedPrompt),
+      card: {
+        name: '增量资金',
+        value: '连续净流入',
+        assessment: '说明风险偏好在恢复，但还没到全面扩散阶段。',
+        status: 'attention',
+        alert: '看是否形成连续 3 日放量',
+        hint: '若只集中在单一主线，行情持续性要打折。',
+      },
+    },
+    {
+      hit: /AI|算力|半导体|订单/i.test(normalizedPrompt),
+      card: {
+        name: 'AI 订单兑现',
+        value: '继续验证',
+        assessment: '主题逻辑仍强，但必须看到订单和利润兑现。',
+        status: 'attention',
+        alert: '若只见叙事不见业绩，需要收缩仓位',
+        hint: '更适合与自选股预警联动看，而不是单看新闻热度。',
+      },
+    },
+    {
+      hit: /港股|互联网|财报|回购/i.test(normalizedPrompt),
+      card: {
+        name: '港股互联网',
+        value: '估值修复中',
+        assessment: '回购和现金流是支撑，但财报验证仍是核心。',
+        status: 'good',
+        alert: '重点看广告、电商和利润率能否继续超预期',
+        hint: '若美元重新走强，修复节奏会被打断。',
+      },
+    },
+  ].filter(item => item.hit).map(item => item.card);
+}
+
+function getBaseDashboardCards() {
+  const source = Array.isArray(DASHBOARD_SEED_CARDS) && DASHBOARD_SEED_CARDS.length
+    ? DASHBOARD_SEED_CARDS
+    : (Array.isArray(DEFAULT_MACRO_INDICATORS) && DEFAULT_MACRO_INDICATORS.length
+      ? DEFAULT_MACRO_INDICATORS
+      : (((H5_INDICATOR_HUB || {}).smart_items || []).slice(0, 4).map(item => ({
+          name: item.name,
+          value: item.value,
+          assessment: item.assessment,
+          status: item.status,
+          alert: item.alert,
+          hint: item.alert,
+        }))));
+  return source.map(item => ({
+    name: item.name,
+    value: item.value,
+    assessment: item.assessment,
+    status: item.status,
+    alert: item.alert,
+    hint: item.hint,
+  }));
+}
+
+function getFallbackDashboardCard(index, mode) {
+  const resolvedMode = normalizeDashboardMode(mode || currentWorkbenchDashboardMode || getDefaultDashboardCardMode(index));
+  const segment = getDashboardSegmentConfig(resolvedMode);
+  const source = segment.cards[index % segment.cards.length] || {
+    name: `核心指标 ${index + 1}`,
+    value: '待跟踪',
+    assessment: '当前缺少可用模板，请补充指标来源。',
+    status: 'attention',
+    alert: '建议补充一条更具体的格子提示词',
+    hint: '发布前请确认该格子的研究重点。',
+  };
+  return { ...source, mode: resolvedMode, segmentId: resolvedMode };
+}
+
+function buildEmptyDashboardCard(promptText, mode) {
+  const resolvedMode = normalizeDashboardMode(mode || currentWorkbenchDashboardMode || 'market');
+  const components = buildDefaultDashboardComponents(resolvedMode);
+  return {
+    mode: resolvedMode,
+    segmentId: resolvedMode,
+    name: '',
+    value: '',
+    assessment: '',
+    status: 'normal',
+    alert: '',
+    hint: '',
+    prompt: String(promptText || '').trim(),
+    components,
+    formula: buildDashboardFormulaText(resolvedMode, components),
+    sources: buildDashboardSourceList(resolvedMode, components),
+    isEmpty: true,
+  };
+}
+
+function summarizeDashboardPrompt(promptText, maxLength) {
+  const compact = String(promptText || '').replace(/\s+/g, ' ').trim();
+  if (!compact) return '';
+  const limit = maxLength || 16;
+  return compact.length > limit ? `${compact.slice(0, limit)}...` : compact;
+}
+
+function getDashboardPromptSeed(index, card, mode) {
+  const cardMode = inferDashboardCardMode(card, mode || getDefaultDashboardCardMode(index));
+  if (card && typeof card.prompt === 'string' && card.prompt.trim()) return card.prompt.trim();
+  if (card && card.name) {
+    return `围绕 ${card.name} 生成适合普通投资者看的核心指标卡，说明当前状态、风险提醒和后续跟踪点。`;
+  }
+  const segment = getDashboardSegmentConfig(cardMode);
+  return segment.promptPlaceholder || DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length];
+}
+
+function normalizeDashboardPromptList(layout, promptList, cards) {
+  const targetCount = getDashboardCardTarget(layout);
+  return Array.from({ length: targetCount }, (_, index) => {
+    const promptText = promptList && typeof promptList[index] === 'string' ? promptList[index].trim() : '';
+    if (promptText) return promptText;
+    return getDashboardPromptSeed(index, cards && cards[index], inferDashboardCardMode(cards && cards[index], getDefaultDashboardCardMode(index)));
+  });
+}
+
+function buildDashboardCardFromPrompt(promptText, index, mode) {
+  const normalizedPrompt = String(promptText || '').trim();
+  const resolvedMode = normalizeDashboardMode(mode || currentWorkbenchDashboardMode || getDefaultDashboardCardMode(index));
+  if (!normalizedPrompt) return buildEmptyDashboardCard('', resolvedMode);
+  const segment = getDashboardSegmentConfig(resolvedMode);
+  const segmentCard = segment.cards[index % segment.cards.length] || getFallbackDashboardCard(index, resolvedMode);
+  const matchedCards = getDashboardKeywordCards(promptText);
+  const fallbackCard = getFallbackDashboardCard(index, resolvedMode);
+  let nextCard = matchedCards.length ? { ...matchedCards[index % matchedCards.length] } : { ...segmentCard, ...fallbackCard };
+  if (!matchedCards.length) {
+    nextCard.name = segmentCard.name || summarizeDashboardPrompt(promptText, 10) || nextCard.name;
+    nextCard.assessment = segmentCard.assessment || `按该格子的定制提示词跟踪：${summarizeDashboardPrompt(promptText, 28)}`;
+    nextCard.alert = segmentCard.alert || '重点确认该主题是否已有最新数据或事件验证。';
+    nextCard.hint = segmentCard.hint || '该格子由独立提示词生成，适合跟踪小众主题或临时变量。';
+  }
+  nextCard.mode = resolvedMode;
+  nextCard.segmentId = resolvedMode;
+  nextCard.prompt = normalizedPrompt;
+  nextCard.components = normalizeDashboardComponents(nextCard.components, resolvedMode);
+  nextCard.formula = buildDashboardFormulaText(resolvedMode, nextCard.components);
+  nextCard.sources = buildDashboardSourceList(resolvedMode, nextCard.components, nextCard.sources);
+  nextCard.isEmpty = false;
+  return nextCard;
+}
+
+function pickDashboardCards(layout, promptSource, modeSource) {
+  const targetCount = getDashboardCardTarget(layout);
+  const promptList = Array.isArray(promptSource)
+    ? Array.from({ length: targetCount }, (_, index) => String(promptSource[index] || '').trim())
+    : Array(targetCount).fill(String(promptSource || '').trim());
+  const modeList = Array.isArray(modeSource)
+    ? Array.from({ length: targetCount }, (_, index) => normalizeDashboardMode(modeSource[index] || getDefaultDashboardCardMode(index)))
+    : Array.from({ length: targetCount }, (_, index) => normalizeDashboardMode(modeSource || getDefaultDashboardCardMode(index)));
+  const cards = [];
+  while (cards.length < targetCount) {
+    cards.push(buildDashboardCardFromPrompt(promptList[cards.length], cards.length, modeList[cards.length]));
+  }
+  return cards;
+}
+
+function getDashboardPromptSummary(promptSource) {
+  if (Array.isArray(promptSource)) {
+    return promptSource.map(item => String(item || '').trim()).filter(Boolean).join('；');
+  }
+  return String(promptSource || '').trim();
+}
+
+function buildDashboardTitle(layout, promptSource, cards) {
+  const targetCards = Array.isArray(cards) ? cards : [];
+  const mixed = isMixedDashboardModes(targetCards);
+  const primaryMode = getDashboardPrimaryMode(targetCards);
+  const segment = getDashboardSegmentConfig(primaryMode);
+  const promptText = getDashboardPromptSummary(promptSource);
+  if (targetCards.length) return mixed ? `今日核心指标面板 · 混合策略 · ${layout.toUpperCase()}` : `${segment.title} · ${layout.toUpperCase()}`;
+  if (/港股|互联网/i.test(promptText)) return '今日核心指标面板 · 港股与科技';
+  if (/AI|算力|半导体/i.test(promptText)) return '今日核心指标面板 · AI 主线';
+  if (/美联储|降息|通胀/i.test(promptText)) return '今日核心指标面板 · 宏观优先';
+  return `今日核心指标面板 · ${layout.toUpperCase()}`;
+}
+
+function buildDashboardNote(promptSource, cards) {
+  const targetCards = Array.isArray(cards) ? cards : [];
+  const segment = getDashboardSegmentConfig(getDashboardPrimaryMode(targetCards));
+  const composition = buildDashboardCompositionSummary(targetCards);
+  if (Array.isArray(promptSource)) {
+    const prompts = promptSource.map(item => String(item || '').trim()).filter(Boolean);
+    if (prompts.length) {
+      return `当前面板支持按格子混搭。组合结构：${composition}。当前共配置 ${prompts.length} 个格子。`;
+    }
+  }
+  const promptText = getDashboardPromptSummary(promptSource);
+  if (promptText) {
+    return `当前面板支持按格子混搭。组合结构：${composition}。当前提示词：${promptText.slice(0, 52)}${promptText.length > 52 ? '...' : ''}`;
+  }
+  return targetCards.length ? `当前面板支持按格子混搭。组合结构：${composition}。` : segment.note;
+}
+
+function hydrateDashboardConfig(config) {
+  const fallbackConfig = buildDefaultFundDashboard();
+  const source = config && typeof config === 'object' ? config : fallbackConfig;
+  const mode = normalizeDashboardMode(source.mode || source.segmentId || fallbackConfig.mode || 'market');
+  const layout = normalizeDashboardLayout(source.layout || fallbackConfig.layout);
+  const existingCards = Array.isArray(source.cards) ? source.cards : fallbackConfig.cards;
+  const cards = Array.from({ length: getDashboardCardTarget(layout) }, (_, index) => {
+    const currentCard = existingCards[index];
+    const cardMode = inferDashboardCardMode(currentCard, getDefaultDashboardCardMode(index));
+    if (!currentCard) return buildEmptyDashboardCard('', cardMode);
+    const fallbackCard = getFallbackDashboardCard(index, cardMode);
+    const hasContent = !!(currentCard.name || currentCard.value || currentCard.assessment || currentCard.alert || currentCard.hint);
+    if (!hasContent && !String(currentCard.prompt || '').trim()) return buildEmptyDashboardCard('', cardMode);
+    return {
+      mode: cardMode,
+      segmentId: cardMode,
+      name: currentCard.name || fallbackCard.name,
+      value: currentCard.value || fallbackCard.value,
+      assessment: currentCard.assessment || fallbackCard.assessment,
+      status: currentCard.status || fallbackCard.status,
+      alert: currentCard.alert || fallbackCard.alert,
+      hint: currentCard.hint || fallbackCard.hint,
+      prompt: getDashboardPromptSeed(index, currentCard, cardMode),
+      components: normalizeDashboardComponents(currentCard.components, cardMode),
+      formula: String(currentCard.formula || '').trim() || buildDashboardFormulaText(cardMode, normalizeDashboardComponents(currentCard.components, cardMode)),
+      sources: buildDashboardSourceList(cardMode, normalizeDashboardComponents(currentCard.components, cardMode), currentCard.sources),
+      isEmpty: false,
+    };
+  });
+  const primaryMode = getDashboardPrimaryMode(cards);
+  const composition = buildDashboardCompositionSummary(cards);
+  return {
+    mode: primaryMode || mode,
+    segmentId: primaryMode || mode,
+    layout,
+    title: source.title || buildDashboardTitle(layout, cards.map(card => card.prompt || ''), cards),
+    note: source.note || `当前面板支持按格子混搭。组合结构：${composition}。`,
+    cards,
+    updatedAt: source.updatedAt || fallbackConfig.updatedAt,
+    publisher: source.publisher || fallbackConfig.publisher,
+  };
+}
+
+function buildDefaultFundDashboard() {
+  const modeList = Array.from({ length: getDashboardCardTarget('2x2') }, (_, index) => getDefaultDashboardCardMode(index));
+  const defaultPrompts = modeList.map((mode, index) => {
+    const segment = getDashboardSegmentConfig(mode);
+    return segment.cards[index % segment.cards.length].prompt || segment.promptPlaceholder;
+  });
+  const cards = pickDashboardCards('2x2', defaultPrompts, modeList);
+  return {
+    mode: getDashboardPrimaryMode(cards),
+    segmentId: getDashboardPrimaryMode(cards),
+    layout: '2x2',
+    title: buildDashboardTitle('2x2', defaultPrompts, cards),
+    note: buildDashboardNote(defaultPrompts, cards),
+    cards,
+    updatedAt: '默认模板',
+    publisher: '系统初始化',
+  };
+}
+
+function ensureTenantFundDashboardState(tenantId) {
+  const remotePublished = tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.published
+    ? hydrateDashboardConfig(tenantFundDashboardRemoteState.published)
+    : null;
+  const remoteDraft = tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.draft
+    ? hydrateDashboardConfig(tenantFundDashboardRemoteState.draft)
+    : null;
+  if (!tenantFundDashboardState[tenantId]) {
+    tenantFundDashboardState[tenantId] = {
+      published: remotePublished || buildDefaultFundDashboard(),
+      draft: remoteDraft,
+    };
+    persistTenantFundDashboardState();
+  } else {
+    const tenantState = tenantFundDashboardState[tenantId];
+    tenantState.published = remotePublished || hydrateDashboardConfig(tenantState.published);
+    tenantState.draft = remoteDraft !== null ? remoteDraft : (tenantState.draft ? hydrateDashboardConfig(tenantState.draft) : null);
+    if (!tenantState.published) {
+      tenantState.published = buildDefaultFundDashboard();
+    }
+    persistTenantFundDashboardState();
+  }
+  return tenantFundDashboardState[tenantId];
+}
+
+async function syncTenantDashboardState(action, dashboardConfig) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!tenantSlug) throw new Error('tenant_missing');
+  const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action,
+      dashboard: dashboardConfig || null,
+    }),
+  });
+  const payload = await resp.json();
+  if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_sync_failed');
+  currentTenantDashboardPayload = payload.dashboard || {};
+  tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+  const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
+  tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
+  tenantState.draft = tenantFundDashboardRemoteState.draft;
+  persistTenantFundDashboardState();
+  try {
+    window.localStorage?.setItem(SITE_CONFIG_BROADCAST_KEY, String(Date.now()));
+  } catch (error) {}
+  return payload;
+}
+
+function getTenantFundDashboardState() {
+  const activeUser = getActiveDemoUser();
+  return ensureTenantFundDashboardState(activeUser.tenant.id);
+}
+
+function getPublishedFundDashboard() {
+  if (tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.published) {
+    return cloneDashboardConfig(tenantFundDashboardRemoteState.published);
+  }
+  return null;
+}
+
+function getDraftFundDashboard() {
+  const tenantState = getTenantFundDashboardState();
+  return cloneDashboardConfig(tenantState.draft);
+}
+
+function formatInt(value) {
+  return Number(value || 0).toLocaleString('zh-CN');
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
+function renderGangtiseMarkdown(value) {
+  const source = String(value || '').replace(/\r\n?/g, '\n').trim();
+  if (!source) return '';
+
+  const recoverCompressedTable = (rawText) => {
+    const firstPipe = rawText.indexOf('|');
+    if (firstPipe <= 0 || !rawText.slice(firstPipe).includes(':---')) return rawText;
+    const remainder = rawText.slice(firstPipe);
+    const proseMarker = remainder.match(/\|\s*(?=(?:从资产配置|在当前|综合来看|综上所述|以上|注：))/);
+    if (!proseMarker || proseMarker.index === undefined) return rawText;
+    const tableRaw = remainder.slice(0, proseMarker.index);
+    const cells = tableRaw.replace(/\*\*/g, '').split('|').map((cell) => cell.trim()).filter(Boolean);
+    const dividerIndex = cells.findIndex((cell) => /^:?-{3,}:?$/.test(cell));
+    if (dividerIndex < 2 || cells.length < dividerIndex * 2) return rawText;
+    const columns = dividerIndex;
+    const tableLines = [
+      `| ${cells.slice(0, columns).join(' | ')} |`,
+      `| ${Array.from({ length: columns }, () => '---').join(' | ')} |`,
+    ];
+    for (let index = columns * 2; index + columns <= cells.length; index += columns) {
+      tableLines.push(`| ${cells.slice(index, index + columns).join(' | ')} |`);
+    }
+    const title = rawText.slice(0, firstPipe).replace(/^\*+|\*+$/g, '').trim();
+    const remainderText = remainder.slice(proseMarker.index + 1).trim()
+      .replace(/^\*\*/, '')
+      .replace(/\*\*$/, '')
+      .trim();
+    return `${title ? `## ${title}\n` : ''}${tableLines.join('\n')}\n\n${remainderText}`.trim();
+  };
+
+  // The API response is untrusted. Escape it before adding only the small,
+  // explicit HTML vocabulary produced by this renderer.
+  let normalizedSource = recoverCompressedTable(source)
+    // Older persisted SSE results may have lost the newline before a heading.
+    .replace(/(---+)(?=#{1,4}\s)/g, '$1\n')
+    .replace(/([^\n])(?=---+(?:\n|$))/g, '$1\n')
+    .replace(/([^#\n])(?=#{1,4}\s)/g, '$1\n')
+    // Recover the two fixed section labels used by the review prompt when
+    // the old merger joined the heading and its first sentence.
+    .replace(/^(#{1,4}\s+(?:结论|详细分析))(?=\S)/gm, '$1\n');
+
+  // Gangtise occasionally wraps a complete table row in bold markers and
+  // returns several Markdown lines as one SSE chunk. Recover the block
+  // boundaries before escaping the source, while keeping inline bold text.
+  normalizedSource = normalizedSource
+    .replace(/\*{2}\s+\*{2}\s*(?=[一二三四五六七八九十]+、)/g, '\n## ')
+    .replace(/\*\*([一二三四五六七八九十]+、[^*\n]{2,40}?(?:策略|要点))(?=[\u4e00-\u9fff])/g, '## $1\n')
+    .replace(/^(#{1,4}\s+[一二三四五六七八九十]+、[^\n]{2,40}?(?:策略|要点))(?=[\u4e00-\u9fff])/gm, '$1\n');
+  normalizedSource = normalizedSource
+    .replace(/^\s*\*\*(?=\|)/gm, '')
+    .replace(/\|\s*\*\*\s*$/gm, '|');
+  const lines = escapeHtml(normalizedSource)
+    .replace(/&lt;br\s*\/?&gt;/gi, '\n')
+    .split('\n');
+  const renderInline = (text) => String(text || '')
+    .replace(/\\ref\{(\d+)\}/g, '<sup class="review-gangtise-citation">[$1]</sup>')
+    .replace(/\[(\d{1,3})\]/g, '<sup class="review-gangtise-citation">[$1]</sup>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line);
+  const isTableDivider = (line) => {
+    if (!isTableRow(line)) return false;
+    return line.split('|').filter((cell, index, cells) => index > 0 && index < cells.length - 1)
+      .every((cell) => /^\s*:?-{3,}:?\s*$/.test(cell));
+  };
+  const tableCells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
+  const blocks = [];
+  let paragraph = [];
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push(`<p>${renderInline(paragraph.join('<br>'))}</p>`);
+    paragraph = [];
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      const level = heading[1].length + 1;
+      blocks.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+      continue;
+    }
+    if (/^\s*(---+|\*\*\*+)\s*$/.test(line)) {
+      flushParagraph();
+      blocks.push('<hr>');
+      continue;
+    }
+    if (isTableRow(line) && isTableDivider(lines[index + 1] || '')) {
+      flushParagraph();
+      const headers = tableCells(line);
+      const rows = [];
+      index += 2;
+      while (index < lines.length && isTableRow(lines[index])) {
+        rows.push(tableCells(lines[index]));
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(`<div class="review-gangtise-table-wrap"><table><thead><tr>${headers.map((cell) => `<th>${renderInline(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${headers.map((_, cellIndex) => `<td>${renderInline(row[cellIndex] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    if (/^\s*[-*]\s+/.test(line)) {
+      flushParagraph();
+      const items = [];
+      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\s*[-*]\s+/, ''));
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(`<ul>${items.map((item) => `<li>${renderInline(item)}</li>`).join('')}</ul>`);
+      continue;
+    }
+    if (!line.trim()) {
+      flushParagraph();
+      continue;
+    }
+    paragraph.push(line.trim());
+  }
+  flushParagraph();
+  return `<div class="review-gangtise-markdown">${blocks.join('')}</div>`;
+}
+
+function hasLoggedInH5User() {
+  return !!(window.CURRENT_DEMO_PROFILE && window.CURRENT_DEMO_PROFILE.username);
+}
+
+function normalizeH5LoginHistoryAccount(raw) {
+  const item = raw && typeof raw === 'object' ? raw : {};
+  const username = String(item.username || '').trim();
+  if (!username) return null;
+  return {
+    username,
+    avatar: String(item.avatar || '👤').trim() || '👤',
+    display_name: String(item.display_name || item.name || username).trim() || username,
+    role_label: String(item.role_label || item.roleLabel || '').trim(),
+    tenant_name: String(item.tenant_name || '').trim(),
+    advisor_name: String(item.advisor_name || '').trim(),
+    password_saved: item.password_saved === true,
+    password: item.password_saved === true ? String(item.password || '') : '',
+    last_login_at: String(item.last_login_at || '').trim(),
+  };
+}
+
+function loadH5LoginHistoryAccounts() {
+  try {
+    const raw = window.localStorage ? window.localStorage.getItem(H5_LOGIN_HISTORY_STORAGE_KEY) : '';
+    const parsed = raw ? JSON.parse(raw) : [];
+    return (Array.isArray(parsed) ? parsed : [])
+      .map(normalizeH5LoginHistoryAccount)
+      .filter(Boolean)
+      .slice(0, 8);
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveH5LoginHistoryAccounts(accounts) {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(H5_LOGIN_HISTORY_STORAGE_KEY, JSON.stringify((Array.isArray(accounts) ? accounts : []).slice(0, 8)));
+    }
+  } catch (error) {}
+}
+
+function getH5LoginHistoryAccounts() {
+  return loadH5LoginHistoryAccounts();
+}
+
+function getH5LoginHistoryAccount(username) {
+  const normalized = String(username || '').trim();
+  if (!normalized) return null;
+  return getH5LoginHistoryAccounts().find((item) => item.username === normalized) || null;
+}
+
+function upsertH5LoginHistoryAccount(profile, username, password, rememberPassword) {
+  const current = getH5LoginHistoryAccounts().filter((item) => item.username !== String(username || '').trim());
+  const profilePayload = profile && typeof profile === 'object' ? profile : {};
+  const tenant = profilePayload.tenant && typeof profilePayload.tenant === 'object' ? profilePayload.tenant : {};
+  const nextItem = normalizeH5LoginHistoryAccount({
+    username: String(username || profilePayload.username || '').trim(),
+    avatar: profilePayload.avatar || '👤',
+    display_name: profilePayload.display_name || profilePayload.name || profilePayload.username || username || '',
+    role_label: profilePayload.roleLabel || profilePayload.role_label || '',
+    tenant_name: tenant.name || profilePayload.tenant_name || '',
+    advisor_name: tenant.advisor || profilePayload.advisor_name || '',
+    password_saved: rememberPassword === true,
+    password: rememberPassword === true ? String(password || '') : '',
+    last_login_at: new Date().toISOString(),
+  });
+  if (!nextItem) return;
+  current.unshift(nextItem);
+  saveH5LoginHistoryAccounts(current);
+}
+
+function removeH5LoginHistoryAccount(username) {
+  const normalized = String(username || '').trim();
+  if (!normalized) return;
+  const nextAccounts = getH5LoginHistoryAccounts().filter((item) => item.username !== normalized);
+  saveH5LoginHistoryAccounts(nextAccounts);
+  if (h5PasswordDraftUsername === normalized) {
+    h5PasswordDraftUsername = '';
+    h5RememberPassword = false;
+  }
+  renderH5LoginScreen();
+}
+
+function toggleH5RememberPassword(checked) {
+  h5RememberPassword = checked === true;
+}
+
+function getH5AuthSettings() {
+  const raw = H5_AUTH_SETTINGS && typeof H5_AUTH_SETTINGS === 'object' ? H5_AUTH_SETTINGS : {};
+  const wechat = raw.wechat && typeof raw.wechat === 'object' ? raw.wechat : {};
+  return {
+    password_login_enabled: raw.password_login_enabled !== false,
+    wechat_login_enabled: raw.wechat_login_enabled === true,
+    quick_select_enabled: raw.quick_select_enabled !== false,
+    wechat_runtime_test_enabled: raw.wechat_runtime_test_enabled !== false,
+    wechat_ready: raw.wechat_ready === true,
+    wechat: {
+      app_id: wechat.app_id || '',
+      redirect_uri: wechat.redirect_uri || '',
+      scope: wechat.scope || 'snsapi_userinfo',
+      auto_register_enabled: wechat.auto_register_enabled === true,
+      default_role: wechat.default_role || 'investor',
+      default_tenant_slug: wechat.default_tenant_slug || '',
+    },
+  };
+}
+
+function switchH5LoginMode(mode) {
+  h5LoginMode = 'login';
+  setH5LoginStatus('', 'normal');
+  renderH5LoginScreen();
+}
+
+function isH5WechatRuntimeTestingEnabled() {
+  return getH5AuthSettings().wechat_runtime_test_enabled !== false;
+}
+
+function normalizeH5WechatRuntimeMode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'simulate' || normalized === 'strict' || normalized === 'off') return normalized;
+  return 'auto';
+}
+
+function detectH5RuntimeEnv() {
+  const params = new URLSearchParams(window.location.search || '');
+  const testingEnabled = isH5WechatRuntimeTestingEnabled();
+  const queryMode = testingEnabled ? normalizeH5WechatRuntimeMode(params.get(H5_WECHAT_RUNTIME_QUERY_KEY) || '') : 'auto';
+  const ua = String((window.navigator && window.navigator.userAgent) || '');
+  const isActualWechat = /MicroMessenger/i.test(ua);
+  const isSimulatedWechat = !isActualWechat && (queryMode === 'simulate' || queryMode === 'strict');
+  const strictRestrictions = queryMode === 'strict';
+  const isWechatContainer = isActualWechat || isSimulatedWechat;
+  const mediaRecorderSupported = !!(
+    window.navigator
+    && navigator.mediaDevices
+    && typeof navigator.mediaDevices.getUserMedia === 'function'
+    && typeof window.MediaRecorder !== 'undefined'
+  );
+  const mode = isActualWechat
+    ? 'actual'
+    : isSimulatedWechat
+      ? (strictRestrictions ? 'strict' : 'simulate')
+      : 'browser';
+  const label = isActualWechat
+    ? '微信内打开'
+    : isSimulatedWechat
+      ? (strictRestrictions ? '微信严格受限测试' : '微信模拟测试')
+      : '普通浏览器';
+  return {
+    mode,
+    queryMode,
+    isActualWechat,
+    isSimulatedWechat,
+    isWechatContainer,
+    strictRestrictions,
+    mediaRecorderSupported,
+    voiceInputEnabled: !strictRestrictions && mediaRecorderSupported,
+    testingEnabled,
+  };
+}
+
+function getH5RuntimeEnv() {
+  if (!h5RuntimeEnv) {
+    h5RuntimeEnv = detectH5RuntimeEnv();
+    window.__GANGTISE_H5_RUNTIME__ = h5RuntimeEnv;
+  }
+  return h5RuntimeEnv;
+}
+
+function buildH5RuntimeBannerHtml(compact) {
+  const env = getH5RuntimeEnv();
+  if (!env.testingEnabled) return '';
+  const title = env.isActualWechat
+    ? '当前是微信真实环境'
+    : env.isSimulatedWechat
+      ? '当前是浏览器模拟的微信环境'
+      : '当前是普通浏览器环境';
+  const desc = env.isActualWechat
+    ? '适合直接验证真实登录、页面跳转和消息链路。'
+    : env.strictRestrictions
+      ? '用于提前验证微信内常见受限场景，当前已主动模拟关闭语音录入。'
+      : env.isSimulatedWechat
+        ? '用于在桌面浏览器里先验收页面样式、入口和受限提示。'
+        : '如果要做微信内受限测试，可以直接切到模拟或严格模式。';
+  const points = [
+    env.strictRestrictions
+      ? '严格模式：语音录入已模拟关闭，用于验证失败兜底和提示文案。'
+      : `语音录入：${env.voiceInputEnabled ? '当前环境可尝试' : '当前设备不支持或未开启'}`,
+    '重点检查：微信登录、录音授权、外链跳转、文件上传和复制提示。',
+  ];
+  const actionMode = env.isActualWechat ? 'actual' : (env.queryMode === 'auto' ? 'browser' : env.queryMode);
+  const actions = env.isActualWechat ? '' : `
+    <div class="h5-runtime-actions">
+      <button class="h5-runtime-action ${actionMode === 'browser' ? 'active' : ''}" type="button" onclick="setH5WechatTestMode('auto')">普通浏览器</button>
+      <button class="h5-runtime-action ${actionMode === 'simulate' ? 'active' : ''}" type="button" onclick="setH5WechatTestMode('simulate')">微信模拟</button>
+      <button class="h5-runtime-action strict ${actionMode === 'strict' ? 'active' : ''}" type="button" onclick="setH5WechatTestMode('strict')">严格受限</button>
+    </div>
+  `;
+  const pillClass = env.isActualWechat
+    ? 'is-wechat'
+    : env.strictRestrictions
+      ? 'is-strict'
+      : 'is-test';
+  return `
+    <div class="h5-runtime-banner ${compact ? 'compact' : ''}">
+      <div class="h5-runtime-head">
+        <div>
+          <div class="h5-runtime-title">${escapeHtml(title)}</div>
+          <div class="h5-runtime-desc">${escapeHtml(desc)}</div>
+        </div>
+        <span class="h5-runtime-pill ${pillClass}">${escapeHtml(env.label || '')}</span>
+      </div>
+      <div class="h5-runtime-points">
+        ${points.map((item) => `<div class="h5-runtime-point">${escapeHtml(item)}</div>`).join('')}
+      </div>
+      ${actions}
+    </div>
+  `;
+}
+
+function renderH5RuntimeBanner() {
+  const host = document.getElementById('h5-runtime-banner');
+  if (!host) return;
+  host.innerHTML = buildH5RuntimeBannerHtml(true);
+}
+
+function renderH5LoginRuntimeBanner() {
+  const host = document.getElementById('h5-login-runtime-banner');
+  if (!host) return;
+  host.innerHTML = buildH5RuntimeBannerHtml(false);
+}
+
+function refreshH5RuntimeEnv() {
+  h5RuntimeEnv = detectH5RuntimeEnv();
+  window.__GANGTISE_H5_RUNTIME__ = h5RuntimeEnv;
+  renderH5RuntimeBanner();
+  renderH5LoginRuntimeBanner();
+  renderHermesComposerSubmit();
+  renderHermesComposerContext();
+}
+
+function setH5WechatTestMode(mode) {
+  if (!isH5WechatRuntimeTestingEnabled()) return;
+  const nextMode = normalizeH5WechatRuntimeMode(mode);
+  const params = new URLSearchParams(window.location.search || '');
+  if (nextMode === 'auto') {
+    params.delete(H5_WECHAT_RUNTIME_QUERY_KEY);
+  } else {
+    params.set(H5_WECHAT_RUNTIME_QUERY_KEY, nextMode);
+  }
+  const query = params.toString();
+  const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState({}, '', nextUrl);
+  refreshH5RuntimeEnv();
+  renderH5LoginScreen();
+  showToast(
+    nextMode === 'strict'
+      ? '已切到微信严格受限测试'
+      : nextMode === 'simulate'
+        ? '已切到微信模拟测试'
+        : '已恢复普通浏览器模式'
+  );
+}
+
+function getH5VoiceBlockedReason() {
+  const env = getH5RuntimeEnv();
+  if (env.strictRestrictions) return '当前处于微信严格受限测试，已模拟关闭语音录入';
+  return '';
+}
+
+function setH5LoginStatus(message, type) {
+  const host = document.getElementById('h5-login-status');
+  if (!host) return;
+  host.textContent = String(message || '').trim();
+  host.style.color = type === 'error'
+    ? '#C95B5B'
+    : type === 'success'
+      ? '#2C8F5A'
+      : 'var(--gray-400)';
+}
+
+function normalizeH5OnboardingState(payload) {
+  const raw = payload && typeof payload === 'object' ? payload : {};
+  const channels = Array.isArray(raw.channels) ? raw.channels.filter(item => typeof item === 'string' && item.trim()) : [];
+  return {
+    required: raw.required === true,
+    selected_channel: raw.selected_channel || '',
+    compliance_acknowledged_at: raw.compliance_acknowledged_at || '',
+    compliance_version: raw.compliance_version || '',
+    onboarding_completed_at: raw.onboarding_completed_at || '',
+    channels,
+    notice: raw.notice && typeof raw.notice === 'object' ? JSON.parse(JSON.stringify(raw.notice)) : null,
+    agreed: false,
+    submitting: false,
+  };
+}
+
+function syncH5OnboardingStateFromProfile(profile) {
+  const onboarding = profile && profile.h5Onboarding ? profile.h5Onboarding : null;
+  h5OnboardingState = normalizeH5OnboardingState(onboarding);
+  renderH5OnboardingModal();
+}
+
+function setH5OnboardingError(message) {
+  const host = document.getElementById('h5-onboarding-error');
+  if (host) host.textContent = String(message || '').trim();
+}
+
+function renderH5OnboardingModal() {
+  const modal = document.getElementById('h5-onboarding-modal');
+  if (!modal) return;
+  const state = h5OnboardingState || {};
+  const shouldShow = hasLoggedInH5User() && state.required === true;
+  modal.classList.toggle('show', shouldShow);
+  if (!shouldShow) {
+    setH5OnboardingError('');
+    return;
+  }
+  const notice = state.notice || {};
+  const sections = Array.isArray(notice.sections) ? notice.sections : [];
+  const title = document.getElementById('h5-onboarding-title');
+  if (title) title.textContent = notice.title || '个人权益与合规须知';
+  const summary = document.getElementById('h5-onboarding-summary');
+  if (summary) summary.textContent = notice.summary || '首次进入前，请确认你已经阅读平台的个人权益说明与研究合规要求。';
+  const confirmLabel = document.getElementById('h5-onboarding-confirm-label');
+  if (confirmLabel) confirmLabel.textContent = notice.confirm_label || '我已阅读并知悉个人权益说明与合规要求';
+  const noticeHost = document.getElementById('h5-onboarding-notice');
+  if (noticeHost) {
+    noticeHost.innerHTML = sections.map((section) => `
+      <div class="h5-onboarding-section">
+        <div class="h5-onboarding-section-title">${escapeHtml(section.title || '')}</div>
+        ${(Array.isArray(section.items) ? section.items : []).map((item) => `<div class="h5-onboarding-item">• ${escapeHtml(item || '')}</div>`).join('')}
+      </div>
+    `).join('');
+  }
+  const channelSelect = document.getElementById('h5-onboarding-channel');
+  if (channelSelect) {
+    channelSelect.innerHTML = `<option value="">请选择渠道</option>${(state.channels || []).map((channel) => `<option value="${escapeAttr(channel)}">${escapeHtml(channel)}</option>`).join('')}`;
+    channelSelect.value = state.selected_channel || '';
+    channelSelect.onchange = function onChange() {
+      h5OnboardingState.selected_channel = String(this.value || '').trim();
+      setH5OnboardingError('');
+    };
+  }
+  const agreeCheckbox = document.getElementById('h5-onboarding-agree');
+  if (agreeCheckbox) {
+    agreeCheckbox.checked = state.agreed === true;
+    agreeCheckbox.onchange = function onToggle() {
+      h5OnboardingState.agreed = this.checked === true;
+      setH5OnboardingError('');
+    };
+  }
+  const submitBtn = document.getElementById('h5-onboarding-submit-btn');
+  if (submitBtn) {
+    submitBtn.disabled = state.submitting === true;
+    submitBtn.textContent = state.submitting === true ? '提交中...' : '确认进入';
+  }
+}
+
+function openH5VersionCenter() {
+  window.GangtiseReleaseNotes?.open();
+}
+
+function maybeAutoOpenH5ReleaseNotes() {
+  if (h5OnboardingState && h5OnboardingState.required === true) return;
+  window.GangtiseReleaseNotes?.maybeAutoOpen();
+}
+
+async function refreshH5OnboardingStatus(options = {}) {
+  if (!hasLoggedInH5User()) return null;
+  try {
+    const resp = await fetch('/api/h5/onboarding', { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'load_h5_onboarding_failed');
+    window.CURRENT_DEMO_PROFILE = data.profile || window.CURRENT_DEMO_PROFILE;
+    h5OnboardingState = normalizeH5OnboardingState(data.onboarding || ((data.profile || {}).h5Onboarding || {}));
+    renderH5OnboardingModal();
+    maybeAutoOpenH5ReleaseNotes();
+    return data;
+  } catch (error) {
+    if (!options.silent) {
+      showToast('首次进入确认加载失败');
+    }
+    return null;
+  }
+}
+
+async function submitH5Onboarding() {
+  if (h5OnboardingState.submitting) return;
+  if (!h5OnboardingState.selected_channel) {
+    setH5OnboardingError('请选择你获取这个 H5 的渠道。');
+    showToast('请选择渠道');
+    return;
+  }
+  if (h5OnboardingState.agreed !== true) {
+    setH5OnboardingError('请先勾选已阅读并知悉相关说明。');
+    showToast('请先勾选阅读确认');
+    return;
+  }
+  h5OnboardingState.submitting = true;
+  renderH5OnboardingModal();
+  try {
+    const resp = await fetch('/api/h5/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agreed: true,
+        selected_channel: h5OnboardingState.selected_channel,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'submit_h5_onboarding_failed');
+    DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
+    window.CURRENT_DEMO_PROFILE = data.profile || window.CURRENT_DEMO_PROFILE;
+    h5OnboardingState = normalizeH5OnboardingState(data.onboarding || ((data.profile || {}).h5Onboarding || {}));
+    renderH5OnboardingModal();
+    renderDemoProfile(data.profile || getDefaultDemoUser());
+    maybeAutoOpenH5ReleaseNotes();
+    showToast('已完成首次进入确认');
+  } catch (error) {
+    const errorMap = {
+      invalid_channel_label: '渠道选项无效，请重新选择。',
+      compliance_agreement_required: '请先勾选已阅读并知悉。',
+    };
+    const message = errorMap[(error && error.message) || ''] || '提交失败，请稍后重试。';
+    setH5OnboardingError(message);
+    showToast(message);
+  } finally {
+    h5OnboardingState.submitting = false;
+    renderH5OnboardingModal();
+  }
+}
+
+function setH5ShellLoggedOut(isLoggedOut) {
+  const appShell = document.querySelector('.h5-wrap');
+  const loginShell = document.getElementById('h5-login-shell');
+  if (appShell) appShell.classList.toggle('is-logged-out', isLoggedOut);
+  if (loginShell) loginShell.classList.toggle('hidden', !isLoggedOut);
+  renderH5Watermark();
+}
+
+async function refreshH5AuthOptions(options = {}) {
+  try {
+    const resp = await fetch('/api/h5/auth-options', { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'load_h5_auth_options_failed');
+    H5_AUTH_SETTINGS = JSON.parse(JSON.stringify(data.auth_settings || {}));
+    DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : [];
+    window.CURRENT_DEMO_PROFILE = data.current_profile || null;
+    if (options.render !== false) {
+      renderH5LoginScreen();
+    }
+    if (hasLoggedInH5User()) {
+      renderDemoProfile(getDefaultDemoUser());
+      refreshH5OnboardingStatus({ silent: true });
+    } else {
+      setH5ShellLoggedOut(true);
+    }
+    return data;
+  } catch (error) {
+    if (!options.silent) {
+      showToast('登录配置刷新失败');
+    }
+    return null;
+  }
+}
+
+function renderH5LoginScreen() {
+  const settings = getH5AuthSettings();
+  const runtimeEnv = getH5RuntimeEnv();
+  const formHost = document.getElementById('h5-login-form-host');
+  const quickHost = document.getElementById('h5-login-quick-section');
+  const descHost = document.getElementById('h5-login-desc');
+  if (!formHost || !quickHost) return;
+  const isRegisterMode = false;
+  if (descHost) {
+    if (isRegisterMode) {
+      descHost.textContent = '注册后需要完成首次进入确认，并选择你获取这个 H5 的渠道。';
+    } else if (runtimeEnv.isActualWechat && settings.wechat_login_enabled) {
+      descHost.textContent = '当前检测到微信环境，建议优先使用微信登录；也可继续用账号密码进入。';
+    } else if (settings.password_login_enabled && settings.wechat_login_enabled) {
+      descHost.textContent = '请输入账号密码登录，也可以直接使用微信登录。';
+    } else if (settings.password_login_enabled) {
+      descHost.textContent = '请输入账号密码登录。';
+    } else if (settings.wechat_login_enabled) {
+      descHost.textContent = '当前仅开放微信登录。';
+    } else {
+      descHost.textContent = '当前登录方式已被关闭，请联系管理员。';
+    }
+  }
+  renderH5LoginRuntimeBanner();
+  formHost.innerHTML = `
+    ${settings.password_login_enabled ? `
+      <div class="h5-login-mode-tabs">
+        <button class="h5-login-mode-tab ${!isRegisterMode ? 'active' : ''}" type="button" onclick="switchH5LoginMode('login')">登录</button>
+      </div>
+    ` : ''}
+    <form class="h5-login-form" onsubmit="event.preventDefault();${isRegisterMode ? 'registerH5Password()' : 'loginH5Password()'}">
+      ${settings.password_login_enabled ? `
+        ${isRegisterMode ? `<input id="h5-register-display-name" class="h5-login-input" type="text" autocomplete="nickname" maxlength="24" placeholder="昵称" value="${escapeAttr(h5PasswordDraftDisplayName)}">` : ''}
+        <input id="h5-login-username" class="h5-login-input" type="text" autocomplete="username" placeholder="用户名" value="${escapeAttr(h5PasswordDraftUsername)}">
+        <input id="h5-login-password" class="h5-login-input" type="password" autocomplete="${isRegisterMode ? 'new-password' : 'current-password'}" placeholder="密码">
+        ${isRegisterMode ? `<input id="h5-register-password-confirm" class="h5-login-input" type="password" autocomplete="new-password" placeholder="确认密码">` : ''}
+        ${!isRegisterMode ? `
+          <label class="h5-login-check">
+            <input id="h5-login-remember-password" type="checkbox" ${h5RememberPassword ? 'checked' : ''} onchange="toggleH5RememberPassword(this.checked)">
+            <span>记住密码。勾选后，下次可直接选择这个账号进入。</span>
+          </label>
+        ` : ''}
+      ` : ''}
+      <div class="h5-login-btn-row">
+        ${settings.password_login_enabled ? `<button class="h5-login-btn" type="submit" ${h5PasswordLoginPending ? 'disabled' : ''}><span class="h5-login-btn-icon account">账</span><span>${h5PasswordLoginPending ? (isRegisterMode ? '注册中...' : '登录中...') : (isRegisterMode ? '注册账号' : '账号登录')}</span></button>` : ''}
+        ${!isRegisterMode && settings.wechat_login_enabled ? `<button class="h5-login-btn secondary" type="button" onclick="startH5WeChatLogin()" ${settings.wechat_ready ? '' : 'disabled'}><span class="h5-login-btn-icon wechat">微</span><span>${settings.wechat_ready ? '微信登录' : '微信未配置'}</span></button>` : ''}
+      </div>
+    </form>
+    ${settings.wechat_login_enabled
+        ? `<div class="h5-login-tip">微信登录会在成功授权后自动绑定或登录当前平台账号。</div>`
+        : ''
+    }
+  `;
+  if (!isRegisterMode && settings.quick_select_enabled) {
+    const recentAccounts = getH5LoginHistoryAccounts();
+    quickHost.innerHTML = `
+      <div class="h5-login-divider">最近登录账号</div>
+      <div class="h5-login-section-title">选择账号进入</div>
+      <div class="h5-login-list" id="h5-login-user-list">${
+        recentAccounts.length
+          ? recentAccounts.map(user => `
+            <div class="h5-login-user ${h5LoginPendingUser === user.username ? 'loading' : ''}" onclick="loginH5User('${escapeAttr(user.username)}')">
+              <div class="h5-login-avatar">${user.avatar || '👤'}</div>
+              <div class="h5-login-main">
+                <div class="h5-login-row">
+                  <div class="h5-login-name">${escapeHtml(user.display_name || user.username)}</div>
+                  <button class="h5-login-remove" type="button" onclick="event.stopPropagation();removeH5LoginHistoryAccount('${escapeAttr(user.username)}')" aria-label="移除历史账号">×</button>
+                </div>
+                <div class="h5-login-meta">${escapeHtml(user.username)}${user.role_label ? ` · ${escapeHtml(user.role_label)}` : ''}${user.tenant_name ? ` · ${escapeHtml(user.tenant_name)}` : ''}${user.advisor_name ? ` · 所属大V ${escapeHtml(user.advisor_name)}` : ''}</div>
+                <div class="h5-login-badge">${user.password_saved ? '已保存密码，可直接进入' : '未保存密码，点击后回填账号'}</div>
+              </div>
+              <div class="h5-login-enter">${h5LoginPendingUser === user.username ? '进入中...' : '进入'}</div>
+            </div>
+          `).join('')
+          : '<div class="h5-login-empty">当前还没有最近登录账号。先用账号密码登录一次，之后这里才会出现可选账号。</div>'
+      }</div>
+    `;
+  } else {
+    quickHost.innerHTML = '';
+  }
+}
+
+function startH5WeChatLogin() {
+  const runtimeEnv = getH5RuntimeEnv();
+  if (runtimeEnv.isSimulatedWechat && !runtimeEnv.isActualWechat) {
+    showToast('当前是浏览器模拟环境，不能完成真实微信授权，请改到手机微信里验收');
+    return;
+  }
+  const params = new URLSearchParams(window.location.search || '');
+  params.delete('login_error');
+  params.delete('login_success');
+  const nextTarget = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+  window.location.href = `/api/h5/wechat/start?next=${encodeURIComponent(nextTarget)}`;
+}
+
+async function loginH5Password(options) {
+  options = options || {};
+  if (h5PasswordLoginPending) return;
+  const usernameField = document.getElementById('h5-login-username');
+  const passwordField = document.getElementById('h5-login-password');
+  const username = String(options.username || (usernameField ? usernameField.value || '' : '')).trim();
+  const password = String(Object.prototype.hasOwnProperty.call(options, 'password') ? options.password : (passwordField ? passwordField.value || '' : ''));
+  h5PasswordDraftUsername = username;
+  if (!username || !password) {
+    setH5LoginStatus('请输入用户名和密码。', 'error');
+    showToast('请输入用户名和密码');
+    return;
+  }
+  h5PasswordLoginPending = true;
+  setH5LoginStatus('正在校验账号...', 'normal');
+  renderH5LoginScreen();
+  try {
+    const resp = await fetch('/api/h5/login/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'password_login_failed');
+    if (data.redirect_to) {
+      window.location.assign(String(data.redirect_to));
+      return;
+    }
+    H5_AUTH_SETTINGS = JSON.parse(JSON.stringify(data.auth_settings || H5_AUTH_SETTINGS || {}));
+    DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
+    window.CURRENT_DEMO_PROFILE = data.current_profile || null;
+    upsertH5LoginHistoryAccount(data.current_profile || null, username, password, h5RememberPassword === true);
+    setH5LoginStatus('登录成功，正在进入...', 'success');
+    if (getH5PostLoginTarget()) {
+      continueAfterH5Login();
+      return;
+    }
+    renderDemoProfile(getDefaultDemoUser());
+    showToast('登录成功');
+  } catch (error) {
+    setH5LoginStatus('账号或密码不正确，或当前账号不可登录。', 'error');
+    showToast('登录失败');
+  } finally {
+    h5PasswordLoginPending = false;
+    renderH5LoginScreen();
+  }
+}
+
+function getH5RegistrationTenantSlug() {
+  return String((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '').trim().toLowerCase();
+}
+
+async function registerH5Password() {
+  if (h5PasswordLoginPending) return;
+  const usernameField = document.getElementById('h5-login-username');
+  const passwordField = document.getElementById('h5-login-password');
+  const confirmField = document.getElementById('h5-register-password-confirm');
+  const displayNameField = document.getElementById('h5-register-display-name');
+  const username = String(usernameField ? usernameField.value || '' : '').trim();
+  const password = String(passwordField ? passwordField.value || '' : '');
+  const confirmPassword = String(confirmField ? confirmField.value || '' : '');
+  const displayName = String(displayNameField ? displayNameField.value || '' : '').trim();
+  const tenantSlug = getH5RegistrationTenantSlug();
+  h5PasswordDraftUsername = username;
+  h5PasswordDraftDisplayName = displayName;
+  if (!displayName) {
+    setH5LoginStatus('请输入昵称。', 'error');
+    showToast('请输入昵称');
+    return;
+  }
+  if (!username || !password || !confirmPassword) {
+    setH5LoginStatus('请完整填写注册信息。', 'error');
+    showToast('请完整填写注册信息');
+    return;
+  }
+  if (password !== confirmPassword) {
+    setH5LoginStatus('两次输入的密码不一致。', 'error');
+    showToast('两次输入的密码不一致');
+    return;
+  }
+  if (password.length < 6) {
+    setH5LoginStatus('密码至少需要 6 位。', 'error');
+    showToast('密码至少需要 6 位');
+    return;
+  }
+  h5PasswordLoginPending = true;
+  setH5LoginStatus('正在创建账号...', 'normal');
+  renderH5LoginScreen();
+  try {
+    const resp = await fetch('/api/h5/register/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username,
+        password,
+        display_name: displayName,
+        tenant_slug: tenantSlug,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'password_register_failed');
+    H5_AUTH_SETTINGS = JSON.parse(JSON.stringify(data.auth_settings || H5_AUTH_SETTINGS || {}));
+    DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
+    window.CURRENT_DEMO_PROFILE = data.current_profile || null;
+    upsertH5LoginHistoryAccount(data.current_profile || null, username, password, false);
+    setH5LoginStatus('注册成功，继续完成首次进入确认。', 'success');
+    if (getH5PostLoginTarget()) {
+      continueAfterH5Login();
+      return;
+    }
+    h5LoginMode = 'login';
+    renderDemoProfile(getDefaultDemoUser());
+    showToast('注册成功');
+  } catch (error) {
+    const errorMap = {
+      username_password_required: '请输入用户名和密码。',
+      display_name_required: '请输入昵称。',
+      password_too_short: '密码至少需要 6 位。',
+      username_exists: '该用户名已经注册，请切换到“登录”后输入密码。',
+      password_login_disabled: '当前未开放账号注册。',
+    };
+    const message = errorMap[(error && error.message) || ''] || '注册失败，请稍后重试。';
+    setH5LoginStatus(message, 'error');
+    showToast(message);
+  } finally {
+    h5PasswordLoginPending = false;
+    renderH5LoginScreen();
+  }
+}
+
+function bootH5Experience() {
+  if (h5ExperienceBooted) return;
+  h5ExperienceBooted = true;
+  loadCommunityPosts();
+  loadCommunityEvents();
+  selectHermesMode('洞见速写');
+  refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
+  refreshHermesCredits({ silent: true });
+}
+
+function getDefaultDemoUser() {
+  syncDemoUsersWithActiveTenant();
+  const currentProfile = window.CURRENT_DEMO_PROFILE || null;
+  if (currentProfile && currentProfile.username) {
+    const matched = DEMO_PROFILE_USERS.find(user => user.username === currentProfile.username);
+    if (matched) return matched;
+    return JSON.parse(JSON.stringify(currentProfile));
+  }
+  return DEMO_PROFILE_USERS[0] || null;
+}
+
+function getActiveDemoUser() {
+  return currentDemoUser || getDefaultDemoUser();
+}
+
+function getSafeActiveDemoUser() {
+  const fallbackTenant = getActiveTenantProfile();
+  const activeUser = getActiveDemoUser() || {};
+  const tenant = {
+    ...fallbackTenant,
+    ...((activeUser && activeUser.tenant) || {}),
+  };
+  return {
+    ...activeUser,
+    role: activeUser.role || 'investor',
+    username: activeUser.username || 'demo_user',
+    name: activeUser.name || activeUser.username || 'Demo User',
+    avatar: activeUser.avatar || '👤',
+    membership: activeUser.membership || '普通用户',
+    tenant,
+  };
+}
+
+function openKolWorkbenchSection(section) {
+  const activeUser = getSafeActiveDemoUser();
+  const tenantSlug = String((((activeUser || {}).tenant || {}).slug) || ((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  if (!tenantSlug) {
+    showToast('当前未识别到租户');
+    return;
+  }
+  const nextUrl = `/kol-workbench?tenant=${encodeURIComponent(tenantSlug)}&section=${encodeURIComponent(section || 'overview')}`;
+  window.location.href = nextUrl;
+}
+
+function getReviewPeriodMeta(period) {
+  return REVIEW_PERIOD_CONFIG[period] || REVIEW_PERIOD_CONFIG.day;
+}
+
+function ensureTenantReviewRuntime(tenantId) {
+  if (!reviewRuntimeStore[tenantId]) {
+    reviewRuntimeStore[tenantId] = {
+      kolGeneratedAt: '2026-06-07 18:40',
+      kolPublishedAt: '2026-06-07 18:40',
+      aiGeneratedAt: '2026-06-07 19:00',
+      kolSourceMode: 'voice',
+      paragraphMode: 'manual',
+      lastReviewPeriod: 'day',
+      latestVoiceTranscript: '系统已转写语音口述：今天先保留 AI 算力和港股互联网两条主线，个股上继续盯中芯国际订单兑现、腾讯回购节奏和贵州茅台稳健配置逻辑。',
+      latestManualHtml: '<p><strong>市场主线</strong></p><p>今天先讲主线，不把所有盘面噪音都写进去。</p><p><strong>重点个股</strong></p><p>中芯国际看订单兑现，腾讯看回购与财报，茅台继续偏稳健配置。</p>',
+      latestFileText: '',
+      latestFileName: '',
+      latestReviewTitle: '',
+      latestAiPrompt: '保持大V自己的判断口吻，适度精简，但不要改动原始观点。',
+      latestPromptTags: ['适合粉丝阅读'],
+      draftReady: false,
+    };
+  }
+  return reviewRuntimeStore[tenantId];
+}
+
+function buildKolReviewData(user, period) {
+  const periodMeta = getReviewPeriodMeta(period);
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  const sourceCfg = REVIEW_SOURCE_OPTIONS.find(item => item.value === runtime.kolSourceMode) || REVIEW_SOURCE_OPTIONS[0];
+  const paragraphCfg = REVIEW_PARAGRAPH_OPTIONS.find(item => item.value === runtime.paragraphMode) || REVIEW_PARAGRAPH_OPTIONS[0];
+  const titleMap = {
+    day: '今日市场洞见：主线与验证节点',
+    week: '本周市场洞见：主线与验证节点',
+    month: '本月市场洞见：主线与验证节点',
+  };
+  const summaryMap = {
+    day: `这版${periodMeta.label}围绕市场主线、关键数据和风险边界组织内容，便于读者快速理解大V的判断。`,
+    week: `这版${periodMeta.label}把一周内的重要观点整理为主线、验证节点和风险边界，方便读者持续跟踪。`,
+    month: `这版${periodMeta.label}强调阶段框架与验证节点，帮助读者理解观点如何随数据变化。`,
+  };
+  const manualParagraphs = runtime.paragraphMode === 'manual'
+    ? (() => {
+        const temp = document.createElement('div');
+        temp.innerHTML = runtime.latestManualHtml || '';
+        const chunks = temp.textContent.split('\n').map(item => item.trim()).filter(Boolean);
+        return chunks.length ? chunks.map((text, idx) => ({
+          title: idx === 0 ? '完整洞见正文' : `正文段落 ${idx}`,
+          text,
+        })) : null;
+      })()
+    : null;
+  const paragraphMap = {
+    day: [
+      { title: '市场主线', text: '内容优先保留真正影响判断的市场主线、数据变化和验证节点，不重复堆砌原始消息。' },
+      { title: '关键观察', text: '行业、公司和宏观信息按事实、判断与不确定性分层表达，避免把短期波动直接当成结论。' },
+      { title: '风险边界', text: '洞见用于研究分享，不构成交易指令；后续观点应随着新数据和验证结果持续修正。' },
+    ],
+    week: [
+      { title: '阶段主线', text: '阶段性观点应围绕高频变化和重要催化组织，而不是只罗列指数涨跌。' },
+      { title: '验证节点', text: '行业与公司判断继续回到景气、订单、利润率和估值等可验证条件。' },
+      { title: '后续跟踪', text: '对每个判断保留来源和置信度，并根据新数据及时修正。' },
+    ],
+    month: [
+      { title: '阶段框架', text: '月度洞见更关注阶段性框架是否成立，而不是单日波动。' },
+      { title: '数据与判断', text: '把事实、解释和不确定性拆开表达，方便读者复核判断依据。' },
+      { title: '后续观察', text: '后续沿着已提出的验证节点持续更新，必要时明确修正原有观点。' },
+    ],
+  };
+  return {
+    id: `${user.tenant.id}-${period}`,
+    author: user.tenant.advisor,
+    avatar: user.tenant.advisor === '财经老王' ? '👑' : '🧭',
+    periodLabel: '洞见',
+    generatedAt: runtime.kolGeneratedAt,
+    title: titleMap[period] || titleMap.day,
+    summary: summaryMap[period] || summaryMap.day,
+    sourceLabel: sourceCfg.label,
+    paragraphLabel: paragraphCfg.label,
+    tags: ['洞见', sourceCfg.label],
+    watchlist: [],
+    annotations: [],
+    paragraphs: manualParagraphs || paragraphMap[period] || paragraphMap.day,
+  };
+}
+
+function hasReviewWatchlistAnalysisContent(section) {
+  const payload = section && typeof section === 'object' ? section : {};
+  return !!(
+    String(payload.sector_summary || '').trim()
+    || (Array.isArray(payload.sector_profiles) && payload.sector_profiles.length)
+    || (Array.isArray(payload.items) && payload.items.length)
+    || (Array.isArray(payload.annotation_evidence) && payload.annotation_evidence.length)
+  );
+}
+
+function deriveReviewCoverTitle(review) {
+  const watchlist = Array.isArray(review.watchlist) ? review.watchlist.filter(Boolean) : [];
+  if (watchlist.length) {
+    return `${review.periodLabel}重点聚焦 ${watchlist.join('、')}`;
+  }
+  const userInputSection = review.userInputSection && typeof review.userInputSection === 'object'
+    ? review.userInputSection
+    : {};
+  const narrative = String(
+    userInputSection.display_text
+    || review.summary
+    || (((review.paragraphs || [])[0] || {}).text)
+    || review.title
+    || ''
+  ).replace(/\s+/g, ' ').trim();
+  const lead = narrative.slice(0, 26) || '市场主线与核心观点';
+  return `${review.periodLabel}重点聚焦 ${lead}`;
+}
+
+function buildReviewArticleData(review) {
+  const sectionEvidence = review.watchlistAnalysisSection && Array.isArray(review.watchlistAnalysisSection.annotation_evidence)
+    ? review.watchlistAnalysisSection.annotation_evidence
+    : [];
+  const evidenceSource = (review.annotations && review.annotations.length)
+    ? review.annotations.map(item => ({
+        stockName: item.stockName,
+        summary: item.summary,
+      }))
+    : sectionEvidence.map(item => ({
+        stockName: item.stock_name,
+        summary: [item.date_label, item.content || item.note || item.title].filter(Boolean).join(' · '),
+      }));
+  const evidenceItems = evidenceSource.map(item => ({
+    title: `${item.stockName} · K线标注`,
+    text: item.summary,
+  }));
+  const selectedCards = Array.isArray(review.selectedCards) ? review.selectedCards : [];
+  const knowledgeAttachments = Array.isArray(review.knowledgeAttachments) ? review.knowledgeAttachments : [];
+  const dataSources = Array.isArray(review.dataSources) ? review.dataSources : [];
+  const newsSources = Array.isArray(review.newsSources) ? review.newsSources : [];
+  const llmModels = Array.isArray(review.llmModels) ? review.llmModels : [];
+  const evidenceChainSection = review.evidenceChainSection && typeof review.evidenceChainSection === 'object'
+    ? review.evidenceChainSection
+    : { status: '', summary: '', items: [], knowledge_match_count: 0, web_match_count: 0 };
+  const userInputSection = {
+    source_mode: review.sourceMode || 'manual',
+    source_mode_label: review.sourceLabel || '用户输入',
+    display_text: ((review.paragraphs || [])[0] || {}).text || review.summary || '',
+    ...(review.userInputSection && typeof review.userInputSection === 'object' ? review.userInputSection : {}),
+  };
+  const watchlistAnalysisSection = review.watchlistAnalysisSection && typeof review.watchlistAnalysisSection === 'object'
+    ? review.watchlistAnalysisSection
+    : { sector_summary: '', sector_profiles: [], items: [] };
+  const bodySections = [];
+  if (review.summary) {
+    bodySections.push({
+      title: '洞见核心摘要',
+      text: review.summary,
+    });
+  }
+  if (!userInputSection.display_text && Array.isArray(review.paragraphs)) {
+    review.paragraphs.forEach((item) => {
+      if (item && item.title && item.text) {
+        bodySections.push({ title: item.title, text: item.text });
+      }
+    });
+  }
+  const articleId = String(review.id || '').trim();
+  const overriddenViewCount = articleId && Object.prototype.hasOwnProperty.call(reviewViewCountOverrides, articleId)
+    ? reviewViewCountOverrides[articleId]
+    : review.viewCount;
+  const viewCount = Math.max(0, Number(overriddenViewCount) || 0);
+  const publishedAt = String(review.publishedAt || review.generatedAt || '').trim() || '日期未提供';
+  return {
+    id: review.id,
+    contentKind: review.content_kind || review.contentKind || 'insight',
+    broadcastKind: review.broadcast_kind || review.broadcastKind || '',
+    broadcastLabel: review.broadcast_label || review.broadcastLabel || '',
+    visualTheme: review.visual_theme || review.visualTheme || '',
+    accessRequired: !!review.access_required,
+    accessNotice: String(review.access_notice || '订阅后查看完整洞见内容'),
+    accessMode: review.access_mode === 'subscriber' ? 'subscriber' : 'public',
+    accessLabel: String(review.access_label || (review.access_mode === 'subscriber' ? '订阅专享' : '常规笔记')),
+    isPinned: !!review.is_pinned,
+    pinnedAt: String(review.pinned_at || '').trim(),
+    title: review.title,
+    kicker: `${review.author} ${review.periodLabel}`,
+    meta: `发布日期 ${publishedAt} · 阅读量 ${formatReviewViewCount(viewCount)}`,
+    publishedAt,
+    viewCount,
+    summary: review.summary,
+    contentText: String(review.content_text || review.contentText || '').trim(),
+    contentHtml: String(review.content_html || review.contentHtml || '').trim(),
+    author: review.author,
+    avatar: review.avatar,
+    periodLabel: review.periodLabel,
+    watchlist: review.watchlist || [],
+    tags: review.tags || [],
+    coverTitle: deriveReviewCoverTitle(review),
+    coverDesc: review.access_mode === 'subscriber'
+      ? '这是一份订阅专享洞见，只有有效订阅用户和内容管理者可以查看完整正文。'
+      : '这是一份常规洞见，所有粉丝和内容管理者都可以查看完整正文。',
+    bodySections,
+    userInputSection,
+    watchlistAnalysisSection,
+    evidenceItems,
+    selectedCards,
+    knowledgeAttachments,
+    dataSources,
+    newsSources,
+    llmModels,
+    evidenceChainSection,
+    quote: evidenceItems.length
+      ? `本次洞见明确引用了 ${evidenceItems.length} 处 K 线标注，这些标注就是洞见智能化总结的依据之一。`
+      : '本次洞见重点承接行业主线、关键个股和已验证资料，不做交易指令，只保留研究判断。',
+  };
+}
+
+function renderReviewWatchlistAnalysisSection(article) {
+  // Historical snapshots may still contain the legacy field, but new readers
+  // must never expose the retired stock-analysis section.
+  return '';
+}
+
+function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
+  const matched = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  const watchlistAnalysisSection = matched.watchlist_analysis_section && typeof matched.watchlist_analysis_section === 'object'
+    ? matched.watchlist_analysis_section
+    : {};
+  const watchlist = hasReviewWatchlistAnalysisContent(watchlistAnalysisSection) && Array.isArray(matched.watchlist)
+    ? matched.watchlist
+    : [];
+  return buildReviewArticleData({
+    id: matched.id || `${davUser.id || davUser.tenant.slug}-${matched.time || nowTs()}`,
+    author: davUser.tenant.advisor,
+    avatar: davUser.tenant.advisor === '财经老王' ? '👑' : '🧭',
+    periodLabel: '洞见',
+    generatedAt: matched.time || matched.published_at || nowTs(),
+    publishedAt: matched.published_at || matched.time || nowTs(),
+    viewCount: matched.view_count,
+    is_pinned: matched.is_pinned,
+    pinned_at: matched.pinned_at,
+    title: matched.title || '洞见分析报告',
+    content_kind: matched.content_kind || 'insight',
+    broadcast_kind: matched.broadcast_kind || '',
+    broadcast_label: matched.broadcast_label || '',
+    visual_theme: matched.visual_theme || '',
+    summary: matched.summary || matched.content_text || '',
+    content_text: matched.content_text || matched.summary || '',
+    tags: matched.tags || [],
+    watchlist,
+    annotations: [],
+    sourceMode: matched.source_mode || 'manual',
+    selectedCards: matched.selected_cards || [],
+    knowledgeAttachments: matched.knowledge_attachments || [],
+    dataSources: matched.data_sources || [],
+    newsSources: matched.news_sources || [],
+    llmModels: matched.llm_models || [],
+    userInputSection: matched.user_input_section || {},
+    watchlistAnalysisSection,
+    evidenceChainSection: matched.evidence_chain_section || {},
+    paragraphs: matched.user_input_section && matched.user_input_section.display_text ? [] : [
+      { title: '完整洞见正文', text: matched.content_text || matched.summary || '' },
+    ],
+  });
+}
+
+function buildPublishedReviewArticles(period) {
+  const targetPeriod = '洞见';
+  return getAllDavUsersForReviews().flatMap(davUser => {
+    const snapshots = Array.isArray(davUser.tenant.review_snapshots) ? davUser.tenant.review_snapshots : [];
+    const matched = snapshots.find(item => item.period === targetPeriod || item.period_key === period || item.period);
+    return matched ? [buildPublishedReviewArticleFromSnapshot(davUser, matched, period)] : [];
+  });
+}
+
+function buildAllPublishedReviewArticles() {
+  return getAllDavUsersForReviews().flatMap((davUser) => {
+    const snapshots = Array.isArray(davUser.tenant.review_snapshots) ? davUser.tenant.review_snapshots : [];
+    return snapshots.map((snapshot) => buildPublishedReviewArticleFromSnapshot(davUser, snapshot, snapshot.period_key || 'day'));
+  }).sort((left, right) => {
+    const leftTime = Date.parse(left.generatedAt || '') || 0;
+    const rightTime = Date.parse(right.generatedAt || '') || 0;
+    return rightTime - leftTime;
+  });
+}
+
+function getAllDavUsersForReviews() {
+  const tenantConfigs = (window.SITE_CONFIG && Array.isArray(window.SITE_CONFIG.tenants)) ? window.SITE_CONFIG.tenants : [];
+  const activeUser = getActiveDemoUser() || {};
+  const activeUserTenant = activeUser.tenant && typeof activeUser.tenant === 'object' ? activeUser.tenant : {};
+  const activeTenant = window.ACTIVE_TENANT && typeof window.ACTIVE_TENANT === 'object' ? window.ACTIVE_TENANT : {};
+  const tenantSlug = String(activeUserTenant.slug || activeTenant.slug || '').trim().toLowerCase();
+  const configuredTenant = tenantConfigs.find((tenant) => String((tenant || {}).slug || '').trim().toLowerCase() === tenantSlug) || {};
+  const tenant = {
+    ...configuredTenant,
+    ...activeTenant,
+    ...activeUserTenant,
+  };
+  const dashboard = currentTenantDashboardPayload && typeof currentTenantDashboardPayload === 'object'
+    ? currentTenantDashboardPayload
+    : {};
+  const dashboardTenant = dashboard.tenant && typeof dashboard.tenant === 'object' ? dashboard.tenant : {};
+  const dashboardTenantSlug = String(dashboardTenant.slug || '').trim().toLowerCase();
+  const dashboardReviews = Array.isArray(dashboard.reviews) ? dashboard.reviews : null;
+  // Published Insights are a content aggregate. The dashboard serializes its
+  // authoritative, permission-filtered records; review_snapshots is only the
+  // pre-migration compatibility source.
+  if (dashboardReviews && dashboardTenantSlug && dashboardTenantSlug === tenantSlug) {
+    tenant.review_snapshots = dashboardReviews;
+  }
+  const directorySnapshots = getReviewDirectorySnapshots();
+  if (directorySnapshots && tenantSlug) {
+    tenant.review_snapshots = directorySnapshots;
+  } else if (String(reviewSearchKeyword || '').trim()) {
+    // Search results must come from the server-side directory, never from the
+    // dashboard bootstrap slice which may omit historical articles.
+    tenant.review_snapshots = [];
+  }
+  if (!tenant.slug && !tenant.id) return [];
+  return [{
+    id: `tenant_dav_${tenant.id || tenant.slug || 'current'}`,
+    role: 'dav',
+    tenant: {
+      ...tenant,
+      desc: tenant.description || tenant.desc || '当前租户的独立管理空间，负责粉丝、内容与知识资产经营。',
+    },
+  }];
+}
+
+function renderReviewArticleCards(articles) {
+  if (!articles.length) {
+    return '<div class="card" style="padding:16px;font-size:12px;color:var(--gray-400)">当前还没有可展示的洞见。</div>';
+  }
+  const canDelete = isDavCapableUser(getActiveDemoUser());
+  return `
+    <div class="review-article-list">
+      ${articles.map(article => `
+        <div class="review-article-card ${article.contentKind === 'ai_broadcast' ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : ''}" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
+          <div class="review-article-cover">
+            ${article.contentKind === 'ai_broadcast' ? `<div class="review-article-broadcast-mark">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(article.broadcastLabel || '财经播报')}</div>` : ''}
+            ${renderReviewArticleAccessBadge(article)}
+            <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
+            <div class="review-article-cover-title">${escapeHtml(article.title)}${article.isPinned ? '<span class="review-pin-badge" aria-label="已置顶">置顶</span>' : ''}</div>
+            <div class="review-article-cover-meta">发布日期 ${escapeHtml(article.publishedAt || article.generatedAt || '日期未提供')} · 阅读量 ${escapeHtml(formatReviewViewCount(article.viewCount))}</div>
+          </div>
+          <div class="review-article-card-summary">${escapeHtml(article.summary)}</div>
+          <div class="review-watchlist-row">
+            ${(article.watchlist || []).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
+          </div>
+          <div class="review-article-card-footer">
+            <div class="review-watchlist-row">
+              ${(article.tags || []).slice(0, 3).map(tag => `<span class="review-watchlist-chip">${escapeHtml(tag)}</span>`).join('')}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="review-article-card-cta">查看全文</div>
+              ${canDelete ? `<button class="review-pin-button" type="button" aria-label="${article.isPinned ? '取消置顶' : '置顶'}" onclick="event.stopPropagation();togglePublishedReviewPin('${escapeAttr(article.id)}', ${article.isPinned ? 'false' : 'true'})">${article.isPinned ? '取消置顶' : '置顶'}</button>` : ''}
+              ${canDelete ? `<button class="btn-outline" type="button" style="padding:5px 8px;font-size:10px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="event.stopPropagation();deletePublishedReviewArticle('${escapeAttr(article.id)}')">删除</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderFeaturedInsightCard() {
+  const host = document.getElementById('feed-featured-insight');
+  if (!host) return;
+  const articles = buildAllPublishedReviewArticles();
+  if (!articles.length) {
+    host.innerHTML = '';
+    return;
+  }
+  const latest = articles.slice().sort((left, right) => {
+    return (Date.parse(right.publishedAt || right.generatedAt || '') || 0)
+      - (Date.parse(left.publishedAt || left.generatedAt || '') || 0);
+  })[0];
+  const cards = [{ article: latest, label: '最新洞见', variant: 'latest' }];
+  host.innerHTML = `
+    <div class="featured-insight-section">
+      <div style="display:flex;justify-content:space-between;align-items:end;gap:10px;margin-bottom:10px">
+        <div><div class="h5-section-title" style="margin-bottom:3px">最新洞见</div><div style="font-size:11px;color:var(--gray-400)">按发布时间展示大V最新发布的洞见。</div></div>
+        <button class="btn-outline" type="button" style="padding:5px 8px;font-size:10px" onclick="switchTab('review'); openReviewArticleList()">全部洞见</button>
+      </div>
+      <div class="featured-insight-grid" aria-label="精选洞见">
+      ${cards.map(({article, label, variant}) => `
+        <div class="featured-insight-card ${variant}" role="button" tabindex="0"
+          onclick="switchTab('review'); openReviewArticleDetail('${escapeAttr(article.id)}')"
+          onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchTab('review'); openReviewArticleDetail('${escapeAttr(article.id)}'); }">
+          <div class="featured-insight-kicker">${escapeHtml(label)} · ${escapeHtml(article.accessLabel || '常规内容')}</div>
+          <div class="featured-insight-title">${escapeHtml(article.title || '最新研究洞见')}</div>
+          <div class="featured-insight-summary">${escapeHtml(article.summary || '查看大V最新研究判断与观察重点。')}</div>
+          <div class="featured-insight-meta">
+            <span>${escapeHtml(article.publishedAt || '最新发布')} · 阅读 ${escapeHtml(formatReviewViewCount(article.viewCount))}</span>
+            <span class="featured-insight-cta">点击阅读全文 ›</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 共享快照', syncTime = '', stale = false) {
+  const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false);
+  const syncLabel = syncTime ? `${stale ? '最近一次成功同步' : '数据同步时间'}：${syncTime}` : '数据同步时间：暂无同步记录';
+  const quoteLabel = rows.some((item) => item.quote_mode === 'daily_close_fallback')
+    ? '盘中分钟行情暂不可用，当前展示上一交易日收盘数据'
+    : (rows.some((item) => item.realtime) ? '盘中分钟行情' : '最近收盘行情');
+  if (!rows.length) return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div class="feed-market-economy-desc">暂无可用的最新数据</div><div class="feed-market-sync-time">${escapeHtml(syncLabel)}</div></div>`;
+  const chartRows = rows.slice().sort((left, right) => {
+    return Number(right.change_pct || 0) - Number(left.change_pct || 0);
+  }).slice(0, Math.max(1, Number(limit) || rows.length)).map((item) => ({
+    label: item.code && item.name ? `${item.name}\n${item.code}` : (item.sector || item.name || item.code || '--'),
+    value: Number(item.change_pct || 0),
+  }));
+  const safeChartId = chartId || `feed-market-chart-${Math.random().toString(36).slice(2, 8)}`;
+  window.setTimeout(() => renderFeedMarketEconomyChart(safeChartId, chartRows), 0);
+  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(quoteLabel)} · ${escapeHtml(syncLabel)}</div></div>`;
+}
+
+function renderFeedMarketEconomyChart(chartId, rows) {
+  const host = document.getElementById(chartId);
+  if (!host || !window.GangtiseEcharts) return;
+  const labels = rows.map((item) => item.label);
+  const values = rows.map((item) => Number.isFinite(item.value) ? item.value : 0);
+  const maxAbs = Math.max(...values.map((value) => Math.abs(value)), 1);
+  const option = {
+    animation: true,
+    animationDuration: 280,
+    grid: { top: 24, right: 8, bottom: 54, left: 38 },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter(params) {
+        const item = Array.isArray(params) ? params.find((entry) => entry.value !== null && entry.value !== '-') : params;
+        const value = item ? Number(item.value || 0) : 0;
+        return `<strong>${escapeHtml(item ? item.axisValue : '--')}</strong><br>${value >= 0 ? '上涨' : '下跌'} ${Math.abs(value).toFixed(2)}%`;
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: labels,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: 'rgba(200,169,110,.28)' } },
+      axisLabel: { color: '#A9B4C0', fontSize: 9, interval: 0, rotate: labels.length > 7 ? 32 : 0, margin: 12 },
+    },
+    yAxis: {
+      type: 'value',
+      min: -maxAbs,
+      max: maxAbs,
+      axisLabel: { color: '#A9B4C0', fontSize: 9, formatter: (value) => `${value}%` },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: 'rgba(200,169,110,.10)' } },
+    },
+    series: [
+      {
+        name: '上涨', type: 'bar', barMaxWidth: 24, barGap: '-100%',
+        data: values.map((value) => value >= 0 ? value : null),
+        itemStyle: { color: '#E74C3C', borderRadius: [4, 4, 0, 0] },
+        label: { show: true, position: 'top', color: '#E74C3C', fontSize: 9, formatter: (params) => params.value == null ? '' : `+${Number(params.value).toFixed(2)}%` },
+      },
+      {
+        name: '下跌', type: 'bar', barMaxWidth: 24, barGap: '-100%',
+        data: values.map((value) => value < 0 ? value : null),
+        itemStyle: { color: '#2ECC71', borderRadius: [0, 0, 4, 4] },
+        label: { show: true, position: 'bottom', color: '#2ECC71', fontSize: 9, formatter: (params) => params.value == null ? '' : `${Number(params.value).toFixed(2)}%` },
+      },
+    ],
+  };
+  window.GangtiseEcharts.render(host, option);
+}
+
+function renderFeedMarketEconomyPanel(overviewPayload, sectorPayload) {
+  const host = document.getElementById('feed-market-economy');
+  if (!host) return;
+  const overview = overviewPayload && typeof overviewPayload === 'object' ? overviewPayload : {};
+  const sectors = sectorPayload && typeof sectorPayload === 'object' ? sectorPayload : {};
+  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">本租户统一行情快照，展示大V发布的市场与行业指标。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectors.items, '热门行业涨跌', 'feed-sector-chart', 10, '申万一级行业指数行情，按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。', sectors.updated_at, sectors.stale)}${renderFeedMarketEconomy(overview.items, '市场一览涨跌', 'feed-overview-chart', 10, '标准市场指数按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。', overview.updated_at, overview.stale)}</div></div>`;
+}
+
+function renderMarketQuoteCards(items, type) {
+  return (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false).map((item) => {
+    const name = type === 'sector' ? item.sector : item.name;
+    const value = type === 'sector' ? item.value : (item.price ?? item.current_price ?? item.close ?? item.value);
+    const rawChange = Number(item.change ?? item.change_amount);
+    const hasChange = item.change != null || item.change_amount != null;
+    const pct = Number(item.change_pct);
+    const hasPct = item.change_pct != null && Number.isFinite(pct);
+    const directionValue = hasChange && Number.isFinite(rawChange) ? rawChange : (hasPct ? pct : 0);
+    const direction = directionValue > 0 ? 'up' : (directionValue < 0 ? 'down' : 'flat');
+    const arrow = directionValue > 0 ? '▲' : (directionValue < 0 ? '▼' : '—');
+    const valueText = Number.isFinite(Number(value)) ? Number(value).toFixed(2) : '--';
+    const changeText = hasChange && Number.isFinite(rawChange)
+      ? `${arrow} ${rawChange > 0 ? '+' : ''}${rawChange.toFixed(2)}${hasPct ? ` (${rawChange > 0 ? '+' : ''}${pct.toFixed(2)}%)` : ''}`
+      : (hasPct ? `${arrow} ${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : '暂无涨跌数据');
+    const code = item.code || item.security_code || (type === 'sector' ? '申万一级行业' : item.market || '--');
+    const quoteLabel = item.quote_mode === 'daily_close_fallback' ? '上一交易日收盘' : (item.realtime ? '盘中分钟行情' : '最近收盘');
+    return `<article class="market-quote-card"><div class="market-quote-name">${escapeHtml(name || '--')}</div><div class="market-quote-code">${escapeHtml(code)}</div><div class="market-quote-value">${valueText}</div><div class="market-quote-change ${direction}">${changeText}</div><div style="margin-top:5px;font-size:10px;color:var(--gray-400)">${escapeHtml(quoteLabel)} · ${escapeHtml(item.updated_at || '--')}</div></article>`;
+  }).join('');
+}
+
+function renderMarketQuoteSection(title, rows, syncTime, emptyText) {
+  return `<section class="market-quote-section"><div class="market-quote-section-head"><div class="market-quote-section-title">${escapeHtml(title)}</div><div class="market-quote-section-meta">${syncTime ? `同步：${escapeHtml(syncTime)}` : '等待同步'}</div></div><div class="market-quote-grid">${rows || `<div class="market-quote-empty">${escapeHtml(emptyText)}</div>`}</div></section>`;
+}
+
+function marketSnapshotTenantQuery() {
+  const tenant = String((currentDemoUser && currentDemoUser.tenant && currentDemoUser.tenant.slug) || new URLSearchParams(window.location.search).get('tenant') || '').trim();
+  return tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
+}
+
+let h5MarketDisplayConfigLoading = false;
+let h5MarketDisplayConfig = { settings: {}, catalog: {} };
+let h5MarketDisplayDraft = { market_overview_codes: [], sector_names: [], macro_economic_codes: [], etf_codes: [] };
+let h5MarketPickerTab = 'sectors';
+let h5MarketPickerEtfCategory = '宽基指数';
+let h5MarketDisplaySummaryExpanded = false;
+
+function h5MarketDisplayTenantSlug() {
+  return String((currentDemoUser && currentDemoUser.tenant && currentDemoUser.tenant.slug) || '').trim().toLowerCase();
+}
+
+function renderH5MarketDisplayConfig(payload) {
+  h5MarketDisplayConfig = payload || { settings: {}, catalog: {} };
+  const host = document.getElementById('h5-market-display-config');
+  if (!host) return;
+  host.style.display = '';
+  const settings = h5MarketDisplayConfig.settings || {};
+  const catalog = h5MarketDisplayConfig.catalog || {};
+  const marketRows = Array.isArray(catalog.market_overview) ? catalog.market_overview : [];
+  const macroRows = Array.isArray(catalog.macro_economic) ? catalog.macro_economic : [];
+  const etfRows = Array.isArray(catalog.etf) ? catalog.etf : [];
+  const chips = (values, labelOf, emptyText) => values.length
+    ? values.map((value) => `<span class="market-layout-chip">${escapeHtml(labelOf(value))}</span>`).join('')
+    : `<span style="font-size:11px;color:#7A8C9F">${emptyText}</span>`;
+  const marketName = (code) => ((marketRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
+  const macroName = (code) => ((macroRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
+  const etfName = (code) => ((etfRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
+  const summaryCard = (title, values, labelOf) => `<div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">${title}</strong><span class="market-layout-count">已选 ${values.length} 项</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(values, labelOf, '尚未配置')}</div></div>`;
+  const summary = `<div class="market-layout-summary-grid">${summaryCard('热门行业', settings.sector_names || [], (value) => value)}${summaryCard('市场一览', settings.market_overview_codes || [], marketName)}${summaryCard('宏观经济', settings.macro_economic_codes || [], macroName)}${summaryCard('ETF', settings.etf_codes || [], etfName)}</div>`;
+  host.innerHTML = `<section class="market-layout-summary ${h5MarketDisplaySummaryExpanded ? '' : 'is-collapsed'}"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="font-size:12px;font-weight:750;color:#183A62">粉丝端行情版面</div><div style="font-size:11px;color:#62758A;margin-top:3px">${settings.configured ? `已发布 · ${escapeHtml(settings.updated_at || '--')}` : '尚未发布，可按需选择，不必填满'}</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button type="button" class="btn btn-light border btn-sm" onclick="toggleH5MarketDisplaySummary()">${h5MarketDisplaySummaryExpanded ? '收起' : '展开'}</button><button type="button" class="btn btn-outline-primary btn-sm" onclick="openH5MarketDisplayModal()">调整版面</button></div></div>${summary}</section>`;
+}
+
+function toggleH5MarketDisplaySummary() { h5MarketDisplaySummaryExpanded = !h5MarketDisplaySummaryExpanded; renderH5MarketDisplayConfig(h5MarketDisplayConfig); }
+
+function openH5MarketDisplayModal() {
+  const settings = h5MarketDisplayConfig.settings || {};
+  h5MarketDisplayDraft = { market_overview_codes: [...(settings.market_overview_codes || [])], sector_names: [...(settings.sector_names || [])], macro_economic_codes: [...(settings.macro_economic_codes || [])], etf_codes: [...(settings.etf_codes || [])] };
+  h5MarketPickerTab = 'sectors';
+  h5MarketPickerEtfCategory = '宽基指数';
+  renderH5MarketDisplayModal();
+  document.getElementById('h5-market-layout-modal')?.classList.add('show');
+}
+
+function closeH5MarketDisplayModal() { document.getElementById('h5-market-layout-modal')?.classList.remove('show'); }
+
+function setH5MarketPickerTab(tab) { h5MarketPickerTab = tab; renderH5MarketDisplayModal(); }
+
+function toggleH5MarketDraftSelection(field, value) {
+  const values = [...(h5MarketDisplayDraft[field] || [])];
+  const index = values.indexOf(value);
+  if (index >= 0) values.splice(index, 1);
+  else values.push(value);
+  h5MarketDisplayDraft[field] = values;
+  renderH5MarketDisplayModal();
+}
+
+function renderH5MarketDisplayModal() {
+  const host = document.getElementById('h5-market-layout-modal-content');
+  if (!host) return;
+  const catalog = h5MarketDisplayConfig.catalog || {};
+  const isSector = h5MarketPickerTab === 'sectors';
+  const isMacro = h5MarketPickerTab === 'macro';
+  const isEtf = h5MarketPickerTab === 'etf';
+  const field = isSector ? 'sector_names' : (isMacro ? 'macro_economic_codes' : (isEtf ? 'etf_codes' : 'market_overview_codes'));
+  const etfRows = Array.isArray(catalog.etf) ? catalog.etf : [];
+  const etfCategories = Array.from(new Set(etfRows.map((item) => String(item.category || 'ETF').trim()).filter(Boolean)));
+  if (!etfCategories.includes(h5MarketPickerEtfCategory)) h5MarketPickerEtfCategory = etfCategories[0] || 'ETF';
+  const etfOptions = etfRows.filter((item) => String(item.category || 'ETF').trim() === h5MarketPickerEtfCategory).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' }));
+  const options = isSector ? (catalog.hot_industries || []).map((item) => ({ value: String(item || ''), label: String(item || '') })) : (isMacro ? (catalog.macro_economic || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' })) : (isEtf ? etfOptions : (catalog.market_overview || []).map((item) => ({ value: String(item.code || ''), label: item.name || item.code || '--' }))));
+  const etfSubTabs = isEtf ? `<div class="market-picker-tabs mt-2" data-h5-market-picker-etf-categories="true">${etfCategories.map((category) => `<button type="button" class="market-picker-tab ${category === h5MarketPickerEtfCategory ? 'active' : ''}" onclick="h5MarketPickerEtfCategory='${escapeAttr(category)}';renderH5MarketDisplayModal()">${escapeHtml(category)}</button>`).join('')}</div>` : '';
+  const selected = h5MarketDisplayDraft[field] || [];
+  host.innerHTML = `<div class="p-3 p-md-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="fw-bold" style="color:#183A62">配置粉丝端行情版面</div><div class="small mt-1" style="color:#62758A">可按需选择任意数量的指标。</div></div><button type="button" class="btn-close" aria-label="关闭" onclick="closeH5MarketDisplayModal()"></button></div><div class="market-picker-tabs mt-3"><button type="button" class="market-picker-tab ${isSector ? 'active' : ''}" data-h5-market-picker="sectors" onclick="setH5MarketPickerTab('sectors')">热门行业</button><button type="button" class="market-picker-tab ${!isSector && !isMacro && !isEtf ? 'active' : ''}" data-h5-market-picker="market" onclick="setH5MarketPickerTab('market')">市场一览</button><button type="button" class="market-picker-tab ${isMacro ? 'active' : ''}" data-h5-market-picker="macro" onclick="setH5MarketPickerTab('macro')">宏观经济</button><button type="button" class="market-picker-tab ${isEtf ? 'active' : ''}" data-h5-market-picker="etf" onclick="setH5MarketPickerTab('etf')">ETF</button></div>${etfSubTabs}<div class="d-flex justify-content-between align-items-center mt-3"><strong style="font-size:13px;color:#183A62">${isSector ? '选择热门行业' : (isMacro ? '选择宏观指标' : (isEtf ? `选择 ETF · ${escapeHtml(h5MarketPickerEtfCategory)}` : '选择市场指标'))}</strong><span class="badge text-bg-light border" style="color:#2F74C0!important;border-color:#CFE2F6!important">已选择 ${selected.length} 项 · 可留空</span></div><div class="row row-cols-3 g-2 mt-1">${options.map((item) => `<div class="col"><button type="button" class="market-picker-tile ${selected.includes(item.value) ? 'is-selected' : ''}" data-h5-market-picker-tile="${escapeAttr(item.value)}" onclick="toggleH5MarketDraftSelection('${field}','${escapeAttr(item.value)}')">${selected.includes(item.value) ? '<span class="market-picker-check">✓</span>' : ''}<span>${escapeHtml(item.label)}</span></button></div>`).join('') || '<div class="col-12 small text-center py-4" style="color:#62758A">暂无可选择的指标</div>'}</div><div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top"><button type="button" class="btn btn-light border" onclick="closeH5MarketDisplayModal()">取消</button><button type="button" class="btn btn-primary" onclick="publishH5MarketDisplayDraft()">发布版面</button></div></div>`;
+}
+
+async function loadH5MarketDisplayConfig() {
+  const tenantSlug = h5MarketDisplayTenantSlug();
+  if (!tenantSlug || h5MarketDisplayConfigLoading) return;
+  h5MarketDisplayConfigLoading = true;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, {credentials: 'same-origin', cache: 'no-store'});
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_load_failed');
+    renderH5MarketDisplayConfig(payload);
+  } catch (error) {
+    const host = document.getElementById('h5-market-display-config');
+    if (host) host.innerHTML = `<div style="font-size:12px;color:var(--red)">${escapeHtml(error.message || '展示指标配置加载失败')}</div>`;
+  } finally {
+    h5MarketDisplayConfigLoading = false;
+  }
+}
+
+async function saveH5MarketDisplayConfig() {
+  const tenantSlug = h5MarketDisplayTenantSlug();
+  if (!tenantSlug) return;
+  const market = [...(h5MarketDisplayDraft.market_overview_codes || [])];
+  const sectors = [...(h5MarketDisplayDraft.sector_names || [])];
+  const macro = [...(h5MarketDisplayDraft.macro_economic_codes || [])];
+  const etf = [...(h5MarketDisplayDraft.etf_codes || [])];
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, {
+      method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({market_overview_codes: market, sector_names: sectors, macro_economic_codes: macro, etf_codes: etf}),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_save_failed');
+    h5MarketDisplayConfig.settings = payload.settings || {};
+    closeH5MarketDisplayModal();
+    renderH5MarketDisplayConfig(h5MarketDisplayConfig);
+    showToast(payload.refresh && payload.refresh.queued ? '已发布，新增指标正在立即同步' : '已发布给本租户全部粉丝');
+  } catch (error) {
+    showToast(error.message || '展示指标保存失败');
+  }
+}
+
+async function publishH5MarketDisplayDraft() { await saveH5MarketDisplayConfig(); }
+
+function renderFundamentalWatchlistChart() {
+  const host = document.getElementById('fundamental-watchlist-chart');
+  if (!host) return;
+  const rows = Object.values(WATCHLIST_DETAILS_MAP || {})
+    .filter((item) => item && item.data_unavailable !== true && Number.isFinite(Number(item.change_pct)))
+    .map((item) => ({
+      name: item.name || item.code || '--',
+      code: item.code || item.security_code || '',
+      change_pct: Number(item.change_pct),
+      available: true,
+    }));
+  host.innerHTML = renderFeedMarketEconomy(
+    rows,
+    '我的所有自选股涨跌',
+    'feed-watchlist-chart',
+    10,
+    '按今日涨跌幅从高到低排列 · 仅展示涨跌幅 Top10 · 正增长红柱 · 负增长绿柱',
+  );
+}
+
+async function loadFeedMarketEconomy() {
+  const host = document.getElementById('feed-market-economy');
+  if (!host) return;
+  try {
+    const query = marketSnapshotTenantQuery();
+    const [sectorResponse, overviewResponse] = await Promise.all([
+      fetch(`/api/market-sectors${query}`, {cache: 'no-store'}),
+      fetch(`/api/market-overview${query}`, {cache: 'no-store'}),
+    ]);
+    if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
+    const sectors = await sectorResponse.json().catch(() => ({}));
+    const overview = await overviewResponse.json().catch(() => ({}));
+    renderFeedMarketEconomyPanel(overview, sectors);
+    const retryAfterMs = Math.max(Number(sectors.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
+    if (retryAfterMs && !window.feedMarketOnDemandRetryPending) {
+      window.feedMarketOnDemandRetryPending = true;
+      window.setTimeout(() => {
+        window.feedMarketOnDemandRetryPending = false;
+        loadFeedMarketEconomy();
+      }, retryAfterMs);
+    }
+  } catch (error) {
+    renderFeedMarketEconomyPanel({}, {});
+  }
+}
+
+function renderCoreIndicatorVisibility() {
+  const visible = isFeatureEnabled('core_indicators');
+  document.querySelectorAll('.core-indicators-surface').forEach((node) => { node.style.display = visible ? '' : 'none'; });
+}
+
+function renderReviewArticleAccessBadge(article) {
+  const isSubscriberOnly = article && article.accessMode === 'subscriber';
+  return isSubscriberOnly
+    ? '<span class="review-article-access-badge subscriber" aria-label="订阅专享内容">🔒 订阅专享</span>'
+    : '<span class="review-article-access-badge public" aria-label="常规内容，所有粉丝可查看">常规内容</span>';
+}
+
+function renderReviewArticleAccessLabel(article) {
+  const isSubscriberOnly = article && article.accessMode === 'subscriber';
+  return isSubscriberOnly
+    ? '<span class="review-access-label subscriber" aria-label="订阅专享内容">🔒 订阅专享</span>'
+    : '<span class="review-access-label public" aria-label="常规内容，所有粉丝可查看">常规内容</span>';
+}
+
+async function deletePublishedReviewArticle(articleId) {
+  const reviewId = String(articleId || '').trim();
+  const user = getActiveDemoUser();
+  const tenantSlug = String((((user || {}).tenant || {}).slug) || ((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  if (!isDavCapableUser(user) || !reviewId || !tenantSlug) {
+    showToast('当前账号无权删除洞见');
+    return;
+  }
+  if (!window.confirm('确认删除这篇已发布洞见吗？删除后将不再对前台用户展示，且无法撤销。')) return;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(reviewId)}`, {
+      method: 'DELETE',
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'review_delete_failed');
+    syncPublishedReviewStateToH5(tenantSlug, payload);
+    invalidateReviewDirectory(tenantSlug);
+    delete reviewViewCountOverrides[reviewId];
+    if (reviewDetailArticleId === reviewId) {
+      reviewDetailArticleId = '';
+      reviewView = 'list';
+    }
+    renderReviewExperience();
+    showToast(payload.message || '洞见已删除');
+  } catch (error) {
+    showToast(error.message || '洞见删除失败');
+  }
+}
+
+async function togglePublishedReviewPin(articleId, pinned) {
+  const reviewId = String(articleId || '').trim();
+  const user = getActiveDemoUser();
+  const tenantSlug = String((((user || {}).tenant || {}).slug) || ((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  if (!isDavCapableUser(user) || !reviewId || !tenantSlug) {
+    showToast('当前账号无权管理置顶');
+    return;
+  }
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(reviewId)}/pin`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pinned: !!pinned}),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'review_pin_update_failed');
+    syncPublishedReviewStateToH5(tenantSlug, payload);
+    invalidateReviewDirectory(tenantSlug);
+    renderReviewExperience();
+    showToast(payload.message || (pinned ? '洞见已置顶' : '洞见已取消置顶'));
+  } catch (error) {
+    showToast(error.message || '洞见置顶操作失败');
+  }
+}
+
+function formatReviewViewCount(value) {
+  const count = Math.max(0, Number(value) || 0);
+  if (count >= 10000) return `${(count / 10000).toFixed(1).replace(/\.0$/, '')}万`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(Math.round(count));
+}
+
+const reviewViewCountOverrides = {};
+const reviewViewRequestIds = new Set();
+
+function recordReviewArticleView(articleId) {
+  const id = String(articleId || '').trim();
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  if (!id || !tenantSlug || reviewViewRequestIds.has(id)) return;
+  reviewViewRequestIds.add(id);
+  fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(id)}/view`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: '{}',
+  }).then(response => response.json().catch(() => ({})).then(data => ({response, data}))).then(({response, data}) => {
+    if (!response.ok || !data.ok) return;
+    reviewViewCountOverrides[id] = Number(data.view_count) || 0;
+    if (reviewView === 'detail' && reviewDetailArticleId === id) renderReviewExperience();
+  }).catch(() => {
+    // Reading remains available when analytics storage is unavailable.
+  });
+}
+
+function renderReviewArticleList(period) {
+  return renderReviewArticleCards(buildPublishedReviewArticles(period));
+}
+
+function getReviewArticleSearchText(article) {
+  const payload = article && typeof article === 'object' ? article : {};
+  return [
+    payload.title,
+    payload.summary,
+    payload.author,
+    payload.periodLabel,
+    payload.publishedAt,
+    payload.userInputSection && payload.userInputSection.display_text,
+    ...(Array.isArray(payload.bodySections) ? payload.bodySections.flatMap((item) => [item && item.title, item && item.text]) : []),
+    ...(Array.isArray(payload.selectedCards) ? payload.selectedCards.flatMap((item) => [item && item.name, item && item.code, item && item.security_code, item && item.industry]) : []),
+    ...(Array.isArray(payload.watchlist) ? payload.watchlist : []),
+    ...(Array.isArray(payload.tags) ? payload.tags : []),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function filterReviewArticles(articles, keyword) {
+  const query = String(keyword || '').trim().toLowerCase();
+  if (!query) return Array.isArray(articles) ? articles : [];
+  const searchTerms = [query].concat((reviewSearchResolvedAliases || []).map((item) => String(item || '').trim().toLowerCase()).filter(Boolean));
+  return (Array.isArray(articles) ? articles : []).filter((article) => {
+    const searchText = getReviewArticleSearchText(article);
+    return searchTerms.some((term) => searchText.includes(term));
+  });
+}
+
+function getReviewDirectoryTenantSlug() {
+  const user = getActiveDemoUser() || {};
+  return String((((user.tenant || {}).slug) || ((window.ACTIVE_TENANT || {}).slug) || '')).trim().toLowerCase();
+}
+
+function getReviewDirectorySearchTerms() {
+  return [reviewSearchKeyword].concat(reviewSearchResolvedAliases || [])
+    .map((item) => String(item || '').trim())
+    .filter((item, index, values) => item && values.findIndex((value) => value.toLowerCase() === item.toLowerCase()) === index)
+    .slice(0, 9);
+}
+
+function getReviewDirectorySearchSignature() {
+  return getReviewDirectorySearchTerms().map((item) => item.toLowerCase()).join('\u0001');
+}
+
+function reviewDirectoryStateMatchesCurrentView() {
+  return reviewDirectoryState.tenantSlug === getReviewDirectoryTenantSlug()
+    && reviewDirectoryState.searchSignature === getReviewDirectorySearchSignature();
+}
+
+function getReviewDirectorySnapshots() {
+  return reviewDirectoryStateMatchesCurrentView() && reviewDirectoryState.loaded
+    ? reviewDirectoryState.items
+    : null;
+}
+
+function invalidateReviewDirectory(tenantSlug) {
+  if (String(tenantSlug || '').trim().toLowerCase() !== reviewDirectoryState.tenantSlug) return;
+  reviewDirectoryState = {
+    ...reviewDirectoryState,
+    items: [], total: 0, offset: 0, hasMore: false, loaded: false, loading: false, error: '', requestSeq: reviewDirectoryState.requestSeq + 1,
+  };
+}
+
+async function loadReviewDirectoryPage(options = {}) {
+  const tenantSlug = getReviewDirectoryTenantSlug();
+  if (!tenantSlug || (reviewDirectoryState.loading && !options.force)) return;
+  const append = !!options.append;
+  const terms = getReviewDirectorySearchTerms();
+  const searchSignature = getReviewDirectorySearchSignature();
+  const offset = append && reviewDirectoryStateMatchesCurrentView() ? reviewDirectoryState.offset : 0;
+  const requestSeq = reviewDirectoryState.requestSeq + 1;
+  reviewDirectoryState = {
+    ...reviewDirectoryState,
+    tenantSlug,
+    searchSignature,
+    loading: true,
+    error: '',
+    requestSeq,
+    ...(append ? {} : { items: [], total: 0, offset: 0, hasMore: false, loaded: false }),
+  };
+  const params = new URLSearchParams({ limit: String(REVIEW_DIRECTORY_PAGE_SIZE), offset: String(offset) });
+  if (terms[0]) params.set('q', terms[0]);
+  terms.slice(1).forEach((term) => params.append('alias', term));
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/published-insights?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'published_insights_load_failed');
+    if (requestSeq !== reviewDirectoryState.requestSeq || tenantSlug !== getReviewDirectoryTenantSlug() || searchSignature !== getReviewDirectorySearchSignature()) return;
+    const incoming = Array.isArray(payload.items) ? payload.items : [];
+    const items = append
+      ? reviewDirectoryState.items.concat(incoming.filter((item) => !reviewDirectoryState.items.some((existing) => String(existing.id || '') === String(item.id || ''))))
+      : incoming;
+    reviewDirectoryState = {
+      ...reviewDirectoryState,
+      items,
+      total: Math.max(0, Number(payload.total) || 0),
+      offset: Math.max(0, Number(payload.offset) || 0) + incoming.length,
+      hasMore: !!payload.has_more,
+      loaded: true,
+      loading: false,
+      error: '',
+    };
+  } catch (error) {
+    if (requestSeq !== reviewDirectoryState.requestSeq) return;
+    reviewDirectoryState = { ...reviewDirectoryState, loading: false, error: error.message || '洞见列表加载失败' };
+  }
+  if (document.getElementById('review-report-feed')) renderReviewExperience();
+}
+
+function ensureReviewDirectoryLoaded() {
+  if (reviewDirectorySearchPending) return;
+  if (!reviewDirectoryStateMatchesCurrentView() || (!reviewDirectoryState.loaded && !reviewDirectoryState.loading)) {
+    loadReviewDirectoryPage();
+  }
+}
+
+function loadMoreReviewDirectory() {
+  if (reviewDirectoryStateMatchesCurrentView() && reviewDirectoryState.hasMore && !reviewDirectoryState.loading) {
+    loadReviewDirectoryPage({ append: true });
+  }
+}
+
+function renderReviewDirectoryLoadMore() {
+  if (!reviewDirectoryStateMatchesCurrentView()) return '';
+  if (reviewDirectoryState.error) {
+    return `<div class="review-directory-search-meta" style="margin-top:12px">${escapeHtml(reviewDirectoryState.error)} <button class="btn-outline" type="button" style="padding:4px 8px;font-size:10px" onclick="loadReviewDirectoryPage()">重试</button></div>`;
+  }
+  if (reviewDirectoryState.loading) return '<div class="review-directory-search-meta" style="margin-top:12px">正在加载洞见...</div>';
+  if (!reviewDirectoryState.loaded) return '';
+  if (reviewDirectoryState.hasMore) {
+    return `<button class="btn-outline" type="button" style="width:100%;margin-top:12px;padding:9px;font-size:12px" onclick="loadMoreReviewDirectory()">加载更多洞见（已加载 ${reviewDirectoryState.items.length} / ${reviewDirectoryState.total} 篇）</button>`;
+  }
+  return `<div class="review-directory-search-meta" style="margin-top:12px;text-align:center">已加载全部 ${reviewDirectoryState.total} 篇洞见</div>`;
+}
+
+function renderReviewSearchBox(scope) {
+  const keyword = String(reviewSearchKeyword || '').trim();
+  const placeholder = scope === 'home' ? '搜索洞见标题、摘要、个股或标签' : '在全部洞见中搜索标题、摘要、个股或标签';
+  return `
+    <div class="review-directory-search">
+      <label class="review-directory-search-label" for="review-directory-search-input">查询洞见</label>
+      <div class="review-directory-search-box">
+        <span class="review-directory-search-icon" aria-hidden="true">⌕</span>
+        <input id="review-directory-search-input" class="review-directory-search-input" type="search" value="${escapeAttr(keyword)}" placeholder="${escapeAttr(placeholder)}" autocomplete="off" oninput="handleReviewSearchInput(this.value)">
+        ${keyword ? '<button class="review-directory-search-clear" type="button" aria-label="清空查询" onclick="clearReviewSearch()">×</button>' : ''}
+      </div>
+      <div class="review-directory-search-meta">支持输入洞见主题、个股名称、股票代码或内容标签；不输入则显示全部内容。</div>
+    </div>
+  `;
+}
+
+function handleReviewSearchInput(value) {
+  reviewSearchKeyword = String(value || '').trim();
+  reviewSearchResolvedAliases = [];
+  reviewDirectorySearchPending = true;
+  const requestSeq = ++reviewSearchRequestSeq;
+  if (reviewSearchTimer) window.clearTimeout(reviewSearchTimer);
+  renderReviewExperience();
+  window.requestAnimationFrame(() => {
+    const input = document.getElementById('review-directory-search-input');
+    if (!input) return;
+    input.focus();
+    const end = input.value.length;
+    try { input.setSelectionRange(end, end); } catch (error) {}
+  });
+  if (!reviewSearchKeyword) {
+    reviewDirectorySearchPending = false;
+    loadReviewDirectoryPage({ force: true });
+    return;
+  }
+  // Reuse the same security lookup used by the watchlist input so pinyin and
+  // code searches can resolve to an article's canonical stock name/code.
+  reviewSearchTimer = window.setTimeout(async () => {
+    reviewDirectorySearchPending = false;
+    loadReviewDirectoryPage({ force: true });
+    try {
+      const response = await fetch(`/api/watchlist/search?q=${encodeURIComponent(reviewSearchKeyword)}&limit=8`);
+      const data = await response.json().catch(() => ({}));
+      if (requestSeq !== reviewSearchRequestSeq || !response.ok || data.ok === false) return;
+      reviewSearchResolvedAliases = (Array.isArray(data.items) ? data.items : []).flatMap((item) => [
+        item && item.name,
+        item && item.code,
+        item && item.security_code,
+      ]).filter(Boolean);
+      if (reviewSearchResolvedAliases.length) loadReviewDirectoryPage({ force: true });
+    } catch (error) {
+      // Local article fields remain searchable when security lookup is unavailable.
+    }
+  }, 160);
+}
+
+function clearReviewSearch() {
+  reviewSearchKeyword = '';
+  reviewSearchResolvedAliases = [];
+  reviewDirectorySearchPending = false;
+  reviewSearchRequestSeq += 1;
+  if (reviewSearchTimer) {
+    window.clearTimeout(reviewSearchTimer);
+    reviewSearchTimer = null;
+  }
+  loadReviewDirectoryPage({ force: true });
+  renderReviewExperience();
+  window.requestAnimationFrame(() => document.getElementById('review-directory-search-input')?.focus());
+}
+
+function getReviewArticleById(articleId) {
+  return buildAllPublishedReviewArticles().find(item => String(item.id || '') === String(articleId || '')) || null;
+}
+
+function buildReviewRouteUrl(view, articleId) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('review_view');
+  url.searchParams.delete('review_id');
+  if (view && view !== 'home') url.searchParams.set('review_view', view);
+  if (articleId) url.searchParams.set('review_id', articleId);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function openReviewHome(options = {}) {
+  reviewView = 'home';
+  reviewDetailArticleId = '';
+  if (!options.skipHistory) window.history.pushState({}, '', buildReviewRouteUrl('home'));
+  renderReviewExperience();
+}
+
+function openReviewArticleList(options = {}) {
+  reviewView = 'list';
+  reviewDetailArticleId = '';
+  if (!options.skipHistory) window.history.pushState({}, '', buildReviewRouteUrl('list'));
+  renderReviewExperience();
+}
+
+function openReviewArticleDetail(articleId, options = {}) {
+  const article = getReviewArticleById(articleId);
+  if (!article) {
+    showToast('洞见文章不存在或已下线');
+    return;
+  }
+  reviewView = 'detail';
+  reviewDetailArticleId = String(article.id || articleId || '');
+  if (!options.skipHistory) window.history.pushState({}, '', buildReviewRouteUrl('detail', reviewDetailArticleId));
+  renderReviewExperience();
+}
+
+function buildReviewArticleHeroVisual(article) {
+  return '';
+}
+
+function renderReviewArticleDetailContent(article, options = {}) {
+  const previewMode = !!options.previewMode;
+  const heroDesc = previewMode
+    ? '这是发布前的最终预览。当前阅读态会尽量贴近普通用户和大V最终看到的详情展示。'
+    : article.coverDesc;
+  const metaSuffix = previewMode ? ' · 预览态' : ` · 作者 ${escapeHtml(article.author)}`;
+  const isAgentBroadcast = article.contentKind === 'ai_broadcast';
+  const broadcastClass = isAgentBroadcast ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : '';
+  const broadcastLabel = article.broadcastLabel || (article.broadcastKind === 'night' ? '晚间播报' : '午间播报');
+  return `
+    <div class="review-article-detail-head ${broadcastClass}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div class="review-article-detail-kicker">${isAgentBroadcast ? `<span class="review-article-broadcast-label">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(broadcastLabel)}</span>` : escapeHtml(article.kicker)}</div>
+        ${renderReviewArticleAccessLabel(article)}
+      </div>
+      <div class="review-article-detail-title">${escapeHtml(article.title)}</div>
+      <div class="review-article-detail-meta">${escapeHtml(article.meta)}${metaSuffix}</div>
+      <div class="review-watchlist-row">
+        ${(article.watchlist || []).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
+      </div>
+    </div>
+    <div class="review-article-detail-body">
+      <div class="review-article-hero ${broadcastClass}">
+        <div class="review-article-hero-copy">
+          <div class="review-article-hero-title">${escapeHtml(article.coverTitle)}</div>
+          <div class="review-article-hero-desc">${escapeHtml(heroDesc)}</div>
+        </div>
+        <div style="padding:12px 14px 14px">${buildReviewArticleHeroVisual(article)}</div>
+      </div>
+      ${article.accessRequired ? `
+        <div class="review-article-section" style="text-align:center;padding:24px 16px">
+          <div class="review-article-section-title">订阅后查看完整内容</div>
+          <div class="review-article-section-text">${escapeHtml(article.accessNotice || '订阅后查看完整洞见内容')}。请前往个人中心查看订阅产品。</div>
+        </div>
+      ` : `
+      ${!article.contentHtml && article.userInputSection && article.userInputSection.display_text ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">用户洞见</div>
+          <div class="review-article-section-text">${escapeHtml(article.userInputSection.display_text).replace(/\n/g, '<br>')}</div>
+        </div>
+      ` : ''}
+      ${article.contentKind === 'ai_broadcast' && article.contentText ? `
+        <div class="review-article-section review-article-broadcast-content">
+          <div class="review-article-section-title">${escapeHtml(article.broadcastLabel || '财经播报')}</div>
+          ${article.contentHtml ? article.contentHtml : renderGangtiseMarkdown(article.contentText)}
+        </div>
+      ` : ((article.contentHtml || !article.userInputSection?.display_text) && article.contentText ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">完整洞见正文</div>
+          ${article.contentHtml ? article.contentHtml : renderGangtiseMarkdown(article.contentText)}
+        </div>
+      ` : '')}
+      ${renderReviewWatchlistAnalysisSection(article)}
+      ${false && article.knowledgeAttachments.length ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">附加材料</div>
+          <div class="review-article-evidence-list">
+            ${article.knowledgeAttachments.map(item => `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">${escapeHtml(item.title || '知识材料')}</div>
+                <div class="review-article-evidence-text">${escapeHtml(item.summary || item.body || '暂无摘要')}</div>
+                ${item.source_detail ? `<div class="review-article-evidence-text">来源：${escapeHtml(item.source_detail)}</div>` : ''}
+                ${item.url ? `<div class="review-article-evidence-text">链接：${escapeHtml(item.url)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      ${false && article.evidenceChainSection && (article.evidenceChainSection.summary || (article.evidenceChainSection.items || []).length || article.evidenceChainSection.status === 'empty') ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">归纳来源</div>
+          <div class="review-article-evidence-list">
+            <div class="review-article-evidence-item">
+              <div class="review-article-evidence-title">证据链总结</div>
+              <div class="review-article-evidence-text">${escapeHtml(article.evidenceChainSection.summary || '暂无匹配的证据链')}</div>
+              ${(article.evidenceChainSection.knowledge_match_count || article.evidenceChainSection.web_match_count) ? `<div class="review-article-evidence-text">知识库命中 ${escapeHtml(String(article.evidenceChainSection.knowledge_match_count || 0))} 条 · 互联网命中 ${escapeHtml(String(article.evidenceChainSection.web_match_count || 0))} 条</div>` : ''}
+            </div>
+            ${((article.evidenceChainSection.items || []).length ? (article.evidenceChainSection.items || []).map(item => `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">${escapeHtml(item.title || (item.kind === 'web' ? '互联网公开信息' : '知识库证据'))}</div>
+                <div class="review-article-evidence-text">${escapeHtml(item.summary || '暂无摘要')}</div>
+                <div class="review-article-evidence-text">${escapeHtml(item.source_label || '')}${item.source_detail ? ` · ${escapeHtml(item.source_detail)}` : ''}${item.published_at ? ` · ${escapeHtml(item.published_at)}` : ''}</div>
+                ${item.link ? `<div class="review-article-evidence-text">${escapeHtml(item.link)}</div>` : ''}
+              </div>
+            `).join('') : `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">证据链命中</div>
+                <div class="review-article-evidence-text">暂无匹配的证据链</div>
+              </div>
+            `)}
+          </div>
+        </div>
+      ` : ''}
+      ${false && article.evidenceItems.length ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">洞见依据 · K线标注</div>
+          <div class="review-article-evidence-list">
+            ${article.evidenceItems.map(item => `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">${escapeHtml(item.title)}</div>
+                <div class="review-article-evidence-text">${escapeHtml(item.text)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      `}
+    </div>
+  `;
+}
+
+function buildReviewPreviewArticle() {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  const previewBody = getReviewPreviewText();
+  const structured = reviewStructuredPreview && typeof reviewStructuredPreview === 'object' ? reviewStructuredPreview : {};
+  const periodMeta = getReviewPeriodMeta(reviewTriggerDraft.period || currentReviewPeriod || 'day');
+  const focusNames = (reviewTriggerDraft.selectedWatchlist || []).length
+    ? reviewTriggerDraft.selectedWatchlist.slice(0)
+    : [];
+  const sourceCfg = REVIEW_SOURCE_OPTIONS.find(item => item.value === reviewTriggerDraft.sourceMode) || REVIEW_SOURCE_OPTIONS[0];
+  const paragraphLabel = reviewTriggerDraft.paragraphMode === 'ai' ? '智能优化后草稿' : '用户原稿直出';
+  const llmModels = [];
+  if (reviewIngestResult && reviewIngestResult.review_draft_llm) {
+    llmModels.push({
+      stage: 'draft',
+      label: reviewIngestResult.review_draft_llm.label || reviewIngestResult.review_draft_llm.model_name || '已调用模型',
+      model_name: reviewIngestResult.review_draft_llm.model_name || '',
+      key: reviewIngestResult.review_draft_llm.key || '',
+    });
+  }
+  (structured.llm_models || []).forEach((item) => {
+    if (item && !llmModels.some((row) => row.stage === item.stage && row.key === item.key && row.model_name === item.model_name)) {
+      llmModels.push(item);
+    }
+  });
+  return buildReviewArticleData({
+    id: `preview-${user.tenant.id}-${reviewTriggerDraft.period || currentReviewPeriod || 'day'}`,
+    author: user.tenant.advisor,
+    avatar: user.tenant.advisor === '财经老王' ? '👑' : '🧭',
+    periodLabel: '洞见',
+    generatedAt: runtime.kolGeneratedAt || '刚刚生成',
+    title: String(reviewTriggerDraft.reviewTitle || '').trim() || `${focusNames[0] || '重点样本'}等重点样本洞见`,
+    summary: structured.review_summary || previewBody.slice(0, 150) || '当前预览还没有生成正文。',
+    tags: ['洞见', sourceCfg.label, paragraphLabel],
+    watchlist: focusNames,
+    annotations: [],
+    selectedCards: [],
+    knowledgeAttachments: [],
+    dataSources: reviewTriggerDraft.sourceMode === 'file'
+      ? ['用户上传文件']
+      : (reviewTriggerDraft.sourceMode === 'url' ? ['用户提供网页 URL'] : (reviewTriggerDraft.sourceMode === 'voice' ? ['用户语音转写文稿'] : ['用户手写正文'])),
+    newsSources: [],
+    llmModels,
+    userInputSection: structured.user_input_section || {
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
+      source_mode_label: sourceCfg.label,
+      display_text: getReviewUserInputDisplayText(),
+    },
+    watchlistAnalysisSection: structured.watchlist_analysis_section || {},
+    paragraphs: structured.user_input_section ? [] : [
+      { title: '完整洞见正文', text: previewBody || '暂无正文' },
+    ],
+  });
+}
+
+function renderReviewHome() {
+  const allArticles = buildAllPublishedReviewArticles();
+  const filteredArticles = filterReviewArticles(allArticles, reviewSearchKeyword);
+  const articles = String(reviewSearchKeyword || '').trim() ? filteredArticles : allArticles.slice(0, 3);
+  return `
+    <div class="review-directory-view">
+      <div class="review-directory-view-head">
+        <div>
+          <div class="review-directory-view-title">最新洞见</div>
+          <div class="review-directory-view-desc">按最新发布时间展示最近 3 篇洞见文章，点击后进入独立详情页。</div>
+          <div class="review-access-legend" aria-label="洞见内容权限说明">
+            <span class="review-access-legend-label">内容范围</span>
+            <span class="review-access-label public">常规内容</span>
+            <span class="review-access-label subscriber">🔒 订阅专享</span>
+          </div>
+        </div>
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewArticleList()">查看全部</button>
+      </div>
+      ${renderReviewSearchBox('home')}
+      ${String(reviewSearchKeyword || '').trim() ? `<div class="review-directory-search-meta" style="margin:-5px 0 10px">${reviewDirectoryStateMatchesCurrentView() && reviewDirectoryState.loaded ? `找到 ${reviewDirectoryState.total} 篇匹配洞见` : '正在查询全部历史洞见...'}</div>` : ''}
+      ${renderReviewArticleCards(articles)}
+      ${String(reviewSearchKeyword || '').trim() ? renderReviewDirectoryLoadMore() : ''}
+    </div>
+  `;
+}
+
+function renderReviewListPage() {
+  const articles = filterReviewArticles(buildAllPublishedReviewArticles(), reviewSearchKeyword);
+  return `
+    <div class="review-directory-view">
+      <div class="review-directory-view-head">
+        <div>
+          <div class="review-directory-view-title">全部洞见</div>
+          <div class="review-directory-view-desc">查看当前租户可见的全部已发布洞见文章。</div>
+          <div class="review-access-legend" aria-label="洞见内容权限说明">
+            <span class="review-access-legend-label">内容范围</span>
+            <span class="review-access-label public">常规内容</span>
+            <span class="review-access-label subscriber">🔒 订阅专享</span>
+          </div>
+        </div>
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewHome()">返回洞见</button>
+      </div>
+      ${renderReviewSearchBox('list')}
+      ${String(reviewSearchKeyword || '').trim() ? `<div class="review-directory-search-meta" style="margin:-5px 0 10px">${reviewDirectoryStateMatchesCurrentView() && reviewDirectoryState.loaded ? `找到 ${reviewDirectoryState.total} 篇匹配洞见` : '正在查询全部历史洞见...'}</div>` : ''}
+      ${renderReviewArticleCards(articles)}
+      ${renderReviewDirectoryLoadMore()}
+    </div>
+  `;
+}
+
+function renderReviewDetailPage() {
+  const article = getReviewArticleById(reviewDetailArticleId);
+  if (!article) return renderReviewListPage();
+  return `
+    <div class="review-detail-page">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewArticleList()">返回洞见列表</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <span class="tag tag-gold">洞见详情</span>
+          ${isDavCapableUser(getActiveDemoUser()) ? `<button class="review-pin-button" type="button" onclick="togglePublishedReviewPin('${escapeAttr(article.id)}', ${article.isPinned ? 'false' : 'true'})">${article.isPinned ? '取消置顶' : '置顶'}</button>` : ''}
+          ${renderReviewArticleAccessLabel(article)}
+        </div>
+      </div>
+      ${renderReviewArticleDetailContent(article)}
+    </div>
+  `;
+}
+
+function renderReviewPeriodRow() {
+  const row = document.getElementById('review-period-row');
+  if (!row) return;
+  row.innerHTML = '';
+}
+
+function renderDavReviewStudio(user) {
+  const host = document.getElementById('review-dav-studio');
+  if (!host) return;
+  host.style.display = 'none';
+  host.innerHTML = '';
+}
+
+function renderReviewExperience() {
+  const user = getActiveDemoUser();
+  const hasDavCapabilities = isDavCapableUser(user);
+  const badge = document.getElementById('review-role-badge');
+  const triggerBtn = document.getElementById('review-trigger-button');
+  const actionRow = document.getElementById('review-action-row');
+  const pageHeaderTitle = document.querySelector('#page-review .review-role-title');
+  const pageHeaderDesc = document.querySelector('#page-review .review-role-desc');
+  const host = document.getElementById('review-report-feed');
+  if (!host) return;
+  const reviewParams = new URLSearchParams(window.location.search);
+  const requestedProductionPage = reviewParams.get('review') === 'compose';
+  const requestedDraftLibrary = reviewParams.get('review') === 'drafts';
+  const requestedView = String(reviewParams.get('review_view') || 'home').trim().toLowerCase();
+  if (!requestedProductionPage && requestedDraftLibrary && hasDavCapabilities) {
+    insightDraftLibraryView = true;
+    reviewProductionPage = false;
+  }
+  if (!requestedDraftLibrary && !requestedProductionPage) insightDraftLibraryView = false;
+  if (!requestedProductionPage && ['home', 'list', 'detail'].includes(requestedView)) {
+    reviewView = requestedView;
+    reviewDetailArticleId = String(reviewParams.get('review_id') || '').trim();
+  }
+  if (hasDavCapabilities && requestedProductionPage) reviewProductionPage = true;
+  const productionPage = document.getElementById('review-production-page');
+  const overviewCard = document.getElementById('review-overview-card');
+  if (insightDraftLibraryView && hasDavCapabilities) {
+    if (overviewCard) overviewCard.style.display = 'none';
+    if (productionPage) productionPage.style.display = 'none';
+    host.style.display = 'block';
+    host.innerHTML = renderInsightDraftLibraryPage();
+    if (hasDavCapabilities && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
+    if (hasDavCapabilities) loadInsightDrafts();
+    return;
+  }
+  if (reviewProductionPage && hasDavCapabilities && productionPage) {
+    if (overviewCard) overviewCard.style.display = 'none';
+    host.style.display = 'none';
+    productionPage.style.display = 'block';
+    renderReviewTriggerModal(user);
+    renderReviewActiveJobs();
+    const existingDraftJob = reviewActiveJobs.find((job) => job.job_type === 'review_generate_draft' && ['pending', 'running'].includes(job.status));
+    if (existingDraftJob) resumeActiveReviewDraftJob(existingDraftJob);
+    if (!reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
+    return;
+  }
+  if (overviewCard) {
+    const showDavWorkspace = reviewView === 'home' && hasDavCapabilities;
+    overviewCard.style.display = showDavWorkspace ? '' : 'none';
+    overviewCard.setAttribute('aria-hidden', String(!showDavWorkspace));
+  }
+  if (productionPage) productionPage.style.display = 'none';
+  host.style.display = '';
+  if (badge) badge.textContent = hasDavCapabilities ? '洞见发布中心' : '洞见';
+  if (pageHeaderTitle) pageHeaderTitle.textContent = '洞见';
+  if (pageHeaderDesc) {
+    pageHeaderDesc.textContent = hasDavCapabilities
+      ? '大V可编辑、生成草稿并发布洞见；前台统一展示已发布内容。'
+      : '这里默认展示所有大V已经发布的洞见。';
+  }
+  if (triggerBtn) {
+    triggerBtn.textContent = hasDavCapabilities ? '发布新洞见' : '查看洞见';
+    triggerBtn.style.display = hasDavCapabilities ? '' : 'none';
+  }
+  if (actionRow) actionRow.style.display = reviewView === 'home' && hasDavCapabilities ? 'flex' : 'none';
+  if (hasDavCapabilities && reviewView === 'home') renderReviewPeriodRow();
+  const draftsOverviewHost = document.getElementById('review-insight-drafts-overview-host');
+  if (draftsOverviewHost) {
+    draftsOverviewHost.innerHTML = reviewView === 'home' && hasDavCapabilities
+      ? renderReviewDraftLibraryOverview()
+      : '';
+  }
+  renderDavReviewStudio(user);
+  if (reviewView === 'detail' && !getReviewArticleById(reviewDetailArticleId)) {
+    reviewView = 'list';
+    reviewDetailArticleId = '';
+    window.history.replaceState({}, '', buildReviewRouteUrl('list'));
+  }
+  host.innerHTML = reviewView === 'detail'
+    ? renderReviewDetailPage()
+    : (reviewView === 'list' ? renderReviewListPage() : renderReviewHome());
+  if (reviewView !== 'detail') ensureReviewDirectoryLoaded();
+  if (reviewView === 'detail') recordReviewArticleView(reviewDetailArticleId);
+  if (hasDavCapabilities) renderReviewActiveJobs();
+  if (hasDavCapabilities && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
+  if (hasDavCapabilities) loadInsightDrafts();
+}
+
+function selectReviewPeriod(period) {
+  if (!REVIEW_PERIOD_CONFIG[period]) return;
+  currentReviewPeriod = period;
+  reviewTriggerDraft.period = period;
+  renderReviewExperience();
+}
+
+function openReviewTriggerModal(sourceMode) {
+  const user = getActiveDemoUser();
+  // This entry point always starts a new note. Loading an existing draft goes
+  // through editInsightDraft(), which intentionally retains its database ID.
+  activeInsightDraftId = '';
+  insightDraftLibraryView = false;
+  reviewTriggerDraft.period = currentReviewPeriod;
+  if (sourceMode && getAvailableReviewSourceOptions().some(item => item.value === sourceMode)) {
+    reviewTriggerDraft.sourceMode = sourceMode;
+  }
+  if (!getAvailableReviewSourceOptions().some(item => item.value === reviewTriggerDraft.sourceMode)) {
+    reviewTriggerDraft.sourceMode = 'manual';
+  }
+  // A new insight starts clean. Existing drafts are opened from the draft list.
+  reviewTriggerDraft.paragraphMode = 'manual';
+  reviewTriggerDraft.selectedWatchlist = [];
+  reviewTriggerDraft.watchlistDecision = 'not_applicable';
+  reviewTriggerDraft.voiceTranscript = '';
+  reviewTriggerDraft.manualHtml = '';
+  reviewTriggerDraft.fileText = '';
+  reviewTriggerDraft.fileName = '';
+  reviewTriggerDraft.urlValue = '';
+  reviewTriggerDraft.urlTitle = '';
+  reviewTriggerDraft.urlText = '';
+  reviewTriggerDraft.reviewTitle = '';
+  reviewTriggerDraft.accessMode = 'public';
+  reviewTriggerDraft.aiPrompt = '';
+  reviewTriggerDraft.promptTags = [];
+  reviewTriggerDraft.sectorSummaryRule = '';
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.draftReviewText = '';
+  reviewTriggerDraft.flowStage = 'intake';
+  reviewTriggerDraft.optimizeRuleMode = 'default';
+  reviewTriggerDraft.skipAiProcessing = true;
+  reviewTriggerDraft.previewReady = false;
+  if (isDavCapableUser(user) && document.getElementById('review-production-page')) {
+    reviewProductionPage = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set('review', 'compose');
+    window.history.pushState({}, '', url);
+    switchTab('review');
+    renderReviewExperience();
+    return;
+  }
+  const modal = document.getElementById('review-trigger-modal');
+  if (!modal) return;
+  renderReviewTriggerModal(user);
+  modal.classList.add('show');
+}
+
+function closeReviewTriggerModal() {
+  if (reviewProductionPage) {
+    reviewProductionPage = false;
+    if (reviewActiveJobsTimer) {
+      window.clearTimeout(reviewActiveJobsTimer);
+      reviewActiveJobsTimer = null;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('review');
+    window.history.pushState({}, '', url);
+    renderReviewExperience();
+    return;
+  }
+  const modal = document.getElementById('review-trigger-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function getReviewDraftContentText() {
+  if (reviewTriggerDraft.sourceMode === 'voice') return String(reviewTriggerDraft.voiceTranscript || '').trim();
+  if (reviewTriggerDraft.sourceMode === 'file') return String(reviewTriggerDraft.fileText || '').trim();
+  if (reviewTriggerDraft.sourceMode === 'url') return String(reviewTriggerDraft.urlText || '').trim();
+  const temp = document.createElement('div');
+  temp.innerHTML = reviewTriggerDraft.manualHtml || '';
+  return temp.textContent.trim();
+}
+
+function getReviewPreviewText() {
+  if (reviewStructuredPreview) {
+    return buildReviewStructuredFinalText(reviewStructuredPreview);
+  }
+  return String(reviewTriggerDraft.draftReviewText || '').trim()
+    || String(reviewTriggerDraft.generatedPreviewText || '').trim()
+    || getReviewDraftContentText();
+}
+
+function getReviewUserInputDisplayText() {
+  return String(reviewTriggerDraft.draftReviewText || '').trim() || getReviewDraftContentText();
+}
+
+let reviewVoiceRecorder = null;
+let reviewVoiceChunks = [];
+let reviewVoiceRecording = false;
+let reviewVoiceUploading = false;
+let reviewFileUploading = false;
+let reviewIngestResult = null;
+let reviewDraftGenerating = false;
+let reviewDraftJobState = null;
+let reviewDraftCancellationRequested = false;
+const reviewDraftCancelResolvers = {};
+let reviewPublishSubmitting = false;
+let activeInsightDraftId = '';
+let insightDrafts = [];
+let insightDraftsLoading = false;
+let insightDraftsLoaded = false;
+let insightDraftSearchKeyword = '';
+let insightDraftAccessFilter = 'all';
+let knowledgeVoiceRecorder = null;
+let knowledgeVoiceChunks = [];
+let knowledgeVoiceUploading = false;
+const pendingAsyncJobs = {};
+let knowledgeEditors = { body: null };
+let reviewEditors = { manual: null };
+
+async function generateReviewDraftWithLlm() {
+  const user = getActiveDemoUser();
+  const resp = await fetch('/api/review/generate-draft', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tenant_slug: ((user || {}).tenant || {}).slug || '',
+      period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
+      source_text: getReviewDraftContentText(),
+      prompt_text: reviewTriggerDraft.aiPrompt || '',
+      prompt_tags: reviewTriggerDraft.promptTags || [],
+      // Stage one only optimizes the user's own review text. Stock analysis is
+      // submitted later, after an explicit decision and stock confirmation.
+      selected_watchlist: [],
+      speaker_name: (user && (user.advisor_name || user.username)) || '',
+      entry_point: 'h5_review_draft',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    throw new Error((data && data.error) || 'review_draft_generation_failed');
+  }
+  return data;
+}
+
+async function requestReviewStructuredPreview() {
+  const user = getActiveDemoUser();
+  await syncLocalWatchlistAnnotationsToServer(reviewTriggerDraft.selectedWatchlist || []);
+  const resp = await fetch('/api/review/prepare-preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tenant_slug: ((user || {}).tenant || {}).slug || '',
+      period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+      review_title: String(reviewTriggerDraft.reviewTitle || '').trim(),
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
+      source_text: getReviewUserInputDisplayText(),
+      selected_watchlist: reviewTriggerDraft.selectedWatchlist || [],
+      include_summary: false,
+      speaker_name: (user && (user.advisor_name || user.username)) || '',
+      entry_point: 'h5_review_preview',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    throw new Error((data && data.error) || 'review_prepare_preview_failed');
+  }
+  return data;
+}
+
+function hasConfiguredGeneralLlm() {
+  const registry = (window.SITE_CONFIG && window.SITE_CONFIG.llm_registry) || {};
+  const models = Array.isArray(registry.models) ? registry.models : [];
+  const defaultKey = String(registry.default_model_key || '').trim();
+  if (!models.length) return false;
+  if (defaultKey) {
+    return models.some((item) => item && item.enabled !== false && String(item.key || '').trim() === defaultKey);
+  }
+  return models.some((item) => item && item.enabled !== false && String(item.purpose || 'general').trim().toLowerCase() === 'general');
+}
+
+function getReviewDraftGenerationErrorMessage(error) {
+  const raw = String((error && error.message) || '').trim();
+  if (!raw) return '智能优化失败，请稍后重试';
+  if (raw.includes('review_job_cancelled')) {
+    return '已停止生成，原始输入已保留。';
+  }
+  if (raw.includes('review_draft_llm_not_configured')) {
+    return '当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。';
+  }
+  if (raw.includes('llm_api_key_missing')) {
+    return '大模型 API Key 未配置，请先到 Admin 的系统专区 · 大模型专区补全。';
+  }
+  if (raw.includes('llm_request_failed')) {
+    return '大模型调用失败，请检查模型配置、Base URL 或网络连通性。';
+  }
+  if (raw.includes('review_summary_llm_not_configured') || raw.includes('review_watchlist_analysis_llm_not_configured')) {
+    return '当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。';
+  }
+  if (raw.includes('review_prepare_preview_failed')) {
+    return '洞见归纳预览生成失败，请稍后重试。';
+  }
+  if (raw.includes('review_sector_summary_llm_not_configured')) {
+    return '当前没有配置可用的大模型，无法生成洞见草稿。';
+  }
+  if (raw.includes('review_sector_summary_empty_llm_response')) {
+    return '大模型未返回有效的洞见草稿，请重试。';
+  }
+  return raw;
+}
+
+function formatReviewJobStage(stage) {
+  const map = {
+    queued: '已进入队列',
+    processing: '后台处理中',
+    llm_preparing: '整理原始材料',
+    llm_postprocessing: '整理返回结果',
+    completed: '已完成',
+    failed: '已失败',
+    cancelled: '已停止',
+  };
+  return map[String(stage || '').trim()] || (stage || '处理中');
+}
+
+function renderReviewDraftProgressPanel() {
+  if (reviewPublishSubmitting) {
+    return `
+      <div class="review-progress-panel">
+        <div class="review-progress-head">
+          <div>
+            <div class="review-progress-title">正在确认发布</div>
+            <div class="review-progress-subtitle">系统正在同步前台洞见内容、消息触达和后台入库任务，请稍候。</div>
+          </div>
+          <div class="review-progress-percent">发布中</div>
+        </div>
+        <div class="review-progress-track">
+          <div class="review-progress-fill" style="width:72%"></div>
+        </div>
+      </div>
+    `;
+  }
+  if (!reviewDraftGenerating && !reviewDraftJobState && !reviewPreviewGenerating && !reviewPreviewJobState) return '';
+  const job = reviewPreviewGenerating || reviewPreviewJobState ? (reviewPreviewJobState || {}) : (reviewDraftJobState || {});
+  const percent = Math.max(5, Number(job.progress_percent || 0) || 0);
+  const logs = (Array.isArray(job.result && job.result.live_log) ? job.result.live_log : [])
+    .filter((item) => String((item || {}).stage || '') !== 'watchlist_gangtise_sse_streaming')
+    .slice(-4)
+    .reverse();
+  const previewMode = !!(reviewPreviewGenerating || reviewPreviewJobState);
+  const failed = String(job.status || '').toLowerCase() === 'failed';
+  const cancelled = String(job.status || '').toLowerCase() === 'cancelled';
+  const progressMarkup = failed
+    ? `<div class="review-progress-error">${escapeHtml(job.error_message || job.summary || '洞见任务失败')}<br><span>已保留当前任务的阶段日志和部分返回内容，请检查后重试或继续使用已生成内容。</span></div>`
+    : `<div class="review-progress-track"><div class="review-progress-fill" style="width:${Math.min(100, percent)}%"></div></div>`;
+  const statusMarkup = cancelled
+    ? `<div class="review-progress-error" style="color:var(--gray-400)">已停止生成。原始输入已保留，本次未生成内容。</div>`
+    : progressMarkup;
+  const title = cancelled
+    ? (previewMode ? '洞见预览已停止' : '洞见草稿生成已停止')
+    : (failed ? (previewMode ? '洞见预览未完成' : '洞见草稿生成失败') : (previewMode ? '正在生成洞见预览' : '大模型正在生成洞见草稿'));
+  const percentLabel = cancelled ? '已停止' : (failed ? '失败' : `${escapeHtml(String(percent))}%`);
+  return `
+    <div class="review-progress-panel">
+      <div class="review-progress-head">
+        <div>
+          <div class="review-progress-title">${title}</div>
+          <div class="review-progress-subtitle">${escapeHtml(failed ? (job.error_message || job.summary || 'Gangtise 多股分析失败') : (job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。'))}</div>
+        </div>
+        <div class="review-progress-percent">${percentLabel}</div>
+      </div>
+      ${statusMarkup}
+      <div class="review-progress-log">
+        <div class="review-progress-log-item">
+          <div class="review-progress-log-meta">${escapeHtml(formatReviewJobStage(job.progress_stage || 'processing'))}${job.job_code ? ` · ${escapeHtml(job.job_code)}` : ''}</div>
+          <div class="review-progress-log-text">${escapeHtml(job.summary || '系统正在准备模型请求')}</div>
+        </div>
+        ${logs.map((item) => `
+          <div class="review-progress-log-item">
+            <div class="review-progress-log-meta">${escapeHtml(formatReviewJobStage(item.stage || 'processing'))} · ${escapeHtml(item.at || '--')}</div>
+            <div class="review-progress-log-text">${escapeHtml(item.text || '')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function openReviewIngestResultModal(title, lines) {
+  const host = document.getElementById('review-ingest-result-modal-content');
+  const modal = document.getElementById('review-ingest-result-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${escapeHtml(title || '入库结果')}</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">处理结果</label>
+      <div class="review-preview-panel">
+        <div class="review-preview-copy">${escapeHtml((lines || []).join('\n\n'))}</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-gold" onclick="closeReviewIngestResultModal()">我看到了，关闭</button>
+    </div>
+  `;
+  modal.classList.add('show');
+  if (window.GangtiseEcharts) window.GangtiseEcharts.flush(host);
+}
+
+function closeReviewIngestResultModal() {
+  const modal = document.getElementById('review-ingest-result-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function fetchAsyncJob(jobCode) {
+  const resp = await fetch(`/api/jobs/${encodeURIComponent(jobCode)}`);
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'job_status_failed');
+  return data.job;
+}
+
+function startAsyncJobPolling(jobCode, handlers) {
+  if (!jobCode) return;
+  if (pendingAsyncJobs[jobCode]) {
+    clearTimeout(pendingAsyncJobs[jobCode]);
+    delete pendingAsyncJobs[jobCode];
+  }
+  const tick = async () => {
+    try {
+      const job = await fetchAsyncJob(jobCode);
+      if (handlers && typeof handlers.onProgress === 'function') handlers.onProgress(job);
+      if (job.status === 'success') {
+        if (handlers && typeof handlers.onSuccess === 'function') handlers.onSuccess(job);
+        delete pendingAsyncJobs[jobCode];
+        return;
+      }
+      if (job.status === 'failed') {
+        if (handlers && typeof handlers.onFailed === 'function') handlers.onFailed(job);
+        delete pendingAsyncJobs[jobCode];
+        return;
+      }
+      if (job.status === 'cancelled') {
+        if (handlers && typeof handlers.onCancelled === 'function') handlers.onCancelled(job);
+        delete pendingAsyncJobs[jobCode];
+        return;
+      }
+      pendingAsyncJobs[jobCode] = setTimeout(tick, 1500);
+    } catch (error) {
+      if (handlers && typeof handlers.onError === 'function') handlers.onError(error);
+      delete pendingAsyncJobs[jobCode];
+    }
+  };
+  pendingAsyncJobs[jobCode] = setTimeout(tick, 1200);
+}
+
+function normalizeRichHtml(html) {
+  return String(html || '').replace(/<p><br><\/p>/gi, '<p></p>').trim();
+}
+
+function richHtmlToPlainText(html) {
+  const temp = document.createElement('div');
+  temp.innerHTML = String(html || '');
+  return (temp.textContent || temp.innerText || '').replace(/\u00a0/g, ' ').trim();
+}
+
+function plainTextToRichHtml(text) {
+  const normalized = String(text || '').trim();
+  if (!normalized) return '';
+  return normalized
+    .split(/\n{2,}/)
+    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+function buildReviewGeneratedHtml(text, sourceHtml) {
+  const generated = plainTextToRichHtml(text);
+  const host = document.createElement('div');
+  host.innerHTML = String(sourceHtml || '');
+  const images = Array.from(host.querySelectorAll('img')).map((image) => {
+    const src = String(image.getAttribute('src') || '').trim();
+    if (!/^data:image\//i.test(src) && !/^https?:\/\//i.test(src)) return '';
+    return `<p><img src="${escapeAttr(src)}" alt="复盘图片"></p>`;
+  }).filter(Boolean).join('');
+  return [generated, images].filter(Boolean).join('');
+}
+
+function getReviewPreviewHtml() {
+  return buildReviewGeneratedHtml(getReviewPreviewText(), reviewTriggerDraft.draftReviewHtml || reviewTriggerDraft.manualHtml);
+}
+
+function mergePlainTextIntoRichHtml(existingHtml, incomingText) {
+  const existingText = richHtmlToPlainText(existingHtml || '');
+  const mergedText = appendTranscribedText(existingText, incomingText || '');
+  return plainTextToRichHtml(mergedText);
+}
+
+function installSharedQuillImagePaste(quill, onChange) {
+  if (!quill || !quill.root) return;
+  quill.root.addEventListener('paste', (event) => {
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+    const items = Array.from(clipboard.items || []);
+    const imageItem = items.find((item) => item.type && item.type.startsWith('image/'));
+    if (!imageItem) return;
+    event.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+      quill.insertEmbed(range.index, 'image', reader.result, 'user');
+      quill.setSelection(range.index + 1, 0, 'silent');
+      if (onChange) onChange();
+      showToast('截图已插入正文');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function createSharedQuill(containerId, placeholder, html, onChange) {
+  const host = document.getElementById(containerId);
+  if (!host || typeof window.Quill === 'undefined') return null;
+  host.innerHTML = '';
+  const quill = new window.Quill(host, {
+    theme: 'snow',
+    placeholder,
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, false] }],
+        ['bold', 'italic', 'underline', 'blockquote'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link', 'image'],
+        ['clean'],
+      ],
+    },
+  });
+  const normalizedHtml = normalizeRichHtml(html);
+  if (normalizedHtml) quill.clipboard.dangerouslyPasteHTML(normalizedHtml);
+  quill.on('text-change', () => {
+    if (onChange) onChange();
+  });
+  const toolbar = quill.getModule('toolbar');
+  if (toolbar) toolbar.addHandler('image', () => selectReviewImageFileH5(quill, onChange));
+  installSharedQuillImagePaste(quill, onChange);
+  return quill;
+}
+
+function selectReviewImageFileH5(quill, onChange) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return showToast('图片不能超过 2MB');
+    const reader = new FileReader();
+    reader.onload = () => {
+      const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+      quill.insertEmbed(range.index, 'image', reader.result, 'user');
+      quill.setSelection(range.index + 1, 0, 'silent');
+      if (onChange) onChange();
+      showToast('图片已插入复盘正文');
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function insertReviewImageH5Editor(editor) {
+  if (!editor) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return showToast('图片不能超过 2MB');
+    const reader = new FileReader();
+    reader.onload = () => {
+      editor.focus();
+      document.execCommand('insertHTML', false, `<p><img src="${escapeAttr(reader.result)}" alt="复盘图片"></p>`);
+      syncReviewDraftFromModal();
+      showToast('图片已插入复盘正文');
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function destroyKnowledgeEditors() {
+  knowledgeEditors = { body: null };
+}
+
+function syncKnowledgeDraftFromEditors() {
+  if (knowledgeEditors.body) {
+    knowledgeDraft.bodyHtml = normalizeRichHtml(knowledgeEditors.body.root.innerHTML);
+    knowledgeDraft.body = richHtmlToPlainText(knowledgeDraft.bodyHtml);
+  }
+}
+
+function ensureKnowledgeEditors() {
+  destroyKnowledgeEditors();
+  if (knowledgeIntakeType !== 'manual') return;
+  if (typeof window.Quill === 'undefined') {
+    const host = document.getElementById('knowledge-body-editor');
+    if (host) host.innerHTML = '<div class="knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+    return;
+  }
+  knowledgeEditors.body = createSharedQuill(
+    'knowledge-body-editor',
+    '直接输入正文，可写观点、证据、验证节点和风险边界。',
+    knowledgeDraft.bodyHtml || (knowledgeDraft.body ? `<p>${escapeHtml(knowledgeDraft.body).replace(/\n/g, '<br>')}</p>` : ''),
+    () => syncKnowledgeDraftFromEditors(),
+  );
+}
+
+function destroyReviewEditors() {
+  reviewEditors = { manual: null };
+}
+
+function syncReviewDraftFromEditors() {
+  if (reviewEditors.manual) {
+    reviewTriggerDraft.manualHtml = normalizeRichHtml(reviewEditors.manual.root.innerHTML);
+  }
+}
+
+function ensureReviewEditors() {
+  destroyReviewEditors();
+  if (reviewTriggerDraft.sourceMode !== 'manual') return;
+  if (typeof window.Quill === 'undefined') {
+    const host = document.getElementById('review-manual-editor');
+    if (host) host.innerHTML = '<div class="knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+    return;
+  }
+  reviewEditors.manual = createSharedQuill(
+    'review-manual-editor',
+    '在这里直接完善完整洞见正文，发布后会按文章形式展示给前台用户。',
+    reviewTriggerDraft.manualHtml || '',
+    () => syncReviewDraftFromEditors(),
+  );
+}
+
+function getReviewVoiceButtonLabel() {
+  if (reviewVoiceUploading) return '转写中...';
+  if (reviewVoiceRecording) return '结束录音';
+  return '开始录音';
+}
+
+function getReviewVoiceStatusText() {
+  if (reviewVoiceUploading) return '正在转写刚才的语音，请稍候';
+  if (reviewVoiceRecording) return '正在录音，结束后会自动转成文案';
+  return '点击按钮开始录音，系统会自动转成文案';
+}
+
+async function uploadReviewVoiceBlob(audioBlob) {
+  const user = getActiveDemoUser();
+  const formData = new FormData();
+  const fileName = `review-${Date.now()}.webm`;
+  formData.append('audio', audioBlob, fileName);
+  formData.append('tenant_slug', ((user || {}).tenant || {}).slug || '');
+  formData.append('period', reviewTriggerDraft.period || currentReviewPeriod || 'day');
+  formData.append('entry_point', 'h5');
+  formData.append('speaker_name', (user && (user.advisor_name || user.username)) || '');
+  formData.append('use_llm_enhancement', reviewTriggerDraft.useVoiceLlmEnhancement ? 'true' : 'false');
+  const resp = await fetch('/api/review/voice-transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'voice_transcribe_failed');
+  }
+  return data;
+}
+
+async function uploadKnowledgeVoiceBlob(audioBlob) {
+  const user = getActiveDemoUser();
+  const formData = new FormData();
+  const fileName = `knowledge-${Date.now()}.webm`;
+  formData.append('audio', audioBlob, fileName);
+  formData.append('tenant_slug', ((user || {}).tenant || {}).slug || '');
+  formData.append('period', 'knowledge');
+  formData.append('entry_point', 'h5_knowledge');
+  formData.append('speaker_name', (user && (user.advisor_name || user.username)) || '');
+  formData.append('use_llm_enhancement', knowledgeDraft.useVoiceLlmEnhancement ? 'true' : 'false');
+  const resp = await fetch('/api/review/voice-transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'voice_transcribe_failed');
+  }
+  return data;
+}
+
+async function embedManualReviewText(text) {
+  const user = getActiveDemoUser();
+  const resp = await fetch('/api/review/manual-embed', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text,
+      content_html: getReviewPreviewHtml(),
+      tenant_slug: ((user || {}).tenant || {}).slug || '',
+      period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+      entry_point: 'h5',
+      speaker_name: (user && (user.advisor_name || user.username)) || '',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'manual_embed_failed');
+  }
+  return data;
+}
+
+async function publishReviewContent(text, transcriptionEngine, transcriptModel, extras) {
+  const user = getActiveDemoUser();
+  await syncLocalWatchlistAnnotationsToServer(reviewTriggerDraft.selectedWatchlist || []);
+  const payload = extras && typeof extras === 'object' ? extras : {};
+  const resp = await fetch('/api/review/publish', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text,
+      tenant_slug: ((user || {}).tenant || {}).slug || '',
+      period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+      review_title: String(reviewTriggerDraft.reviewTitle || '').trim(),
+      access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
+      entry_point: 'h5_publish',
+      speaker_name: (user && (user.advisor_name || user.username)) || '',
+      transcription_engine: transcriptionEngine || 'manual',
+      transcript_model: transcriptModel || 'manual_input',
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
+      paragraph_mode: reviewTriggerDraft.paragraphMode || 'manual',
+      selected_watchlist: reviewTriggerDraft.selectedWatchlist || [],
+      prompt_tags: reviewTriggerDraft.promptTags || [],
+      review_summary: payload.review_summary || '',
+      user_input_section: payload.user_input_section || {},
+      watchlist_analysis_section: payload.watchlist_analysis_section || {},
+      llm_models: Array.isArray(payload.llm_models) ? payload.llm_models : [],
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'publish_failed');
+  }
+  return data;
+}
+
+function mapKnowledgeEntryForTenant(item, tenantId, index = 0) {
+  return {
+    tenantId,
+    sourceDetail: item.source_detail || item.sourceDetail || '',
+    voiceMinutes: item.voice_minutes,
+    destination: Array.isArray(item.sync_targets) && item.sync_targets.length ? item.sync_targets[0] : '已同步知识专区',
+    time: index === 0 ? '刚刚' : (item.time || '1分钟前'),
+    body: item.body || item.raw_input || '',
+    ...item,
+  };
+}
+
+function addOrReplaceKnowledgeEntry(entry) {
+  const next = {...entry};
+  const index = knowledgeEntryStore.findIndex(item => item.id === next.id);
+  if (index >= 0) knowledgeEntryStore.splice(index, 1, next);
+  else knowledgeEntryStore.unshift(next);
+}
+
+function appendTranscribedText(existingText, incomingText) {
+  const current = String(existingText || '').trim();
+  const next = String(incomingText || '').trim();
+  if (!next) return current;
+  return current ? `${current}\n\n${next}` : next;
+}
+
+function clearReviewVoiceTranscript() {
+  reviewTriggerDraft.voiceTranscript = '';
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.draftReviewText = '';
+  reviewTriggerDraft.flowStage = 'intake';
+  reviewStructuredPreview = null;
+  reviewIngestResult = null;
+  renderReviewTriggerModal(getActiveDemoUser());
+  showToast('已清空口述文案');
+}
+
+function clearKnowledgeVoiceDraft() {
+  syncKnowledgeDraftFromModal();
+  knowledgeDraft.body = '';
+  knowledgeDraft.bodyHtml = '';
+  knowledgeDraft.summary = '';
+  if (knowledgeDraft.title === '最新语音纪要整理') {
+    knowledgeDraft.title = '';
+  }
+  renderKnowledgeIntakeModal();
+  showToast('已清空口述内容');
+}
+
+function renderReviewInputPanel() {
+  const titleField = `
+    <div style="margin-bottom:12px">
+      <label class="knowledge-modal-label" style="display:block;margin-bottom:6px">洞见主题</label>
+    <input id="review-title-input" class="knowledge-modal-input" placeholder="输入本次洞见主题，发布后会直接作为文章标题" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" oninput="reviewTriggerDraft.reviewTitle = this.value" />
+    </div>
+  `;
+  const accessModeField = isDavCapableUser(getActiveDemoUser()) ? `
+    <div style="margin-bottom:12px">
+      <label class="knowledge-modal-label" style="display:block;margin-bottom:6px">发布范围</label>
+      <div id="review-access-mode" class="review-access-scope-tags" role="radiogroup" aria-label="选择洞见发布范围" data-access-mode="${reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public'}">
+        <button type="button" class="review-access-scope-tag ${reviewTriggerDraft.accessMode === 'public' ? 'active' : ''}" role="radio" aria-checked="${reviewTriggerDraft.accessMode === 'public'}" aria-label="常规笔记，所有粉丝可查看" onclick="setReviewAccessMode('public')"><span class="review-access-scope-tag-title">常规笔记</span><span class="review-access-scope-tag-desc">所有粉丝可查看完整正文</span></button>
+        <button type="button" class="review-access-scope-tag ${reviewTriggerDraft.accessMode === 'subscriber' ? 'active' : ''}" role="radio" aria-checked="${reviewTriggerDraft.accessMode === 'subscriber'}" aria-label="订阅专享，仅有效订阅用户查看正文" onclick="setReviewAccessMode('subscriber')"><span class="review-access-scope-tag-title">订阅专享</span><span class="review-access-scope-tag-desc">仅有效订阅用户查看正文</span></button>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:6px">访问范围按每篇洞见单独生效，不会影响其他已发布笔记。</div>
+    </div>
+  ` : '';
+  if (reviewTriggerDraft.sourceMode === 'voice') {
+    return `
+      <div class="review-intake-panel">
+        ${titleField}${accessModeField}
+        <div class="review-intake-toolbar">
+          <div class="knowledge-record-status">
+            <span class="knowledge-live-dot" style="opacity:${reviewVoiceRecording ? '1' : '0.35'}"></span>
+            ${getReviewVoiceStatusText()}
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn-outline" ${reviewVoiceRecording || reviewVoiceUploading || !String(reviewTriggerDraft.voiceTranscript || '').trim() ? 'disabled' : ''} style="padding:7px 12px;font-size:12px" onclick="clearReviewVoiceTranscript()">清空</button>
+            <button class="review-input-button" ${reviewVoiceUploading ? 'disabled' : ''} onclick="captureReviewVoiceInput()">${getReviewVoiceButtonLabel()}</button>
+          </div>
+        </div>
+        <label class="knowledge-check-row" style="margin-top:10px;display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#6b7280">
+          <input type="checkbox" id="review-voice-llm-enhancement" ${reviewTriggerDraft.useVoiceLlmEnhancement ? 'checked' : ''} onchange="toggleReviewVoiceLlmEnhancement(this.checked)" ${reviewVoiceRecording || reviewVoiceUploading ? 'disabled' : ''} />
+          <span>启用大模型深度整理。关闭后仍会保留基础规则纠错、术语清洗和可编辑转写文本。</span>
+        </label>
+        <div style="margin-top:8px;font-size:11px;line-height:1.7;color:#9B7A1C;background:rgba(200,169,110,0.10);border:1px solid rgba(200,169,110,0.16);border-radius:10px;padding:8px 10px">
+          口述录制功能当前处于测试阶段，建议在安静环境下分段录入，并在提交前简单检查转写结果。
+        </div>
+        <div class="review-intake-result">
+          <div class="review-intake-result-title">转写文案</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.voiceTranscript || '录音结束后，这里会立即展示转写后的洞见文案；支持多次录制并按顺序追加。')}</div>
+        </div>
+      </div>
+    `;
+  }
+  if (reviewTriggerDraft.sourceMode === 'file') {
+    return `
+      <div class="review-intake-panel">
+        ${titleField}${accessModeField}
+        <div class="review-intake-toolbar">
+          <div class="knowledge-record-status">${reviewFileUploading ? '正在解析文件...' : '支持 PDF、Word、Excel，解析后可继续编辑'}</div>
+          <button class="review-input-button" ${reviewFileUploading ? 'disabled' : ''} onclick="captureReviewFileInput()">${reviewFileUploading ? '解析中...' : '点击上传文件'}</button>
+        </div>
+        <div class="review-intake-result">
+          <div class="review-intake-result-title">${reviewTriggerDraft.fileName ? `已解析：${escapeHtml(reviewTriggerDraft.fileName)}` : '解析文案'}</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.fileText || '完成文件上传后，这里会展示抽取后的洞见文案。')}</div>
+        </div>
+      </div>
+    `;
+  }
+  if (reviewTriggerDraft.sourceMode === 'url') {
+    return `
+      <div class="review-intake-panel">
+        ${titleField}${accessModeField}
+        <div class="review-intake-toolbar" style="align-items:flex-end">
+          <div style="flex:1;display:grid;gap:10px">
+            <input id="review-url-input" class="knowledge-modal-input" placeholder="输入网页 URL 作为本次洞见补充素材" value="${escapeAttr(reviewTriggerDraft.urlValue || '')}" />
+            <input id="review-url-title" class="knowledge-modal-input" placeholder="可选：自定义这份 URL 材料标题" value="${escapeAttr(reviewTriggerDraft.urlTitle || '')}" />
+          </div>
+          <button class="review-input-button" type="button" onclick="previewReviewUrl()">抓取网页</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;line-height:1.7;color:#9B7A1C;background:rgba(200,169,110,0.10);border:1px solid rgba(200,169,110,0.16);border-radius:10px;padding:8px 10px">
+          网页 URL 解析功能当前处于测试阶段，请确认链接可公开访问，并在提交前简单检查抓取内容和来源是否完整。
+        </div>
+        <div class="review-intake-result">
+          <div class="review-intake-result-title">网页提炼结果</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.urlText || '抓取网页后，这里会展示正文摘要，可作为洞见素材。')}</div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="review-intake-panel">
+      ${titleField}${accessModeField}
+      <div class="knowledge-rich-shell">
+        <div class="knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，适合作为大V洞见正文编辑。</div>
+        <div id="review-manual-editor" class="review-rich-editor"></div>
+        <div class="knowledge-rich-help">这里和 web 后台使用同一套富文本编辑器 Quill。</div>
+      </div>
+    </div>
+    `;
+}
+
+function renderReviewPromptPanel() {
+  if (reviewTriggerDraft.flowStage !== 'optimize_rule') return '';
+  const useCustomRule = reviewTriggerDraft.optimizeRuleMode === 'custom';
+  return `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">智能优化规则</label>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">点击智能优化后，你可以让大模型按默认方式整理，也可以补充具体规则。这里不会直接发布，优化结果会先进入 draft 审核。</div>
+      <div class="knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
+        <div class="knowledge-source-pill ${reviewTriggerDraft.optimizeRuleMode === 'default' ? 'active' : ''}" onclick="setReviewOptimizeRuleMode('default')">忽略规则，默认优化</div>
+        <div class="knowledge-source-pill ${useCustomRule ? 'active' : ''}" onclick="setReviewOptimizeRuleMode('custom')">输入规则后优化</div>
+      </div>
+      ${useCustomRule ? `
+        <textarea id="review-ai-prompt-input" class="knowledge-modal-textarea" style="margin-top:10px" placeholder="例如：更口语化，但保留原始观点，不要写买卖建议。">${escapeHtml(reviewTriggerDraft.aiPrompt || '')}</textarea>
+        <div class="review-prompt-tag-row" style="margin-top:10px">
+          ${REVIEW_PROMPT_TAGS.map(tag => `
+            <button class="review-prompt-tag ${reviewTriggerDraft.promptTags.includes(tag) ? 'active' : ''}" onclick="toggleReviewPromptTag('${tag}')">${escapeHtml(tag)}</button>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderReviewDraftReviewPanel() {
+  if (reviewTriggerDraft.flowStage !== 'draft_review') return '';
+  return `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">Draft 审核与详细修改</label>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">这是智能优化后的草稿。你可以继续详细修改，确认无误后再进入最终预览。</div>
+      <div id="review-draft-review-input" class="review-rich-editor" contenteditable="true" style="min-height:220px">${reviewTriggerDraft.draftReviewHtml || buildReviewGeneratedHtml(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText(), reviewTriggerDraft.manualHtml)}</div>
+      <button class="review-input-button" type="button" style="margin-top:8px" onclick="insertReviewImageH5Editor(document.getElementById('review-draft-review-input'))">上传图片</button>
+    </div>
+  `;
+}
+
+function renderReviewStructuredReviewPanel() {
+  // The former stock-analysis review stage is intentionally unreachable for
+  // new Insight notes. Historical snapshots are rendered by the reader only.
+  return '';
+}
+
+function isReviewInputStage() {
+  return reviewTriggerDraft.flowStage === 'intake' || reviewTriggerDraft.flowStage === 'optimize_rule';
+}
+
+function isReviewDraftProcessingStage() {
+  return reviewTriggerDraft.flowStage === 'draft_generating';
+}
+
+function renderReviewWatchlistSelectionPanel() {
+  return '';
+}
+
+function renderReviewPreviewPanel() {
+  if (!reviewTriggerDraft.previewReady || reviewTriggerDraft.flowStage !== 'preview') return '';
+  const article = buildReviewPreviewArticle();
+  return `
+    <div class="review-preview-panel" style="padding:0;background:#FFFFFF;border-color:rgba(47,116,192,0.12)">
+      ${renderReviewArticleDetailContent(article, { previewMode: true })}
+    </div>
+  `;
+}
+
+function renderReviewStageOnePreviewPanel() {
+  return '';
+}
+
+function renderInsightDraftLibrary() {
+  if (!isDavCapableUser(getActiveDemoUser())) return '';
+  if (insightDraftsLoading) {
+    return '<div class="knowledge-modal-block"><div style="font-size:12px;color:var(--gray-400)">正在加载洞见草稿...</div></div>';
+  }
+  if (!insightDrafts.length) return '';
+  return `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">已保存草稿</label>
+      <div style="display:grid;gap:8px">
+        ${insightDrafts.map((draft) => `
+          <div style="padding:10px;border:1px solid rgba(47,116,192,0.12);border-radius:10px;background:#F8FBFF">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+              <div style="min-width:0">
+                <div style="font-size:12px;font-weight:700;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(draft.title || '未命名洞见草稿')}</div>
+                <div style="font-size:10px;color:var(--gray-400);margin-top:4px">更新于 ${escapeHtml(draft.updated_at || '--')}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button class="btn-outline" type="button" style="padding:5px 8px;font-size:11px" onclick="editInsightDraft('${escapeAttr(draft.id)}')">编辑</button>
+                <button class="btn-outline" type="button" style="padding:5px 8px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="deleteInsightDraft('${escapeAttr(draft.id)}')">删除</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderReviewDraftLibraryOverview() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) return '';
+  if (insightDraftsLoading && !insightDraftsLoaded) {
+    return '<div class="knowledge-modal-block" style="margin-top:12px;margin-bottom:0;padding:12px;background:#F8FBFF;border:1px solid rgba(47,116,192,0.12);border-radius:12px"><div style="font-size:12px;font-weight:800;color:var(--text-main)">洞见草稿箱</div><div style="font-size:11px;color:var(--gray-400);margin-top:5px">正在加载草稿...</div></div>';
+  }
+  // The overview is a compact preview. Full draft management belongs on the
+  // database-backed draft library page.
+  const drafts = Array.isArray(insightDrafts) ? insightDrafts : [];
+  const previewDrafts = drafts
+    .slice()
+    .sort((left, right) => String(right.updated_at || right.created_at || '').localeCompare(String(left.updated_at || left.created_at || '')))
+    .slice(0, 3);
+  return `
+    <div class="knowledge-modal-block" style="margin-top:12px;margin-bottom:0;padding:12px;background:#F8FBFF;border:1px solid rgba(47,116,192,0.12);border-radius:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div>
+          <div style="font-size:12px;font-weight:800;color:var(--text-main)">洞见草稿箱</div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:4px">小金智能体加入的内容和手动保存的洞见都会在这里。</div>
+        </div>
+        <span class="review-access-label public">${previewDrafts.length} 篇</span>
+      </div>
+      ${previewDrafts.length ? `<div style="display:grid;gap:7px;margin-top:10px">${previewDrafts.map((draft) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden;padding:9px 10px;background:#FFFFFF;border:1px solid rgba(47,116,192,0.10);border-radius:9px">
+          <div style="flex:1 1 auto;width:0;min-width:0;overflow:hidden"><div style="font-size:12px;color:var(--text-main);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(draft.title || '未命名洞见草稿')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">更新于 ${escapeHtml(draft.updated_at || '--')}</div></div>
+        </div>
+      `).join('')}</div>` : '<div style="font-size:11px;color:var(--gray-400);margin-top:10px">当前还没有草稿。可以在小金智能体回答下方点击“加入洞见笔记草稿”，或在编辑器中保存。</div>'}
+      <button class="btn-outline" type="button" style="width:100%;margin-top:10px;padding:7px 10px;font-size:11px" onclick="openInsightDraftLibrary()">${drafts.length ? '查看全部草稿' : '打开草稿箱'}</button>
+    </div>
+  `;
+}
+
+function renderInsightDraftLibraryPage() {
+  const allDrafts = Array.isArray(insightDrafts) ? insightDrafts : [];
+  const query = String(insightDraftSearchKeyword || '').trim().toLowerCase();
+  const accessFilter = String(insightDraftAccessFilter || 'all');
+  const drafts = allDrafts.filter((draft) => {
+    const searchText = [
+      draft.title,
+      draft.content_text,
+      draft.source_mode,
+      draft.access_mode === 'subscriber' ? '订阅专享' : '免费内容',
+    ].filter(Boolean).join(' ').toLowerCase();
+    const matchesQuery = !query || searchText.includes(query);
+    const matchesAccess = accessFilter === 'all'
+      || (accessFilter === 'subscriber' && draft.access_mode === 'subscriber')
+      || (accessFilter === 'public' && draft.access_mode !== 'subscriber');
+    return matchesQuery && matchesAccess;
+  });
+  const formatDraftDate = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '更新时间未记录';
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? raw : date.toLocaleString('zh-CN', {hour12: false});
+  };
+  return `
+    <div class="review-draft-library-page">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px">
+        <div><div class="modal-title" style="margin-bottom:5px">洞见草稿箱</div><div style="font-size:12px;color:var(--gray-400);line-height:1.7">集中管理尚未发布的洞见。选择一篇进入编辑，保存后仍会保留在这里。</div></div>
+        <span class="review-access-label public">${drafts.length} 篇</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn-outline" type="button" style="padding:8px 11px;font-size:11px" onclick="closeInsightDraftLibrary()">返回洞见</button><button class="btn-gold" type="button" style="padding:8px 11px;font-size:11px" onclick="openReviewTriggerModal()">新建洞见</button></div>
+      <div class="review-directory-search" style="margin-bottom:12px">
+        <label class="review-directory-search-label" for="insight-draft-search-input">查询草稿</label>
+        <div class="review-directory-search-box">
+          <span class="review-directory-search-icon" aria-hidden="true">⌕</span>
+          <input id="insight-draft-search-input" class="review-directory-search-input" type="search" value="${escapeAttr(insightDraftSearchKeyword)}" placeholder="搜索草稿标题或正文" autocomplete="off" oninput="handleInsightDraftSearchInput(this.value)">
+          ${insightDraftSearchKeyword ? '<button class="review-directory-search-clear" type="button" aria-label="清空查询" onclick="clearInsightDraftSearch()">×</button>' : ''}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px">
+          <div style="font-size:11px;color:var(--gray-400)">共 ${allDrafts.length} 篇，当前显示 ${drafts.length} 篇</div>
+          <select class="review-directory-search-input" style="width:auto;min-width:104px;padding:7px 25px 7px 9px" aria-label="按内容类型筛选" onchange="handleInsightDraftAccessFilter(this.value)">
+            <option value="all" ${accessFilter === 'all' ? 'selected' : ''}>全部内容</option>
+            <option value="public" ${accessFilter === 'public' ? 'selected' : ''}>免费内容</option>
+            <option value="subscriber" ${accessFilter === 'subscriber' ? 'selected' : ''}>订阅专享</option>
+          </select>
+        </div>
+      </div>
+      ${drafts.length ? `<div style="display:grid;gap:10px">${drafts.map((draft) => {
+        const content = String(draft.content_text || '').trim();
+        const summary = content.replace(/\s+/g, ' ').slice(0, 110) || '尚未填写正文';
+        return `<article class="review-draft-library-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div style="min-width:0"><div class="review-draft-library-card-title">${escapeHtml(draft.title || '未命名洞见')}</div><div class="review-draft-library-card-meta">${escapeHtml(formatDraftDate(draft.updated_at))} · ${draft.access_mode === 'subscriber' ? '订阅专享' : '公开内容'}</div></div><span class="review-draft-library-status">草稿</span></div><div class="review-draft-library-card-summary">${escapeHtml(summary)}${content.length > 110 ? '...' : ''}</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn-outline" type="button" style="padding:6px 10px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,.24)" onclick="deleteInsightDraft('${escapeAttr(draft.id)}')">删除</button><button class="btn-gold" type="button" style="padding:6px 10px;font-size:11px" onclick="editInsightDraft('${escapeAttr(draft.id)}')">编辑</button></div></article>`;
+      }).join('')}</div>` : `<div class="review-draft-library-empty"><div class="review-draft-library-empty-icon">${allDrafts.length ? '⌕' : '+'}</div><div style="font-size:14px;font-weight:700;color:var(--text-main);margin-top:8px">${allDrafts.length ? '没有匹配的草稿' : '还没有洞见草稿'}</div><div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:5px">${allDrafts.length ? '请调整搜索关键词或内容类型筛选。' : '可以新建一篇洞见，或在小金智能体回答下方加入洞见笔记草稿。'}</div></div>`}
+    </div>
+  `;
+}
+
+function handleInsightDraftSearchInput(value) {
+  insightDraftSearchKeyword = String(value || '').trim();
+  renderReviewExperience();
+  window.requestAnimationFrame(() => {
+    const input = document.getElementById('insight-draft-search-input');
+    if (!input) return;
+    input.focus();
+    const end = input.value.length;
+    try { input.setSelectionRange(end, end); } catch (error) {}
+  });
+}
+
+function clearInsightDraftSearch() {
+  insightDraftSearchKeyword = '';
+  renderReviewExperience();
+  window.requestAnimationFrame(() => document.getElementById('insight-draft-search-input')?.focus());
+}
+
+function handleInsightDraftAccessFilter(value) {
+  insightDraftAccessFilter = ['all', 'public', 'subscriber'].includes(String(value || '')) ? String(value) : 'all';
+  renderReviewExperience();
+}
+
+function openInsightDraftLibrary() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) return;
+  reviewProductionPage = false;
+  insightDraftLibraryView = true;
+  // The inbox is a database-backed view. Always refresh it so drafts created
+  // from Hermes or another browser are visible immediately.
+  insightDrafts = [];
+  insightDraftsLoaded = false;
+  insightDraftsLoading = false;
+  const url = new URL(window.location.href);
+  url.searchParams.set('review', 'drafts');
+  url.searchParams.delete('review_view');
+  url.searchParams.delete('review_id');
+  window.history.pushState({}, '', url);
+  switchTab('review');
+  renderReviewExperience();
+  loadInsightDrafts();
+}
+
+function closeInsightDraftLibrary() {
+  insightDraftLibraryView = false;
+  const url = new URL(window.location.href);
+  url.searchParams.delete('review');
+  window.history.pushState({}, '', url);
+  renderReviewExperience();
+}
+
+function getModalSheetByContentId(contentId) {
+  const host = document.getElementById(contentId);
+  if (!host) return null;
+  return host.closest('.modal-sheet');
+}
+
+function captureModalSheetScroll(contentId) {
+  const sheet = getModalSheetByContentId(contentId);
+  if (!sheet) return null;
+  return {
+    top: sheet.scrollTop,
+    left: sheet.scrollLeft,
+  };
+}
+
+function restoreModalSheetScroll(contentId, snapshot) {
+  if (!snapshot) return;
+  const sheet = getModalSheetByContentId(contentId);
+  if (!sheet) return;
+  sheet.scrollTop = Number(snapshot.top || 0);
+  sheet.scrollLeft = Number(snapshot.left || 0);
+}
+
+function captureReviewPageScroll() {
+  const scrollingElement = document.scrollingElement || document.documentElement;
+  return {
+    windowX: Number(window.scrollX || window.pageXOffset || 0),
+    windowY: Number(window.scrollY || window.pageYOffset || 0),
+    documentTop: Number(scrollingElement && scrollingElement.scrollTop || 0),
+    documentLeft: Number(scrollingElement && scrollingElement.scrollLeft || 0),
+  };
+}
+
+function restoreReviewPageScroll(snapshot) {
+  if (!snapshot) return;
+  const restore = () => {
+    const scrollingElement = document.scrollingElement || document.documentElement;
+    if (typeof window.scrollTo === 'function') {
+      window.scrollTo({
+        left: Number(snapshot.windowX || 0),
+        top: Number(snapshot.windowY || 0),
+        behavior: 'auto',
+      });
+    }
+    if (scrollingElement) {
+      scrollingElement.scrollTop = Number(snapshot.documentTop || snapshot.windowY || 0);
+      scrollingElement.scrollLeft = Number(snapshot.documentLeft || snapshot.windowX || 0);
+    }
+  };
+  restore();
+  const schedule = typeof window.requestAnimationFrame === 'function'
+    ? window.requestAnimationFrame.bind(window)
+    : (callback) => window.setTimeout(callback, 0);
+  schedule(() => schedule(restore));
+}
+
+function renderReviewTriggerModal(user) {
+  const host = document.getElementById(reviewProductionPage ? 'review-production-page-content' : 'review-trigger-modal-content');
+  if (!host) return;
+  const scrollContentId = reviewProductionPage ? 'review-production-page-content' : 'review-trigger-modal-content';
+  const scrollSnapshot = captureModalSheetScroll(scrollContentId);
+  const pageScrollSnapshot = captureReviewPageScroll();
+  const hasDavCapabilities = isDavCapableUser(user);
+  let reviewStage = String(reviewTriggerDraft.flowStage || 'intake').trim().toLowerCase();
+  if (reviewStage === 'watchlist_select' || reviewStage === 'structured_review') {
+    // Migrate stale browser state into the current Insight draft flow.
+    reviewTriggerDraft.selectedWatchlist = [];
+    reviewTriggerDraft.watchlistDecision = 'none';
+    reviewTriggerDraft.flowStage = reviewTriggerDraft.previewReady ? 'preview' : 'intake';
+    reviewStage = reviewTriggerDraft.flowStage;
+  }
+  const isReviewSetupStage = reviewStage === 'intake' || reviewStage === 'optimize_rule';
+  const isReviewFinalPreview = reviewStage === 'preview' || reviewTriggerDraft.previewReady === true;
+  const stageLabelMap = {
+    intake: '编辑洞见',
+    optimize_rule: '设置智能优化',
+    draft_generating: '正在生成草稿',
+    draft_review: '审核草稿',
+    preview: '发布预览',
+  };
+  const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
+  const modalTitle = isReviewFinalPreview ? '发布前确认' : (hasDavCapabilities ? '发布大V洞见' : '生成智能洞见');
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:${isReviewFinalPreview ? '4px' : '10px'}">${modalTitle}</div>
+    ${isReviewFinalPreview ? `
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">请确认正文内容，发布后将向粉丝展示。</div>
+    ` : (isReviewSetupStage ? `
+      <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
+        ${hasDavCapabilities
+          ? '先提交手写或文件内容，再决定是否进行智能优化。'
+          : '提交内容后，系统会生成一篇可编辑的洞见草稿。'}
+      </div>
+      ${hasDavCapabilities ? `<div class="review-flow-row" style="margin-bottom:12px"><span class="review-flow-step">${escapeHtml(stageLabel)}</span><span class="review-flow-step">智能优化可选</span><span class="review-flow-step">人工确认发布</span></div>` : ''}
+    ` : `
+      <div class="review-stage-compact-meta">${escapeHtml(stageLabel)}</div>
+    `)}
+    ${hasDavCapabilities ? `
+      ${isReviewSetupStage ? `
+        <div class="knowledge-modal-block">
+          <label class="knowledge-modal-label">供稿方式</label>
+          <div class="knowledge-source-selector" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+            ${getAvailableReviewSourceOptions().map(item => `
+              <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.sourceMode ? 'active' : ''}" onclick="setReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</div>
+            `).join('')}
+          </div>
+        </div>
+        ${isReviewInputStage() ? `
+          <div class="knowledge-modal-block">
+            <label class="knowledge-modal-label">输入内容</label>
+            ${renderReviewInputPanel()}
+          </div>
+          ${renderReviewPromptPanel()}
+        ` : ''}
+      ` : ''}
+      ${isReviewDraftProcessingStage() ? `
+        <div class="knowledge-modal-block">
+          <label class="knowledge-modal-label">正在生成洞见草稿</label>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.7">原始输入已经提交给大模型处理。草稿生成完成后，可继续编辑、保存或发布。</div>
+        </div>
+      ` : ''}
+      ${renderReviewDraftReviewPanel()}
+      ${renderInsightDraftLibrary()}
+    ` : ''}
+    ${hasDavCapabilities ? renderReviewDraftProgressPanel() : ''}
+    ${hasDavCapabilities ? renderReviewPreviewPanel() : ''}
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
+      ${hasDavCapabilities
+        ? renderReviewFlowActions()
+        : '<button class="btn-gold" onclick="submitReviewTrigger()">生成智能洞见</button>'}
+    </div>
+  `;
+  ensureReviewEditors();
+  restoreModalSheetScroll(scrollContentId, scrollSnapshot);
+  restoreReviewPageScroll(pageScrollSnapshot);
+}
+
+function reviewActiveJobLabel(job) {
+  const labels = {
+    review_generate_draft: '洞见草稿生成',
+    review_prepare_preview: '洞见预览',
+    review_sector_summary_constraint: '洞见规则约束',
+    review_voice_transcribe: '语音转写',
+    review_polish_input: '洞见输入润色',
+    review_compose_draft: '洞见完整成稿',
+  };
+  return labels[String((job || {}).job_type || '').trim()] || '洞见任务';
+}
+
+function reviewActiveJobStatusLabel(status) {
+  return String(status || '').toLowerCase() === 'running' ? '处理中' : '排队中';
+}
+
+function renderReviewActiveJobs() {
+  const hosts = [
+    document.getElementById('review-active-jobs-host'),
+    document.getElementById('review-active-jobs-overview-host'),
+  ].filter(Boolean);
+  if (!hosts.length) return;
+  const jobs = Array.isArray(reviewActiveJobs) ? reviewActiveJobs : [];
+  const html = jobs.length ? jobs.map((job) => `
+    <div class="review-active-job">
+      <div>
+        <div class="review-active-job-title">${escapeHtml(reviewActiveJobLabel(job))}</div>
+        <div class="review-active-job-meta">${escapeHtml(job.summary || '系统正在后台处理')} · ${escapeHtml(job.job_code || '')}</div>
+      </div>
+      <div class="review-active-job-status">${escapeHtml(reviewActiveJobStatusLabel(job.status))} ${Math.max(0, Number(job.progress_percent || 0))}%</div>
+    </div>
+  `).join('') : '';
+  hosts.forEach((host) => { host.innerHTML = html; });
+}
+
+function hydrateReviewDraftFromJob(job) {
+  const payload = job && job.payload && typeof job.payload === 'object' ? job.payload : {};
+  reviewTriggerDraft.period = String(payload.period || reviewTriggerDraft.period || 'day').trim().toLowerCase() || 'day';
+  reviewTriggerDraft.sourceMode = String(payload.source_mode || reviewTriggerDraft.sourceMode || 'manual').trim().toLowerCase() || 'manual';
+  reviewTriggerDraft.selectedWatchlist = Array.isArray(payload.selected_watchlist) ? payload.selected_watchlist.slice(0) : [];
+  reviewTriggerDraft.aiPrompt = String(payload.prompt_text || '');
+  reviewTriggerDraft.promptTags = Array.isArray(payload.prompt_tags) ? payload.prompt_tags.slice(0) : [];
+  const sourceText = String(payload.source_text || '').trim();
+  if (reviewTriggerDraft.sourceMode === 'voice') reviewTriggerDraft.voiceTranscript = sourceText;
+  else if (reviewTriggerDraft.sourceMode === 'file') reviewTriggerDraft.fileText = sourceText;
+  else if (reviewTriggerDraft.sourceMode === 'url') reviewTriggerDraft.urlText = sourceText;
+  else reviewTriggerDraft.manualHtml = plainTextToRichHtml(sourceText);
+}
+
+function resumeActiveReviewDraftJob(job) {
+  if (!job || !job.job_code || pendingAsyncJobs[job.job_code]) return;
+  hydrateReviewDraftFromJob(job);
+  reviewDraftGenerating = true;
+  reviewDraftJobState = job;
+  reviewTriggerDraft.flowStage = 'draft_generating';
+  renderReviewTriggerModal(getActiveDemoUser());
+  startAsyncJobPolling(job.job_code, {
+    onProgress(nextJob) {
+      reviewDraftJobState = nextJob || reviewDraftJobState;
+      reviewActiveJobs = reviewActiveJobs.map((item) => item.job_code === job.job_code ? reviewDraftJobState : item);
+      renderReviewTriggerModal(getActiveDemoUser());
+      renderReviewActiveJobs();
+    },
+    onSuccess(nextJob) {
+      const result = nextJob.result || {};
+      reviewTriggerDraft.generatedPreviewText = result.text || '';
+      reviewTriggerDraft.draftReviewText = result.text || getReviewDraftContentText();
+      reviewIngestResult = { ...(reviewIngestResult || {}), review_draft_llm: result.llm_model || null };
+      reviewDraftGenerating = false;
+      reviewDraftJobState = nextJob;
+      reviewTriggerDraft.flowStage = 'draft_review';
+      reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== job.job_code);
+      renderReviewTriggerModal(getActiveDemoUser());
+      renderReviewActiveJobs();
+      showToast('智能优化已完成，请先审核用户内容 Draft');
+    },
+    onFailed(nextJob) {
+      reviewDraftGenerating = false;
+      reviewDraftJobState = nextJob;
+      reviewTriggerDraft.flowStage = 'optimize_rule';
+      reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== job.job_code);
+      renderReviewTriggerModal(getActiveDemoUser());
+      renderReviewActiveJobs();
+      showToast(nextJob.error_message || nextJob.summary || '洞见草稿生成失败');
+    },
+    onCancelled(nextJob) {
+      reviewDraftGenerating = false;
+      reviewDraftJobState = nextJob;
+      reviewTriggerDraft.flowStage = 'optimize_rule';
+      reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== job.job_code);
+      renderReviewTriggerModal(getActiveDemoUser());
+      renderReviewActiveJobs();
+      showToast('已停止生成，原始输入已保留。');
+    },
+  });
+}
+
+async function loadActiveReviewJobs() {
+  const reviewPageActive = document.getElementById('page-review')?.classList.contains('active');
+  if (!reviewProductionPage && !reviewPageActive) {
+    if (reviewActiveJobsTimer) {
+      window.clearTimeout(reviewActiveJobsTimer);
+      reviewActiveJobsTimer = null;
+    }
+    return;
+  }
+  if (reviewActiveJobsLoading) return;
+  reviewActiveJobsLoading = true;
+  const user = getActiveDemoUser();
+  const tenantSlug = String(((user || {}).tenant || {}).slug || '').trim().toLowerCase();
+  if (!tenantSlug || !isDavCapableUser(user)) {
+    reviewActiveJobsLoading = false;
+    return;
+  }
+  try {
+    const response = await fetch(`/api/review/jobs?tenant_slug=${encodeURIComponent(tenantSlug)}`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'review_jobs_unavailable');
+    reviewActiveJobs = Array.isArray(data.jobs) ? data.jobs : [];
+    renderReviewActiveJobs();
+    const draftJob = reviewActiveJobs.find((job) => job.job_type === 'review_generate_draft');
+    if (draftJob && reviewProductionPage) resumeActiveReviewDraftJob(draftJob);
+  } catch (error) {
+    console.warn('active review jobs unavailable', error);
+  } finally {
+    reviewActiveJobsLoading = false;
+  }
+  if (reviewProductionPage) {
+    if (reviewActiveJobsTimer) window.clearTimeout(reviewActiveJobsTimer);
+    reviewActiveJobsTimer = window.setTimeout(loadActiveReviewJobs, 5000);
+  }
+}
+
+function renderReviewFlowActions() {
+  if (reviewPublishSubmitting) {
+    return '<button class="btn-outline" disabled>请稍候</button><button class="btn-gold" disabled>发布中...</button>';
+  }
+  if (reviewDraftGenerating || reviewPreviewGenerating) {
+    return '<button class="btn-outline" onclick="cancelReviewAsyncJob()">停止生成</button><button class="btn-gold" disabled>处理中...</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'optimize_rule') {
+    return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'draft_review') {
+    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">进入发布预览</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'preview' || reviewTriggerDraft.previewReady) {
+    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>';
+  }
+  return `<button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-outline" onclick="prepareReviewDirectPreview()">直接预览</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">智能优化</button>`;
+}
+
+async function cancelReviewAsyncJob() {
+  // A completed/failed preview keeps its state for error display. It is not
+  // the task currently on screen and must never receive a later Draft cancel.
+  const isPreview = reviewPreviewGenerating || reviewTriggerDraft.flowStage === 'preview_generating';
+  const job = isPreview ? reviewPreviewJobState : reviewDraftJobState;
+  const jobCode = String((job || {}).job_code || '').trim();
+  // Close the current task from the user's perspective immediately. When the
+  // create request has not returned yet, its job code is cancelled below as
+  // soon as it arrives.
+  if (!isPreview) reviewDraftCancellationRequested = true;
+  if (isPreview) {
+    reviewPreviewGenerating = false;
+    reviewPreviewJobState = null;
+    reviewTriggerDraft.flowStage = 'draft_review';
+  } else {
+    reviewDraftGenerating = false;
+    reviewDraftJobState = null;
+    reviewTriggerDraft.flowStage = 'optimize_rule';
+  }
+  reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== jobCode);
+  if (jobCode && pendingAsyncJobs[jobCode]) {
+    clearTimeout(pendingAsyncJobs[jobCode]);
+    delete pendingAsyncJobs[jobCode];
+  }
+  if (jobCode && reviewDraftCancelResolvers[jobCode]) {
+    reviewDraftCancelResolvers[jobCode]();
+    delete reviewDraftCancelResolvers[jobCode];
+  }
+  renderReviewTriggerModal(getActiveDemoUser());
+  renderReviewActiveJobs();
+  showToast('已停止生成。当前任务已关闭，原始输入已保留。');
+  if (!jobCode) return;
+  try {
+    const response = await fetch(`/api/review/jobs/${encodeURIComponent(jobCode)}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'review_job_cancel_failed');
+    // Let the existing polling callback observe the terminal state once so
+    // the generation Promise is settled and no async closure is left behind.
+  } catch (error) {
+    // A job may finish in the small race between the click and this request.
+    // The user-facing task remains closed in either case.
+    console.warn('review job close acknowledgement unavailable', error);
+  }
+}
+
+function setReviewTriggerPeriod(period) {
+  if (!REVIEW_PERIOD_CONFIG[period]) return;
+  reviewTriggerDraft.period = period;
+  reviewStructuredPreview = null;
+  const user = getActiveDemoUser();
+  renderReviewTriggerModal(user);
+}
+
+function setReviewTriggerSourceMode(mode) {
+  if (!getAvailableReviewSourceOptions().some(item => item.value === mode)) return;
+  syncReviewDraftFromModal();
+  if (mode === 'manual' && !String(richHtmlToPlainText(reviewTriggerDraft.manualHtml || '')).trim()) {
+    const voiceText = String(reviewTriggerDraft.voiceTranscript || '').trim();
+    if (voiceText) {
+      reviewTriggerDraft.manualHtml = plainTextToRichHtml(voiceText);
+    }
+  }
+  reviewTriggerDraft.sourceMode = mode;
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.draftReviewText = '';
+  reviewTriggerDraft.flowStage = 'intake';
+  reviewStructuredPreview = null;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function confirmReviewWatchlistSelection() {
+  showToast('洞见发布不再包含独立的股票分析阶段，请直接审核洞见草稿。');
+}
+
+function setReviewOptimizeRuleMode(mode) {
+  syncReviewDraftFromModal();
+  reviewTriggerDraft.optimizeRuleMode = mode === 'custom' ? 'custom' : 'default';
+  if (reviewTriggerDraft.optimizeRuleMode === 'default') {
+    reviewTriggerDraft.aiPrompt = '';
+    reviewTriggerDraft.promptTags = [];
+  }
+  reviewStructuredPreview = null;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function toggleReviewVoiceLlmEnhancement(checked) {
+  reviewTriggerDraft.useVoiceLlmEnhancement = !!checked;
+}
+
+function setReviewAccessMode(accessMode) {
+  const normalized = accessMode === 'subscriber' ? 'subscriber' : 'public';
+  reviewTriggerDraft.accessMode = normalized;
+  const group = document.getElementById('review-access-mode');
+  if (!group) return;
+  group.dataset.accessMode = normalized;
+  group.querySelectorAll('[role="radio"]').forEach((item) => {
+    const selected = item.getAttribute('onclick').includes(`'${normalized}'`);
+    item.classList.toggle('active', selected);
+    item.setAttribute('aria-checked', selected ? 'true' : 'false');
+  });
+}
+
+function syncReviewDraftFromModal() {
+  const reviewHostSelector = reviewProductionPage ? '#review-production-page-content' : '#review-trigger-modal-content';
+  const titleInput = document.querySelector(`${reviewHostSelector} #review-title-input`) || document.getElementById('review-title-input');
+  const accessModeInput = document.querySelector(`${reviewHostSelector} #review-access-mode`) || document.getElementById('review-access-mode');
+  const urlInput = document.getElementById('review-url-input');
+  const urlTitleInput = document.getElementById('review-url-title');
+  const promptInput = document.getElementById('review-ai-prompt-input');
+  const draftReviewInput = document.getElementById('review-draft-review-input');
+  const structuredUserInput = document.getElementById('review-structured-user-input');
+  const structuredCombinedText = document.getElementById('review-structured-combined-text');
+  const structuredSectorSummary = document.getElementById('review-structured-sector-summary');
+  const structuredSectorSummaryRule = document.getElementById('review-structured-sector-summary-rule');
+  syncReviewDraftFromEditors();
+  if (titleInput) reviewTriggerDraft.reviewTitle = String(titleInput.value || '').trim();
+  if (accessModeInput) reviewTriggerDraft.accessMode = accessModeInput.dataset.accessMode === 'subscriber' ? 'subscriber' : 'public';
+  if (urlInput) reviewTriggerDraft.urlValue = String(urlInput.value || '').trim();
+  if (urlTitleInput) reviewTriggerDraft.urlTitle = String(urlTitleInput.value || '').trim();
+  if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
+  if (draftReviewInput) {
+    reviewTriggerDraft.draftReviewHtml = String(draftReviewInput.innerHTML || '').trim();
+    const textNode = document.createElement('div');
+    textNode.innerHTML = reviewTriggerDraft.draftReviewHtml;
+    reviewTriggerDraft.draftReviewText = String(textNode.textContent || '').trim();
+  }
+  if (structuredUserInput || structuredCombinedText || structuredSectorSummary) {
+    reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
+    if (structuredUserInput) {
+      reviewStructuredPreview.user_input_section = reviewStructuredPreview.user_input_section || {};
+      reviewStructuredPreview.user_input_section.display_text = structuredUserInput.value;
+      reviewTriggerDraft.draftReviewText = structuredUserInput.value;
+    }
+    if (structuredSectorSummary) {
+      reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
+      reviewStructuredPreview.watchlist_analysis_section.sector_summary = structuredSectorSummary.value;
+    }
+    if (structuredSectorSummaryRule) {
+      reviewTriggerDraft.sectorSummaryRule = String(structuredSectorSummaryRule.value || '').trim();
+      reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
+      reviewStructuredPreview.watchlist_analysis_section.sector_summary_rule = reviewTriggerDraft.sectorSummaryRule;
+    }
+    if (structuredCombinedText) {
+      reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
+      reviewStructuredPreview.watchlist_analysis_section.combined_text = structuredCombinedText.value;
+    }
+    const itemNodes = Array.from(document.querySelectorAll('[data-review-watchlist-analysis-index]'));
+    const items = ((reviewStructuredPreview.watchlist_analysis_section || {}).items || []);
+    itemNodes.forEach((node) => {
+      const index = Number(node.getAttribute('data-review-watchlist-analysis-index'));
+      if (!Number.isInteger(index) || !items[index]) return;
+      items[index].analysis_text = node.value;
+    });
+  }
+}
+
+async function applyReviewSectorSummaryRule() {
+  showToast('洞见发布不再支持独立的股票归纳约束，请直接修改洞见草稿。');
+}
+
+function validateReviewIntakeReady() {
+  syncReviewDraftFromModal();
+  if (!String(reviewTriggerDraft.reviewTitle || '').trim()) {
+    showToast('请先填写洞见主题');
+    return false;
+  }
+  if (!getReviewDraftContentText()) {
+    showToast('请先补充输入内容');
+    return false;
+  }
+  return true;
+}
+
+function openReviewOptimizeRuleStep() {
+  if (!validateReviewIntakeReady()) return;
+  reviewTriggerDraft.flowStage = 'optimize_rule';
+  reviewTriggerDraft.paragraphMode = 'ai';
+  reviewTriggerDraft.skipAiProcessing = false;
+  reviewTriggerDraft.previewReady = false;
+  reviewStructuredPreview = null;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+async function prepareReviewStructuredPreview() {
+  // Keep old bookmarks and in-flight client state from re-entering the
+  // removed stock-analysis endpoint.
+  prepareReviewDirectPreview();
+  return;
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  if (!validateReviewIntakeReady()) return;
+  if (!hasConfiguredGeneralLlm()) {
+    showToast('当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。');
+    return;
+  }
+  syncReviewDraftFromModal();
+  reviewStructuredPreview = null;
+  reviewPreviewGenerating = true;
+  reviewPreviewJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 8,
+    summary: '已提交预览任务，正在准备洞见预览',
+    result: { live_log: [] },
+  };
+  reviewTriggerDraft.flowStage = 'preview_generating';
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(user);
+  try {
+    const previewResult = await requestReviewStructuredPreview();
+    if (!previewResult.async || !previewResult.job_code) throw new Error('review_prepare_preview_job_missing');
+    await new Promise((resolve, reject) => {
+      startAsyncJobPolling(previewResult.job_code, {
+        onProgress(job) {
+          reviewPreviewJobState = job || reviewPreviewJobState;
+          renderReviewTriggerModal(user);
+        },
+        onSuccess(job) {
+          const result = job.result || {};
+          reviewStructuredPreview = normalizeReviewStructuredPreview(result);
+          reviewPreviewGenerating = false;
+          reviewPreviewJobState = job;
+          reviewTriggerDraft.previewReady = false;
+          reviewTriggerDraft.flowStage = 'structured_review';
+          persistReviewDraftRuntime(runtime);
+          resolve();
+        },
+        onFailed(job) {
+          reviewPreviewJobState = job || reviewPreviewJobState;
+          const failedResult = (job && job.result) || {};
+          reviewStructuredPreview = normalizeReviewStructuredPreview({
+            user_input_section: { display_text: getReviewUserInputDisplayText() },
+            raw_text: failedResult.raw_text || failedResult.partial_text || '',
+            partial_text: failedResult.partial_text || failedResult.raw_text || '',
+            watchlist_analysis_section: {
+              raw_text: failedResult.raw_text || failedResult.partial_text || '',
+              combined_text: failedResult.raw_text || failedResult.partial_text || '',
+              sector_profiles: failedResult.sector_profiles || [],
+            },
+          });
+          reject(new Error(job.error_message || job.summary || '洞见预览生成失败'));
+        },
+        onError(error) {
+          reject(error);
+        },
+      });
+    });
+  } catch (error) {
+    reviewPreviewGenerating = false;
+    if (!reviewPreviewJobState || String(reviewPreviewJobState.status || '').toLowerCase() !== 'failed') {
+      reviewPreviewJobState = {
+        ...(reviewPreviewJobState || {}),
+        status: 'failed',
+        progress_stage: 'failed',
+        progress_percent: 100,
+        summary: '洞见预览未完成',
+        error_message: String((error && error.message) || '洞见预览生成失败'),
+        result: (reviewPreviewJobState && reviewPreviewJobState.result) || { live_log: [] },
+      };
+    }
+    const partialAnalysis = buildReviewWatchlistAnalysisText((reviewStructuredPreview || {}).watchlist_analysis_section || {});
+    reviewTriggerDraft.flowStage = partialAnalysis ? 'structured_review' : 'preview_failed';
+    renderReviewTriggerModal(user);
+    showToast(getReviewDraftGenerationErrorMessage(error));
+    return;
+  } finally {
+    reviewPreviewGenerating = false;
+    if (reviewPreviewJobState && reviewPreviewJobState.status === 'success') {
+      reviewPreviewJobState = null;
+    }
+  }
+  renderReviewTriggerModal(user);
+  showToast('洞见预览已生成，请审核后发布');
+}
+
+function prepareReviewDirectPreview() {
+  reviewTriggerDraft.paragraphMode = 'manual';
+  reviewTriggerDraft.skipAiProcessing = true;
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.draftReviewText = getReviewDraftContentText();
+  reviewTriggerDraft.watchlistDecision = 'none';
+  reviewTriggerDraft.selectedWatchlist = [];
+  reviewStructuredPreview = null;
+  reviewTriggerDraft.previewReady = true;
+  reviewTriggerDraft.flowStage = 'preview';
+  renderReviewTriggerModal(getActiveDemoUser());
+  showToast('已进入发布预览');
+}
+
+function backToReviewIntake() {
+  syncReviewDraftFromModal();
+  reviewTriggerDraft.flowStage = 'intake';
+  reviewTriggerDraft.previewReady = false;
+  reviewStructuredPreview = null;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function backToReviewDraftEdit() {
+  syncReviewDraftFromModal();
+  reviewTriggerDraft.previewReady = false;
+  reviewStructuredPreview = null;
+  reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function confirmReviewDraftToPreview() {
+  syncReviewDraftFromModal();
+  if (!String(reviewTriggerDraft.draftReviewText || '').trim()) {
+    showToast('请先确认或填写 draft 正文');
+    return;
+  }
+  reviewTriggerDraft.paragraphMode = 'ai';
+  reviewTriggerDraft.skipAiProcessing = false;
+  reviewTriggerDraft.watchlistDecision = 'none';
+  reviewTriggerDraft.selectedWatchlist = [];
+  reviewStructuredPreview = null;
+  reviewTriggerDraft.previewReady = true;
+  reviewTriggerDraft.flowStage = 'preview';
+  renderReviewTriggerModal(getActiveDemoUser());
+  showToast('洞见草稿已确认，可预览或发布');
+}
+
+function confirmStructuredReviewToPreview() {
+  syncReviewDraftFromModal();
+  reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
+  if (!String((((reviewStructuredPreview.user_input_section || {}).display_text) || '')).trim()) {
+    showToast('请先确认或填写用户洞见');
+    return;
+  }
+  reviewTriggerDraft.previewReady = true;
+  reviewTriggerDraft.flowStage = 'preview';
+  renderReviewTriggerModal(getActiveDemoUser());
+  showToast('已进入最终预览');
+}
+
+function persistReviewDraftRuntime(runtime) {
+  runtime.kolGeneratedAt = '刚刚生成';
+  runtime.kolSourceMode = reviewTriggerDraft.sourceMode;
+  runtime.paragraphMode = reviewTriggerDraft.paragraphMode;
+  runtime.lastReviewPeriod = currentReviewPeriod;
+  runtime.latestVoiceTranscript = reviewTriggerDraft.voiceTranscript;
+  runtime.latestManualHtml = reviewTriggerDraft.manualHtml;
+  runtime.latestFileText = reviewTriggerDraft.fileText;
+  runtime.latestFileName = reviewTriggerDraft.fileName || '';
+  runtime.latestReviewTitle = reviewTriggerDraft.reviewTitle || '';
+  runtime.latestAiPrompt = reviewTriggerDraft.aiPrompt;
+  runtime.latestPromptTags = (reviewTriggerDraft.promptTags || []).slice(0);
+  runtime.latestGeneratedPreviewText = reviewTriggerDraft.generatedPreviewText || '';
+  runtime.latestDraftReviewText = reviewTriggerDraft.draftReviewText || '';
+  runtime.draftReady = true;
+}
+
+async function saveReviewDraft() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) return;
+  syncReviewDraftFromModal();
+  const text = getReviewPreviewText() || getReviewDraftContentText();
+  if (!String(text || '').trim()) {
+    showToast('请先填写洞见内容');
+    return;
+  }
+  reviewTriggerDraft.draftReviewText = text;
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  persistReviewDraftRuntime(runtime);
+  const payload = {
+    id: activeInsightDraftId || undefined,
+    title: String(reviewTriggerDraft.reviewTitle || '').trim(),
+    content_text: String(text).trim(),
+    content_html: getReviewPreviewHtml(),
+    source_mode: reviewTriggerDraft.sourceMode || 'manual',
+    access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
+  };
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'insight_draft_storage_failed');
+    activeInsightDraftId = String((data.draft || {}).id || activeInsightDraftId || '');
+    insightDrafts = Array.isArray(data.drafts) ? data.drafts : insightDrafts;
+    insightDraftsLoaded = true;
+    showToast('洞见草稿已保存，可随时继续编辑或发布');
+    if (reviewProductionPage) {
+      renderReviewTriggerModal(user);
+    } else if (insightDraftLibraryView) {
+      const libraryHost = document.getElementById('review-report-feed');
+      if (libraryHost) libraryHost.innerHTML = renderInsightDraftLibraryPage();
+    } else {
+      const overviewHost = document.getElementById('review-insight-drafts-overview-host');
+      if (overviewHost) overviewHost.innerHTML = renderReviewDraftLibraryOverview();
+    }
+  } catch (error) {
+    showToast(error.message || '洞见草稿保存失败');
+  }
+}
+
+async function loadInsightDrafts() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user) || insightDraftsLoading || insightDraftsLoaded) return;
+  insightDraftsLoading = true;
+  const loadingOverviewHost = document.getElementById('review-insight-drafts-overview-host');
+  if (loadingOverviewHost && !reviewProductionPage) loadingOverviewHost.innerHTML = renderReviewDraftLibraryOverview();
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'insight_drafts_unavailable');
+    insightDrafts = Array.isArray(data.drafts) ? data.drafts : [];
+    insightDraftsLoaded = true;
+    if (reviewProductionPage) {
+      renderReviewTriggerModal(user);
+    } else if (insightDraftLibraryView) {
+      const libraryHost = document.getElementById('review-report-feed');
+      if (libraryHost) libraryHost.innerHTML = renderInsightDraftLibraryPage();
+    } else {
+      const overviewHost = document.getElementById('review-insight-drafts-overview-host');
+      if (overviewHost) overviewHost.innerHTML = renderReviewDraftLibraryOverview();
+    }
+  } catch (error) {
+    console.warn('Insight drafts unavailable', error);
+    const target = insightDraftLibraryView
+      ? document.getElementById('review-report-feed')
+      : document.getElementById('review-insight-drafts-overview-host');
+    if (target) {
+      target.innerHTML = '<div class="knowledge-modal-block" style="margin-top:12px;color:#B42318">草稿箱暂时无法连接数据库，请稍后重试。</div>';
+    }
+  } finally {
+    insightDraftsLoading = false;
+  }
+}
+
+function editInsightDraft(draftId) {
+  const draft = insightDrafts.find((item) => String((item || {}).id || '') === String(draftId || ''));
+  if (!draft) return;
+  insightDraftLibraryView = false;
+  activeInsightDraftId = String(draft.id || '');
+  reviewTriggerDraft.period = 'day';
+  reviewTriggerDraft.reviewTitle = String(draft.title || '').trim();
+  reviewTriggerDraft.accessMode = draft.access_mode === 'subscriber' ? 'subscriber' : 'public';
+  reviewTriggerDraft.sourceMode = String(draft.source_mode || 'manual').trim() || 'manual';
+  reviewTriggerDraft.manualHtml = String(draft.content_html || '') || mergePlainTextIntoRichHtml('', String(draft.content_text || '').trim());
+  reviewTriggerDraft.draftReviewHtml = String(draft.content_html || '');
+  reviewTriggerDraft.draftReviewText = String(draft.content_text || '').trim();
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = 'intake';
+  if (!reviewProductionPage) {
+    reviewProductionPage = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set('review', 'compose');
+    window.history.pushState({}, '', url);
+    switchTab('review');
+  }
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+async function deleteInsightDraft(draftId) {
+  const user = getActiveDemoUser();
+  if (!draftId || !isDavCapableUser(user)) return;
+  if (!window.confirm('确认删除这篇洞见草稿吗？删除后无法恢复。')) return;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts/${encodeURIComponent(draftId)}`, {method: 'DELETE'});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'insight_draft_delete_failed');
+    insightDrafts = Array.isArray(data.drafts) ? data.drafts : [];
+    insightDraftsLoaded = true;
+    if (activeInsightDraftId === draftId) activeInsightDraftId = '';
+    if (insightDraftLibraryView) {
+      const libraryHost = document.getElementById('review-report-feed');
+      if (libraryHost) libraryHost.innerHTML = renderInsightDraftLibraryPage();
+    } else {
+      renderReviewTriggerModal(user);
+    }
+    showToast('洞见草稿已删除');
+  } catch (error) {
+    showToast(error.message || '洞见草稿删除失败');
+  }
+}
+
+async function openInsightDraftFromHermes(entryId) {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) {
+    showToast('洞见草稿仅支持大V在工作区内编辑和发布');
+    return;
+  }
+  const entry = hermesConversation.find((item) => String((item || {}).id || '') === String(entryId || ''));
+  const artifact = normalizeHermesArtifact((entry || {}).artifact || (entry || {}).result, (entry || {}).question || '');
+  const isInteractionSummary = isHermesInteractionSummaryEntry(entry);
+  const parts = (isInteractionSummary
+    ? [artifact.body, artifact.summary, artifact.headline]
+    : [artifact.headline, artifact.summary, artifact.body]
+  )
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    showToast('当前回答没有可加入洞见草稿的内容');
+    return;
+  }
+  const question = String((entry || {}).question || (entry || {}).text || '').trim();
+  const interactionTitle = buildHermesInteractionInsightDraftTitle(question);
+  const text = isInteractionSummary
+    ? [
+        `# ${interactionTitle}`,
+        question ? `归纳范围：${question}` : '',
+        '以下内容来自当前租户的粉丝评论与个股 K 线标注归纳。粉丝观点与盘面记录请继续保持区分，并在发布前完成编辑审核。',
+        parts[0] || '',
+      ].filter(Boolean).join('\n\n')
+    : `${question ? `问题：${question}\n\n` : ''}${parts.join('\n\n')}`;
+  const title = isInteractionSummary
+    ? interactionTitle
+    : (String(artifact.headline || '').trim().slice(0, 60) || '小金智能体洞见');
+  // Save directly to the draft library. Do not replace the active Hermes view
+  // with a newly initialized editor: the user can continue the conversation
+  // and open this draft later from the Insight draft list.
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        title,
+        content_text: text,
+        source_mode: isInteractionSummary ? 'hermes_interaction_task' : 'manual',
+        access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'insight_draft_storage_failed');
+    insightDrafts = Array.isArray(data.drafts) ? data.drafts : insightDrafts;
+    insightDraftsLoaded = true;
+  } catch (error) {
+    showToast(error.message || '洞见草稿保存失败');
+    return;
+  }
+  showToast(isInteractionSummary
+    ? '互动归纳已加入洞见草稿，可稍后在草稿列表中查看'
+    : '已加入洞见笔记草稿，可稍后在草稿列表中查看');
+}
+
+function buildHermesInteractionInsightDraftTitle(question) {
+  const text = String(question || '').trim();
+  const range = [
+    ['本周', '本周'], ['今日', '今日'], ['今天', '今日'], ['昨日', '昨日'], ['昨天', '昨日'],
+    ['本月', '本月'], ['今年', '今年'], ['所有', '全部历史'], ['全部', '全部历史'],
+  ].find(([keyword]) => text.includes(keyword));
+  return `粉丝互动归纳${range ? ` · ${range[1]}` : ''}`;
+}
+
+function captureReviewVoiceInput() {
+  if (reviewVoiceUploading) return;
+  const blockedReason = getH5VoiceBlockedReason();
+  if (blockedReason) {
+    showToast(blockedReason);
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('当前浏览器不支持录音');
+    return;
+  }
+  if (reviewVoiceRecording && reviewVoiceRecorder) {
+    reviewVoiceRecorder.stop();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    reviewVoiceChunks = [];
+    reviewVoiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    reviewVoiceRecording = true;
+    reviewTriggerDraft.previewReady = false;
+    reviewVoiceRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        reviewVoiceChunks.push(event.data);
+      }
+    };
+    reviewVoiceRecorder.onerror = () => {
+      reviewVoiceRecording = false;
+      reviewVoiceUploading = false;
+      stream.getTracks().forEach((track) => track.stop());
+      renderReviewTriggerModal(getActiveDemoUser());
+      showToast('录音失败，请重试');
+    };
+    reviewVoiceRecorder.onstop = async () => {
+      reviewVoiceRecording = false;
+      reviewVoiceUploading = true;
+      renderReviewTriggerModal(getActiveDemoUser());
+      const blob = new Blob(reviewVoiceChunks, { type: reviewVoiceRecorder.mimeType || 'audio/webm' });
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        const data = await uploadReviewVoiceBlob(blob);
+        if (!data.async || !data.job_code) throw new Error('voice_transcribe_job_missing');
+        showToast('语音已提交，正在后台转写');
+        startAsyncJobPolling(data.job_code, {
+          onSuccess(job) {
+            const result = job.result || {};
+            const transcript = String(result.display_transcript || result.enhanced_transcript || result.transcript || '').trim();
+            const hadTranscript = String(reviewTriggerDraft.voiceTranscript || '').trim();
+            reviewTriggerDraft.voiceTranscript = appendTranscribedText(reviewTriggerDraft.voiceTranscript, transcript);
+            reviewTriggerDraft.previewReady = false;
+            reviewTriggerDraft.generatedPreviewText = '';
+            reviewTriggerDraft.draftReviewText = '';
+            reviewTriggerDraft.flowStage = 'intake';
+            reviewStructuredPreview = null;
+            reviewIngestResult = result;
+            renderReviewTriggerModal(getActiveDemoUser());
+            showToast(hadTranscript ? '语音已追加到文案' : '语音已转成文案，待确认发布');
+          },
+          onFailed(job) {
+            showToast(job.error_message || '语音转写失败');
+          },
+        });
+      } catch (error) {
+        showToast(error.message || '语音转写失败');
+      } finally {
+        reviewVoiceUploading = false;
+        reviewVoiceRecorder = null;
+        reviewVoiceChunks = [];
+        renderReviewTriggerModal(getActiveDemoUser());
+      }
+    };
+    reviewVoiceRecorder.start();
+    renderReviewTriggerModal(getActiveDemoUser());
+  }).catch(() => {
+    showToast('未获得麦克风权限');
+  });
+}
+
+function captureReviewFileInput() {
+  if (reviewFileUploading) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,text/html';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    syncReviewDraftFromModal();
+    reviewFileUploading = true;
+    renderReviewTriggerModal(getActiveDemoUser());
+    try {
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      const response = await fetch('/api/kol/knowledge/file-preview', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || `文件解析失败：${file.name}`);
+      }
+      const preview = data.preview || {};
+      const extractedText = String(preview.body || preview.summary || '').trim();
+      if (!extractedText) throw new Error('文件未提取到可用文本，请更换文件或检查文件内容');
+      reviewTriggerDraft.fileName = String(preview.filename || file.name);
+      reviewTriggerDraft.fileText = extractedText;
+      // Parsed material becomes editable review input; it is sent to the LLM
+      // only after the user confirms the text and starts Draft generation.
+      reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml(reviewTriggerDraft.manualHtml || '', reviewTriggerDraft.fileText || '');
+      reviewTriggerDraft.sourceMode = 'manual';
+      reviewTriggerDraft.previewReady = false;
+      reviewTriggerDraft.generatedPreviewText = '';
+      reviewTriggerDraft.draftReviewText = '';
+      reviewTriggerDraft.flowStage = 'intake';
+      reviewStructuredPreview = null;
+      showToast('文件已解析为文本，可继续编辑后生成 Draft');
+    } catch (error) {
+      showToast(error.message || '文件解析失败');
+    } finally {
+      reviewFileUploading = false;
+      renderReviewTriggerModal(getActiveDemoUser());
+    }
+  };
+  input.click();
+}
+
+async function previewReviewUrl() {
+  syncReviewDraftFromModal();
+  if (!reviewTriggerDraft.urlValue) {
+    showToast('请先输入 URL');
+    return;
+  }
+  try {
+    const response = await fetch('/api/kol/knowledge/url-preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url: reviewTriggerDraft.urlValue}),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error((data && data.error) || '网页抓取失败');
+    const preview = data.preview || {};
+    const extractedText = String(preview.body || preview.summary || '').trim();
+    if (!extractedText) throw new Error('网页未提取到可用文本，请确认链接内容');
+    reviewTriggerDraft.urlTitle = reviewTriggerDraft.urlTitle || String(preview.title || '');
+    reviewTriggerDraft.urlText = extractedText;
+    reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml(reviewTriggerDraft.manualHtml || '', extractedText);
+    reviewTriggerDraft.sourceMode = 'manual';
+    reviewTriggerDraft.previewReady = false;
+    reviewTriggerDraft.generatedPreviewText = '';
+    reviewTriggerDraft.draftReviewText = '';
+    reviewTriggerDraft.flowStage = 'intake';
+    reviewStructuredPreview = null;
+    showToast('网页内容已提取为文本，可继续编辑后生成 Draft');
+  } catch (error) {
+    showToast(error.message || '网页抓取失败');
+  } finally {
+    renderReviewTriggerModal(getActiveDemoUser());
+  }
+}
+
+function toggleReviewPromptTag(tag) {
+  syncReviewDraftFromModal();
+  const current = new Set(reviewTriggerDraft.promptTags || []);
+  if (current.has(tag)) {
+    current.delete(tag);
+  } else {
+    current.add(tag);
+  }
+  reviewTriggerDraft.promptTags = REVIEW_PROMPT_TAGS.filter(item => current.has(item));
+  reviewTriggerDraft.previewReady = false;
+  reviewStructuredPreview = null;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+async function submitReviewSmartOptimize() {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  currentReviewPeriod = reviewTriggerDraft.period;
+  if (!validateReviewIntakeReady()) return;
+  const existingDraftJob = reviewActiveJobs.find((job) => job.job_type === 'review_generate_draft' && ['pending', 'running'].includes(job.status));
+  if (existingDraftJob && (!reviewDraftJobState || reviewDraftJobState.job_code !== existingDraftJob.job_code)) {
+    resumeActiveReviewDraftJob(existingDraftJob);
+    showToast('已有洞见草稿正在生成，请勿重复提交');
+    return;
+  }
+  if (!hasConfiguredGeneralLlm()) {
+    showToast('当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。');
+    return;
+  }
+  syncReviewDraftFromModal();
+  reviewTriggerDraft.paragraphMode = 'ai';
+  reviewTriggerDraft.skipAiProcessing = false;
+  if (reviewTriggerDraft.optimizeRuleMode !== 'custom') {
+    reviewTriggerDraft.aiPrompt = '';
+    reviewTriggerDraft.promptTags = [];
+  }
+  reviewDraftGenerating = true;
+  reviewDraftCancellationRequested = false;
+  reviewStructuredPreview = null;
+  reviewTriggerDraft.flowStage = 'draft_generating';
+  reviewTriggerDraft.previewReady = false;
+  reviewDraftJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 6,
+    summary: '已提交任务，正在进入大模型处理队列',
+    result: { live_log: [] },
+  };
+  renderReviewTriggerModal(user);
+  try {
+    const draftResult = await generateReviewDraftWithLlm();
+    if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
+    if (reviewDraftCancellationRequested) {
+      await fetch(`/api/review/jobs/${encodeURIComponent(draftResult.job_code)}/cancel`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+      });
+      throw new Error('review_job_cancelled');
+    }
+    await new Promise((resolve, reject) => {
+      reviewDraftCancelResolvers[draftResult.job_code] = resolve;
+      startAsyncJobPolling(draftResult.job_code, {
+        onProgress(job) {
+          if (reviewDraftCancellationRequested) return;
+          reviewDraftJobState = job || reviewDraftJobState;
+          renderReviewTriggerModal(user);
+        },
+        onSuccess(job) {
+          delete reviewDraftCancelResolvers[draftResult.job_code];
+          const result = job.result || {};
+          reviewTriggerDraft.generatedPreviewText = result.text || '';
+          reviewTriggerDraft.draftReviewText = result.text || getReviewDraftContentText();
+          reviewIngestResult = {
+            ...(reviewIngestResult || {}),
+            review_draft_llm: result.llm_model || null,
+          };
+          reviewDraftGenerating = false;
+          reviewDraftJobState = job;
+          resolve();
+        },
+        onFailed(job) {
+          delete reviewDraftCancelResolvers[draftResult.job_code];
+          reject(new Error(job.error_message || job.summary || '大模型洞见草稿生成失败'));
+        },
+        onCancelled(job) {
+          delete reviewDraftCancelResolvers[draftResult.job_code];
+          reviewDraftJobState = job;
+          reject(new Error('review_job_cancelled'));
+        },
+        onError(error) {
+          reject(error);
+        },
+      });
+    });
+  } catch (error) {
+    reviewDraftGenerating = false;
+    const cancelled = String((error && error.message) || '').includes('review_job_cancelled');
+    if (!cancelled) reviewDraftJobState = null;
+    reviewTriggerDraft.flowStage = 'optimize_rule';
+    renderReviewTriggerModal(user);
+    showToast(getReviewDraftGenerationErrorMessage(error));
+    return;
+  } finally {
+    reviewDraftGenerating = false;
+    if (reviewDraftJobState && reviewDraftJobState.status === 'success') {
+      reviewDraftJobState = null;
+    }
+  }
+  if (reviewDraftCancellationRequested) return;
+  reviewTriggerDraft.flowStage = 'draft_review';
+  reviewTriggerDraft.previewReady = false;
+  persistReviewDraftRuntime(runtime);
+  renderReviewTriggerModal(user);
+  showToast('智能优化已完成，请先审核用户内容 Draft');
+}
+
+async function submitReviewTrigger() {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  currentReviewPeriod = reviewTriggerDraft.period;
+  if (isDavCapableUser(user)) {
+    prepareReviewDirectPreview();
+    return;
+  } else {
+    runtime.aiGeneratedAt = '刚刚生成';
+    showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}智能洞见已生成`);
+  }
+  closeReviewTriggerModal();
+  renderReviewExperience();
+  loadDmConversations();
+  if (currentDmKol) {
+    loadDmMessages(currentDmKol.id);
+  }
+}
+
+function publishReviewDraft() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) return;
+  if (reviewPublishSubmitting) return;
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  syncReviewDraftFromModal();
+  const finalText = getReviewPreviewText();
+  const transcriptionEngine = reviewTriggerDraft.sourceMode === 'voice'
+    ? ((reviewIngestResult && reviewIngestResult.transcript_engine) || 'local')
+    : 'manual';
+  const transcriptModel = reviewTriggerDraft.sourceMode === 'voice'
+    ? ((reviewIngestResult && reviewIngestResult.transcript_model) || '')
+    : 'manual_input';
+  const previewPayload = reviewStructuredPreview && typeof reviewStructuredPreview === 'object' ? reviewStructuredPreview : {};
+  const llmModels = [];
+  if (reviewIngestResult && reviewIngestResult.review_draft_llm) {
+    llmModels.push({
+      stage: 'draft',
+      key: reviewIngestResult.review_draft_llm.key || '',
+      label: reviewIngestResult.review_draft_llm.label || '',
+      provider: reviewIngestResult.review_draft_llm.provider || '',
+      model_name: reviewIngestResult.review_draft_llm.model_name || '',
+      purpose: reviewIngestResult.review_draft_llm.purpose || '',
+    });
+  }
+  (previewPayload.llm_models || []).forEach((item) => {
+    if (item && !llmModels.some((row) => row.stage === item.stage && row.key === item.key && row.model_name === item.model_name)) {
+      llmModels.push(item);
+    }
+  });
+  reviewPublishSubmitting = true;
+  renderReviewTriggerModal(user);
+  showToast('正在发布洞见，请稍候');
+  publishReviewContent(finalText, transcriptionEngine, transcriptModel, {
+    review_summary: previewPayload.review_summary || '',
+    user_input_section: previewPayload.user_input_section || {
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
+      source_mode_label: (REVIEW_SOURCE_OPTIONS.find((item) => item.value === reviewTriggerDraft.sourceMode) || {}).label || '用户输入',
+      display_text: getReviewUserInputDisplayText(),
+      summary_source: 'llm_user_input_only',
+    },
+    watchlist_analysis_section: previewPayload.watchlist_analysis_section || {},
+    llm_models: llmModels,
+  }).then((publishResult) => {
+    reviewPublishSubmitting = false;
+    reviewIngestResult = publishResult || {};
+    runtime.kolPublishedAt = '刚刚发布';
+    runtime.kolGeneratedAt = '刚刚发布';
+    runtime.latestReviewTitle = reviewTriggerDraft.reviewTitle || '';
+    runtime.draftReady = false;
+    syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', publishResult);
+    if (publishResult.snapshots && user && user.tenant) {
+      user.tenant.review_snapshots = publishResult.snapshots;
+    }
+    if (publishResult.message_center_state && user && user.tenant) {
+      user.tenant.message_center_state = publishResult.message_center_state;
+    }
+    closeReviewTriggerModal();
+    loadDmConversations();
+    if (currentDmKol) loadDmMessages(currentDmKol.id);
+    renderReviewExperience();
+    const publishWarnings = Array.isArray(publishResult && publishResult.publish_warnings)
+      ? publishResult.publish_warnings
+      : [];
+    showToast(publishWarnings.length
+      ? '洞见已发布，部分通知暂未完成，请稍后重试'
+      : ((publishResult && publishResult.message) || '洞见已发布'));
+  }).catch((error) => {
+    reviewPublishSubmitting = false;
+    renderReviewTriggerModal(user);
+    showToast(error.message || '发布入库失败');
+  });
+}
+
+function getTenantVisibleAuthors(authors) {
+  const activeUser = getActiveDemoUser();
+  if (isDavCapableUser(activeUser) || activeUser.role !== 'investor') return authors || [];
+  return (authors || []).filter(author => author.name === activeUser.tenant.advisor);
+}
+
+function canAccessAdvisor(advisorName) {
+  const activeUser = getSafeActiveDemoUser();
+  return isDavCapableUser(activeUser) || advisorName === activeUser.tenant.advisor;
+}
+
+function syncTenantScopedAdvisorViews() {
+  const activeUser = getActiveDemoUser();
+  const hint = document.getElementById('community-dav-hint');
+  if (hint) {
+    hint.textContent = isDavCapableUser(activeUser)
+      ? '大V投顾 · 当前可查看租户工作台、知识板块与粉丝端展示内容。'
+      : `大V投顾 · 当前仅展示所属租户投顾 ${activeUser.tenant.advisor} 的互动内容，跨租户内容已隐藏。`;
+  }
+  document.querySelectorAll('#kol-list .kol-card').forEach(card => {
+    const advisorName = card.getAttribute('data-advisor') || '';
+    card.style.display = canAccessAdvisor(advisorName) ? '' : 'none';
+  });
+}
+
+function renderDemoUserSwitchList() {
+  const host = document.getElementById('demo-user-switch-list');
+  if (!host) return;
+  const activeUser = getActiveDemoUser() || {};
+  const role = String(activeUser.role || '').trim().toLowerCase();
+  const switchSection = document.getElementById('profile-switch-section');
+  const switchDesc = document.getElementById('profile-switch-desc');
+  // Account impersonation is an administrator-only operation. A DAV keeps
+  // their own workspace identity and must not switch into follower accounts.
+  const canSwitch = role === 'admin';
+  if (switchSection) switchSection.style.display = canSwitch ? '' : 'none';
+  if (switchDesc) switchDesc.style.display = canSwitch ? '' : 'none';
+  host.style.display = canSwitch ? '' : 'none';
+  if (!canSwitch) {
+    host.innerHTML = '';
+    return;
+  }
+  const visibleUsers = DEMO_PROFILE_USERS;
+  host.innerHTML = visibleUsers.map(user => `
+    <div class="demo-switch-item ${currentDemoUser && currentDemoUser.username === user.username ? 'active' : ''}" onclick="switchDemoProfileUser('${escapeAttr(user.username)}')">
+      <div class="demo-switch-avatar">${user.avatar}</div>
+      <div class="demo-switch-main">
+        <div class="demo-switch-name">${user.username}</div>
+        <div class="demo-switch-meta">${user.roleLabel} · ${user.role === 'dav' ? `主理 ${user.tenant.name}` : `归属 ${user.tenant.name}`} · ${user.membership}</div>
+      </div>
+      <div class="demo-switch-tag">${currentDemoUser && currentDemoUser.username === user.username ? '当前身份' : '切换'}</div>
+    </div>
+  `).join('');
+}
+
+function getTenantKnowledgeEntries() {
+  const activeUser = getActiveDemoUser();
+  return knowledgeEntryStore.filter(entry => entry.tenantId === activeUser.tenant.id);
+}
+
+function getKnowledgeEntryById(entryId) {
+  return knowledgeEntryStore.find(entry => entry.id === entryId) || null;
+}
+
+function buildKnowledgeDraft(entry) {
+  return {
+    title: entry && entry.title ? entry.title : '',
+    summary: entry && entry.summary ? entry.summary : '',
+    body: entry && (entry.body || entry.raw_input) ? (entry.body || entry.raw_input) : '',
+    bodyHtml: entry && entry.raw_html ? entry.raw_html : (entry && (entry.body || entry.raw_input) ? `<p>${escapeHtml(entry.body || entry.raw_input).replace(/\n/g, '<br>')}</p>` : ''),
+    processingMode: entry && entry.processing_mode ? entry.processing_mode : ((entry && Object.prototype.hasOwnProperty.call(entry, 'skip_ai_processing') && entry.skip_ai_processing) ? 'none' : 'algorithm'),
+    url: entry && entry.url ? entry.url : '',
+    useVoiceLlmEnhancement: entry && Object.prototype.hasOwnProperty.call(entry, 'use_voice_llm_enhancement') ? !!entry.use_voice_llm_enhancement : true,
+  };
+}
+
+function getKnowledgeStatusMeta(status) {
+  const text = String(status || '').trim();
+  if (!text) {
+    return { className: 'syncing', label: '清洗中' };
+  }
+  if (text === 'ready') {
+    return { className: 'ready', label: '已同步' };
+  }
+  if (/(同步|已|可微调|ready|Hermes)/i.test(text) && !/中/.test(text)) {
+    return { className: 'ready', label: text };
+  }
+  return { className: 'syncing', label: text };
+}
+
+function getKnowledgeSyncMeta(entry) {
+  const syncStatus = entry && entry.sync_status && typeof entry.sync_status === 'object' ? entry.sync_status : null;
+  if (syncStatus) {
+    return {
+      className: syncStatus.class_name || 'syncing',
+      label: syncStatus.label || '待同步',
+      detail: syncStatus.detail || '',
+      target: syncStatus.target || '知识专区',
+      queuedAt: syncStatus.queued_at || '',
+      syncedAt: syncStatus.synced_at || '',
+      failedAt: syncStatus.failed_at || '',
+    };
+  }
+  const fallback = getKnowledgeStatusMeta(entry && entry.status);
+  return {
+    className: fallback.className,
+    label: fallback.label,
+    detail: entry && entry.destination ? `同步去向：${entry.destination}` : '',
+    target: entry && entry.destination ? entry.destination : '知识专区',
+    queuedAt: entry && entry.queued_at ? entry.queued_at : '',
+    syncedAt: entry && entry.synced_at ? entry.synced_at : '',
+    failedAt: entry && entry.failed_at ? entry.failed_at : '',
+  };
+}
+
+function getActiveKnowledgeTenantSlug() {
+  const activeUser = getActiveDemoUser() || {};
+  return String((((activeUser || {}).tenant || {}).slug) || ((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+}
+
+function renderKnowledgeStructureStats(payload) {
+  const host = document.getElementById('knowledge-structure-stats');
+  if (!host) return;
+  const stats = payload && payload.summary && typeof payload.summary === 'object' ? payload.summary : {};
+  const items = [
+    { label: '知识词条', value: Number(stats.entry_count || 0) },
+    { label: '已成型', value: Number(stats.ready_count || 0) },
+    { label: '平均成熟度', value: Number(stats.avg_maturity_score || 0) },
+    { label: '平均关系数', value: Number(stats.avg_relation_count || 0) },
+  ];
+  host.innerHTML = items.map((item) => `
+    <div class="knowledge-structure-stat">
+      <div class="knowledge-structure-stat-label">${escapeHtml(item.label)}</div>
+      <div class="knowledge-structure-stat-value">${escapeHtml(String(item.value))}</div>
+    </div>
+  `).join('');
+}
+
+function buildKnowledgeStructureLayerCard(title, desc, rows, entryField = 'entry_titles') {
+  const list = Array.isArray(rows) ? rows.slice(0, 5) : [];
+  return `
+    <div class="knowledge-structure-layer-card">
+      <div class="knowledge-structure-layer-title">${escapeHtml(title)}</div>
+      <div class="knowledge-structure-layer-desc">${escapeHtml(desc)}</div>
+      <div class="knowledge-structure-layer-list">
+        ${list.length ? list.map((item) => `
+          <div class="knowledge-structure-layer-item">
+            <div class="knowledge-structure-layer-top">
+              <div class="knowledge-structure-layer-name">${escapeHtml(item.label || '--')}</div>
+              <span class="knowledge-structure-layer-count">${formatInt(item.count || 0)} 条</span>
+            </div>
+            ${Array.isArray(item[entryField]) && item[entryField].length ? `<div class="knowledge-structure-layer-links">${escapeHtml(item[entryField].slice(0, 3).join(' / '))}</div>` : ''}
+            ${Array.isArray(item.keywords) && item.keywords.length ? `<div class="knowledge-chip-row">${item.keywords.slice(0, 4).map((keyword) => `<span class="knowledge-chip">${escapeHtml(keyword)}</span>`).join('')}</div>` : ''}
+          </div>
+        `).join('') : '<div class="knowledge-structure-empty">当前还没有形成这一层的稳定内容。</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function buildKnowledgeStructureOverviewCard(title, desc, rows) {
+  const list = Array.isArray(rows) ? rows.slice(0, 4) : [];
+  return `
+    <div class="knowledge-structure-overview-card">
+      <div class="knowledge-structure-overview-title">${escapeHtml(title)}</div>
+      <div class="knowledge-structure-overview-desc">${escapeHtml(desc)}</div>
+      <div class="knowledge-chip-row">
+        ${list.length ? list.map((item) => `<span class="knowledge-chip">${escapeHtml(item.label || item.title || '--')}</span>`).join('') : '<span class="knowledge-chip">暂无</span>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderKnowledgeStructureTabs() {
+  const host = document.getElementById('knowledge-structure-tabs');
+  if (!host) return;
+  const tabs = [
+    { id: 'overview', label: '总览' },
+    { id: 'topics', label: '主题' },
+    { id: 'entities', label: '对象' },
+    { id: 'methods', label: '方法' },
+    { id: 'signals', label: '验证' },
+    { id: 'entries', label: '词条' },
+  ];
+  host.innerHTML = tabs.map((tab) => `
+    <button type="button" class="knowledge-structure-tab ${knowledgeStructureState.activeTab === tab.id ? 'active' : ''}" onclick="setKnowledgeStructureTab('${tab.id}')">${escapeHtml(tab.label)}</button>
+  `).join('');
+}
+
+function buildKnowledgeStructureEntriesHtml(entries) {
+  const list = Array.isArray(entries) ? entries.slice(0, 6) : [];
+  if (!list.length) {
+    return '<div class="knowledge-structure-empty">当前还没有可展示的知识词条，请先录入内容。</div>';
+  }
+  return list.map((entry) => {
+    const relations = entry.relations && typeof entry.relations === 'object' ? entry.relations : {};
+    const qkv = entry.qkv && typeof entry.qkv === 'object' ? entry.qkv : {};
+    const prompt = Array.isArray(qkv.questions) && qkv.questions.length ? qkv.questions[0] : '';
+    return `
+      <div class="knowledge-structure-entry-card">
+        <div class="knowledge-structure-entry-top">
+          <div>
+            <div class="knowledge-structure-entry-title">${escapeHtml(entry.title || '未命名知识')}</div>
+            <div class="knowledge-structure-entry-meta">${escapeHtml(entry.source || '--')} · ${escapeHtml(entry.time || '--')} · ${escapeHtml(entry.maturity_label || '种子')} ${escapeHtml(String(entry.maturity_score || 0))}</div>
+          </div>
+          <span class="knowledge-chip">${escapeHtml(`关系 ${entry.relation_count || 0}`)}</span>
+        </div>
+        <div class="knowledge-structure-entry-summary">${escapeHtml(entry.summary || '暂无摘要')}</div>
+        <div class="knowledge-chip-row">
+          ${((relations.topics || []).slice(0, 2)).map((item) => `<span class="knowledge-chip">${escapeHtml(item)}</span>`).join('')}
+          ${((relations.entities || []).slice(0, 2)).map((item) => `<span class="knowledge-chip">${escapeHtml(item)}</span>`).join('')}
+          ${((relations.methods || []).slice(0, 1)).map((item) => `<span class="knowledge-chip">${escapeHtml(item)}</span>`).join('')}
+          ${((relations.signals || []).slice(0, 1)).map((item) => `<span class="knowledge-chip">${escapeHtml(item)}</span>`).join('')}
+        </div>
+        <div class="knowledge-structure-entry-actions">
+          <button class="btn-outline" type="button" style="padding:7px 12px;font-size:12px" onclick="openKnowledgeEntryEditor('${escapeAttr(entry.id || '')}')">查看并微调</button>
+          <button class="btn-outline" type="button" style="padding:7px 12px;font-size:12px" onclick="useKnowledgeStructureSeed('${escapeAttr(entry.title || '')}','${escapeAttr(entry.summary || '')}')">继续补充</button>
+          ${prompt ? `<button class="btn-gold" type="button" style="padding:7px 12px;font-size:12px" onclick="sendKnowledgeStructureQuestion('${escapeAttr(prompt)}')">继续追问</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderKnowledgeStructurePanel(payload) {
+  const host = document.getElementById('knowledge-structure-panel');
+  if (!host) return;
+  const groups = payload && payload.relationship_groups && typeof payload.relationship_groups === 'object' ? payload.relationship_groups : {};
+  const sourceRows = Array.isArray(payload && payload.source_breakdown) ? payload.source_breakdown : [];
+  const entries = Array.isArray(payload && payload.entries) ? payload.entries : [];
+  if (knowledgeStructureState.activeTab === 'overview') {
+    host.innerHTML = `
+      <div class="knowledge-structure-overview-grid">
+        ${buildKnowledgeStructureOverviewCard('主题概览', '当前租户最常沉淀的研究主题。', groups.topics || [])}
+        ${buildKnowledgeStructureOverviewCard('对象概览', '当前最常出现的股票、行业和研究对象。', groups.entities || [])}
+        ${buildKnowledgeStructureOverviewCard('方法概览', '当前最常复用的分析框架与表达方式。', groups.methods || [])}
+        ${buildKnowledgeStructureOverviewCard('验证概览', '当前最常跟踪的验证节点和信号。', groups.signals || [])}
+        ${buildKnowledgeStructureOverviewCard('来源概览', '知识主要来自哪些录入方式。', sourceRows || [])}
+      </div>
+    `;
+    return;
+  }
+  if (knowledgeStructureState.activeTab === 'topics') {
+    host.innerHTML = `<div class="knowledge-structure-layer-grid">${buildKnowledgeStructureLayerCard('主题层', '先看当前租户围绕哪些研究主题形成了沉淀。', groups.topics || [])}</div>`;
+    return;
+  }
+  if (knowledgeStructureState.activeTab === 'entities') {
+    host.innerHTML = `<div class="knowledge-structure-layer-grid">${buildKnowledgeStructureLayerCard('对象层', '再看高频提及的股票、行业、指数和关键对象。', groups.entities || [])}</div>`;
+    return;
+  }
+  if (knowledgeStructureState.activeTab === 'methods') {
+    host.innerHTML = `<div class="knowledge-structure-layer-grid">${buildKnowledgeStructureLayerCard('方法层', '这里沉淀的是常用框架、方法论和分析手法。', groups.methods || [])}</div>`;
+    return;
+  }
+  if (knowledgeStructureState.activeTab === 'signals') {
+    host.innerHTML = `<div class="knowledge-structure-layer-grid">${buildKnowledgeStructureLayerCard('验证层', '最后看验证节点和信号，帮助后续跟踪。', groups.signals || [])}</div>`;
+    return;
+  }
+  host.innerHTML = `<div class="knowledge-structure-entry-list">${buildKnowledgeStructureEntriesHtml(entries)}</div>`;
+}
+
+function setKnowledgeStructureTab(tabId) {
+  knowledgeStructureState.activeTab = String(tabId || 'overview').trim() || 'overview';
+  renderKnowledgeStructure();
+}
+
+function renderKnowledgeStructure() {
+  const card = document.getElementById('knowledge-dav-graph-card');
+  const activeUser = getActiveDemoUser() || {};
+  if (!card) return;
+  const isDav = isDavCapableUser(activeUser);
+  card.style.display = isDav ? 'block' : 'none';
+  if (!isDav) return;
+  const payload = knowledgeStructureState.payload || {};
+  const note = document.getElementById('knowledge-structure-note');
+  renderKnowledgeStructureStats(payload);
+  renderKnowledgeStructureTabs();
+  renderKnowledgeStructurePanel(payload);
+  if (note) {
+    if (knowledgeStructureState.loading) {
+      note.textContent = '正在加载知识结构...';
+    } else if (knowledgeStructureState.error) {
+      note.textContent = `加载状态：${knowledgeStructureState.error}`;
+    } else {
+      note.textContent = '这里展示的是面向阅读和复用的知识结构；复杂关系网仅在 admin 后台查看。';
+    }
+  }
+}
+
+async function loadKnowledgeStructure(options = {}) {
+  const tenantSlug = getActiveKnowledgeTenantSlug();
+  const force = options.force === true;
+  if (!tenantSlug) return null;
+  if (!force && knowledgeStructureState.loading) return knowledgeStructureState.payload;
+  if (!force && knowledgeStructureState.loaded && knowledgeStructureState.tenantSlug === tenantSlug && knowledgeStructureState.payload) {
+    return knowledgeStructureState.payload;
+  }
+  knowledgeStructureState.loading = true;
+  knowledgeStructureState.error = '';
+  knowledgeStructureState.tenantSlug = tenantSlug;
+  renderKnowledgeStructure();
+  try {
+    const resp = await fetch(`/api/kol/knowledge-assets?tenant=${encodeURIComponent(tenantSlug)}`, { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) {
+      throw new Error((data && data.error) || 'knowledge_assets_load_failed');
+    }
+    knowledgeStructureState.payload = data.assets || null;
+    knowledgeStructureState.loaded = true;
+    knowledgeStructureState.error = '';
+    return knowledgeStructureState.payload;
+  } catch (error) {
+    knowledgeStructureState.payload = null;
+    knowledgeStructureState.loaded = false;
+    knowledgeStructureState.error = error.message || '知识结构加载失败';
+    if (!options.silent) {
+      showToast('知识结构加载失败');
+    }
+    return null;
+  } finally {
+    knowledgeStructureState.loading = false;
+    renderKnowledgeStructure();
+  }
+}
+
+function useKnowledgeStructureSeed(title, summary) {
+  knowledgeDraft = buildKnowledgeDraft();
+  knowledgeDraft.title = String(title || '').trim();
+  knowledgeDraft.summary = String(summary || '').trim();
+  openKnowledgeIntake('manual');
+}
+
+function sendKnowledgeStructureQuestion(text) {
+  const question = String(text || '').trim();
+  if (!question) return;
+  switchTab('hermes');
+  setTimeout(() => {
+    fillHermesQuestionInput(question);
+  }, 60);
+}
+
+async function refreshKnowledgeStructure(showSuccessToast) {
+  await loadKnowledgeStructure({ force: true, silent: false });
+  if (showSuccessToast && knowledgeStructureState.payload) {
+    showToast('知识结构已刷新');
+  }
+}
+
+function renderKnowledgeWorkbench() {
+  const entryGrid = document.getElementById('wb-knowledge-entry-grid');
+  const queueHost = document.getElementById('wb-knowledge-queue');
+  if (!entryGrid || !queueHost) return;
+  entryGrid.innerHTML = Object.entries(KNOWLEDGE_INPUT_TYPES).map(([type, cfg]) => `
+    <div class="knowledge-entry-card" onclick="openKnowledgeIntake('${type}')">
+      <div class="knowledge-entry-icon">${cfg.icon}</div>
+      <div class="knowledge-entry-title">${cfg.label}</div>
+      <div class="knowledge-entry-desc">${cfg.desc}</div>
+      <div class="knowledge-entry-cta">点击录入</div>
+    </div>
+  `).join('');
+  const entries = getTenantKnowledgeEntries();
+  queueHost.innerHTML = entries.map(entry => {
+    const status = getKnowledgeSyncMeta(entry);
+    return `
+      <div class="knowledge-queue-item" onclick="openKnowledgeEntryEditor('${entry.id}')">
+        <div class="knowledge-queue-head">
+          <div>
+            <div class="knowledge-queue-title">${escapeHtml(entry.title)}</div>
+            <div class="knowledge-queue-meta">${escapeHtml(entry.sourceDetail)} · ${escapeHtml(entry.time)} · ${escapeHtml(status.detail || `同步去向：${status.target}`)}${status.queuedAt ? ` · 入队 ${escapeHtml(status.queuedAt)}` : ''}${status.syncedAt && status.label === '已同步' ? ` · 完成 ${escapeHtml(status.syncedAt)}` : ''}${status.failedAt ? ` · 失败 ${escapeHtml(status.failedAt)}` : ''}</div>
+          </div>
+          <span class="knowledge-status ${status.className}">${status.label}</span>
+        </div>
+        <div class="knowledge-queue-body">${escapeHtml(entry.summary)}</div>
+        <div class="knowledge-chip-row">
+          ${(entry.tags || []).map(tag => `<span class="knowledge-chip">${escapeHtml(tag)}</span>`).join('')}
+          <span class="knowledge-chip">${escapeHtml(status.target)}</span>
+        </div>
+        <div class="knowledge-entry-hint">点击弹框微调</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderKnowledgeZone() {
+  const countEl = document.getElementById('knowledge-zone-count');
+  const feedHost = document.getElementById('knowledge-zone-feed');
+  if (!countEl || !feedHost) return;
+  const entries = getTenantKnowledgeEntries();
+  countEl.textContent = `今日新增 ${entries.length} 条`;
+  feedHost.innerHTML = entries.map(entry => {
+    const cfg = KNOWLEDGE_INPUT_TYPES[entry.type] || KNOWLEDGE_INPUT_TYPES.voice;
+    const status = getKnowledgeSyncMeta(entry);
+    return `
+      <div class="knowledge-zone-card" onclick="openKnowledgeEntryEditor('${entry.id}')">
+        <div class="knowledge-zone-top">
+          <div>
+            <div class="knowledge-zone-title">${escapeHtml(entry.title)}</div>
+            <div class="knowledge-zone-origin">${cfg.icon} ${escapeHtml(entry.source)} · ${escapeHtml(entry.sourceDetail)} · ${escapeHtml(status.detail || `同步去向：${status.target}`)}${status.queuedAt ? ` · 入队 ${escapeHtml(status.queuedAt)}` : ''}${status.syncedAt && status.label === '已同步' ? ` · 完成 ${escapeHtml(status.syncedAt)}` : ''}${status.failedAt ? ` · 失败 ${escapeHtml(status.failedAt)}` : ''}</div>
+          </div>
+          <span class="knowledge-status ${status.className}">${status.label}</span>
+        </div>
+        <div class="knowledge-zone-summary">${escapeHtml(entry.summary)}</div>
+        <div class="knowledge-chip-row">
+          ${(entry.tags || []).map(tag => `<span class="knowledge-chip">${escapeHtml(tag)}</span>`).join('')}
+        </div>
+        <div class="knowledge-entry-hint">点击弹框微调</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDashboardCards(config, options) {
+  if (!config || !config.cards || !config.cards.length) return '';
+  const opts = options || {};
+  const segment = getDashboardSegmentConfig(inferDashboardMode(config));
+  const layout = normalizeDashboardLayout(config.layout);
+  const toolbarTag = opts.toolbarTag || `${segment.shortTitle} · ${layout.toUpperCase()}`;
+  const toolbarNote = opts.toolbarNote || config.note || '';
+  return `
+    <div class="fund-macro-toolbar">
+      <div class="fund-macro-toolbar-note">${escapeHtml(toolbarNote)}</div>
+      <span class="fund-macro-layout-tag">${escapeHtml(toolbarTag)}</span>
+    </div>
+    <div class="fund-macro-grid cols-${layout.charAt(0)}">
+      ${config.cards.map((card, index) => `
+        ${(() => {
+          const cardMode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+          const cardSegment = getDashboardSegmentConfig(cardMode);
+          const metricCompactText = buildDashboardMetricCompactText(card.components || [], 2);
+          return `
+        <div class="fund-macro-card ${escapeHtml(card.status || 'normal')}" onclick="openFundMetricDetail(${index})">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div class="fund-macro-name">${escapeHtml(card.name || '待补充指标')}</div>
+            <span class="fund-macro-badge ${escapeHtml(card.status || 'normal')}">${escapeHtml(getFundStatusLabel(card.status || 'normal'))}</span>
+          </div>
+          <div class="fund-macro-value">${escapeHtml(card.value || '--')}</div>
+          <div class="fund-macro-assessment">${escapeHtml(card.assessment || '当前格子尚未配置指标提示词。')}</div>
+          <div class="fund-macro-compact">${escapeHtml(metricCompactText)}</div>
+          <div class="fund-macro-entry-hint">点击查看${escapeHtml(cardSegment.shortTitle)}指标说明</div>
+        </div>
+          `;
+        })()}
+      `).join('')}
+    </div>
+  `;
+}
+
+function hashMetricSeed(input) {
+  const text = String(input || '');
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) || 1;
+}
+
+function createSeededRandom(seedText) {
+  let seed = hashMetricSeed(seedText) % 2147483647;
+  if (seed <= 0) seed += 2147483646;
+  return function seededRandom() {
+    seed = seed * 16807 % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+}
+
+function formatMetricDate(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  const month = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${month}-${day}`;
+}
+
+function formatDashboardDataDate(value) {
+  const text = String(value || '').trim();
+  if (!text) return '未记录';
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})(?:\s+\d+)?$/);
+  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  const separated = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (separated) return `${separated[1]}-${String(separated[2]).padStart(2, '0')}-${String(separated[3]).padStart(2, '0')}`;
+  return text;
+}
+
+function getIndicatorHubItems() {
+  return [
+    ...(((H5_INDICATOR_HUB || {}).smart_items) || []),
+    ...(((H5_INDICATOR_HUB || {}).lake_items) || []),
+  ];
+}
+
+function normalizeMetricLookupName(name) {
+  return String(name || '').replace(/\s+/g, '').trim().toLowerCase();
+}
+
+function findIndicatorHubItemForCard(card, index) {
+  const name = String(card && card.name || `核心指标${index + 1}`);
+  const normalized = normalizeMetricLookupName(name);
+  const items = getIndicatorHubItems();
+  const exact = items.find(item => normalizeMetricLookupName(item.name) === normalized);
+  if (exact) return exact;
+  const contains = items.find(item => normalized && normalizeMetricLookupName(item.name).includes(normalized));
+  if (contains) return contains;
+  const prompt = String(card && card.prompt || '').trim();
+  if (prompt) {
+    if (/美联储|降息|联储|非农|通胀/i.test(prompt)) return items.find(item => item.id === 'fed_rate_path') || null;
+    if (/南向|北向|资金|流入|流出/i.test(prompt)) return items.find(item => item.id === 'southbound_flow') || null;
+    if (/AI|算力|半导体|订单/i.test(prompt)) return items.find(item => item.id === 'ai_order_signal') || null;
+    if (/信用|社融|地产|顺周期|CPI/i.test(prompt)) return items.find(item => item.id === 'credit_pulse') || null;
+  }
+  return null;
+}
+
+function buildFundMetricHistory(card, index) {
+  const linkedItem = findIndicatorHubItemForCard(card, index);
+  if (linkedItem) {
+    const trend = Array.isArray(linkedItem.history_series) ? linkedItem.history_series.map(item => ({
+      date: String(item.date || '').slice(5) || item.date || '--',
+      value: Number(item.value || 0),
+      status: item.status || linkedItem.status || 'normal',
+    })) : [];
+    const rawKline = linkedItem.history_kline || {};
+    const rawCandles = Array.isArray(rawKline.candles) ? rawKline.candles : [];
+    const anomalies = Array.isArray(rawKline.anomalies) ? rawKline.anomalies.map(entry => ({
+      ...entry,
+      date: String(entry.date || '').slice(5) || entry.date || '--',
+    })) : [];
+    return {
+      name: linkedItem.name || String(card && card.name || `核心指标${index + 1}`),
+      status: linkedItem.status || String(card && card.status || 'normal'),
+      value: linkedItem.value || (card && card.value) || '--',
+      category: linkedItem.category || '核心指标',
+      owner: linkedItem.owner || '指标湖',
+      dataModeLabel: linkedItem.data_mode_label || '指标湖',
+      trend,
+      kline: {
+        candles: rawCandles.map(candle => ({
+          ...candle,
+          date: String(candle.date || '').slice(5) || candle.date || '--',
+        })),
+        ma5: Array.isArray(rawKline.ma5) ? rawKline.ma5.map(item => ({ ...item, date: String(item.date || '').slice(5) || item.date || '--' })) : [],
+        ma10: Array.isArray(rawKline.ma10) ? rawKline.ma10.map(item => ({ ...item, date: String(item.date || '').slice(5) || item.date || '--' })) : [],
+        ma20: Array.isArray(rawKline.ma20) ? rawKline.ma20.map(item => ({ ...item, date: String(item.date || '').slice(5) || item.date || '--' })) : [],
+        anomalies,
+      },
+      anomalies,
+    };
+  }
+  const name = String(card && card.name || `核心指标${index + 1}`);
+  const status = String(card && card.status || 'normal');
+  const random = createSeededRandom(`h5-fund-metric:${name}:${status}:${index}`);
+  let current = 32 + random() * 30;
+  const candles = [];
+  const startDate = new Date('2026-05-18T00:00:00');
+  for (let i = 0; i < 24; i += 1) {
+    const open = Number((current + (random() - 0.5) * 3.4).toFixed(2));
+    let delta = (random() - 0.5) * 6.2;
+    if (status === 'good') delta += random() * 0.9;
+    if (status === 'warning') delta -= random() * 0.9;
+    const close = Number(Math.max(8, open + delta).toFixed(2));
+    const high = Number((Math.max(open, close) + 0.4 + random() * 1.8).toFixed(2));
+    const low = Number((Math.max(5, Math.min(open, close) - 0.4 - random() * 1.8)).toFixed(2));
+    const currentDate = new Date(startDate.getTime());
+    currentDate.setDate(startDate.getDate() + i);
+    candles.push({
+      date: formatMetricDate(currentDate),
+      open,
+      high,
+      low,
+      close,
+    });
+    current = close;
+  }
+  const movingAverage = (windowSize) => candles.map((_, candleIndex) => {
+    if (candleIndex + 1 < windowSize) return null;
+    const slice = candles.slice(candleIndex - windowSize + 1, candleIndex + 1);
+    const sum = slice.reduce((total, item) => total + Number(item.close || 0), 0);
+    return Number((sum / windowSize).toFixed(2));
+  });
+  const ma5 = movingAverage(5);
+  const ma10 = movingAverage(10);
+  const ma20 = movingAverage(20);
+  const trend = [];
+  for (let i = 0; i < 8; i += 1) {
+    const candle = candles[Math.min(candles.length - 1, i * 3)];
+    if (!candle) continue;
+    let pointStatus = 'good';
+    if (status === 'warning' && i >= 6) pointStatus = 'warning';
+    else if (status === 'attention' && i >= 5) pointStatus = 'attention';
+    trend.push({
+      date: candle.date,
+      value: candle.close,
+      status: pointStatus,
+    });
+  }
+  const rankedIndexes = candles
+    .map((item, candleIndex) => ({
+      candleIndex,
+      score: Math.abs(Number(item.close || 0) - Number(item.open || 0)) + Number(item.high || 0) - Number(item.low || 0),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, status === 'warning' ? 2 : 1);
+  const anomalies = rankedIndexes.map((entry) => ({
+    date: candles[entry.candleIndex].date,
+    value: candles[entry.candleIndex].close,
+    status: status === 'normal' ? 'attention' : status,
+    label: status === 'warning' ? '异常放大' : '波动抬升',
+    candleIndex: entry.candleIndex,
+  }));
+  return {
+    name,
+    status,
+    value: card && card.value ? card.value : '--',
+    category: '核心指标',
+    owner: '前台基本面面板',
+    dataModeLabel: '本地模拟',
+    trend,
+    kline: { candles, ma5, ma10, ma20, anomalies },
+    anomalies,
+  };
+}
+
+function getFundMetricStatusLabel(status) {
+  if (status === 'good') return '正常';
+  if (status === 'attention') return '关注';
+  if (status === 'warning') return '预警';
+  return '待跟踪';
+}
+
+function renderFundMetricStatus(status) {
+  return `<span class="fund-metric-status ${escapeHtml(status || 'normal')}">${escapeHtml(getFundMetricStatusLabel(status || 'normal'))}</span>`;
+}
+
+function buildFundMetricTrendSummary(series) {
+  const list = Array.isArray(series) ? series : [];
+  return list.map((item, index) => {
+    const value = Number(item && item.value || 0);
+    const previous = index > 0 ? Number(list[index - 1] && list[index - 1].value || value) : value;
+    const delta = Number((value - previous).toFixed(2));
+    return {
+      date: item.date || '--',
+      value: value.toFixed(2),
+      status: item.status || 'normal',
+      delta,
+      direction: delta > 0 ? '上行' : delta < 0 ? '下行' : '持平',
+    };
+  });
+}
+
+function buildInlineChartShell(prefix, height, mountFn) {
+  const chartId = window.GangtiseEcharts ? window.GangtiseEcharts.nextId(prefix) : `${prefix}-${Date.now()}`;
+  if (window.GangtiseEcharts && typeof mountFn === 'function') {
+    window.GangtiseEcharts.enqueue(chartId, mountFn);
+  }
+  return {
+    chartId,
+    chartHtml: `<div id="${chartId}" data-inline-chart="true" style="width:100%;height:${height};min-height:${height}"></div>`,
+  };
+}
+
+function buildMovingAverageSeries(series, windowSize) {
+  const values = calcMovingAverage(series, windowSize);
+  return series.map((item, index) => ({
+    date: item.date || '',
+    value: values[index],
+  })).filter((item) => item.value !== null && item.value !== undefined);
+}
+
+function normalizeCandleAnomalies(candles, anomalies) {
+  const list = Array.isArray(anomalies) ? anomalies : [];
+  return list.map((item) => {
+    if (item && item.date) return item;
+    const candleIndex = Number(item && item.candleIndex);
+    const candle = Number.isInteger(candleIndex) ? candles[candleIndex] : null;
+    return candle ? {
+      ...item,
+      date: candle.date || '',
+      value: Number(item && item.value) || Number(candle.high || candle.close || 0),
+    } : null;
+  }).filter(Boolean);
+}
+
+function buildFundMetricKlineSvg(payload) {
+  const candles = Array.isArray(payload && payload.candles) ? payload.candles : [];
+  if (!candles.length) {
+    return '<div class="fund-metric-chart-shell" style="text-align:center;font-size:12px;color:var(--text-sub)">暂无历史数据</div>';
+  }
+  const chartPayload = {
+    candles,
+    ma5: Array.isArray(payload && payload.ma5) ? payload.ma5 : buildMovingAverageSeries(candles, 5),
+    ma10: Array.isArray(payload && payload.ma10) ? payload.ma10 : buildMovingAverageSeries(candles, 10),
+    ma20: Array.isArray(payload && payload.ma20) ? payload.ma20 : buildMovingAverageSeries(candles, 20),
+    anomalies: normalizeCandleAnomalies(candles, payload && payload.anomalies),
+  };
+  const shell = buildInlineChartShell('fund-metric-kline', '220px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildKlineOption(chartPayload, {
+      candleLabel: '核心指标',
+    }));
+  });
+  return `
+    <div class="fund-metric-chart-shell">
+      <div class="fund-metric-chart-head">
+        <div class="fund-metric-chart-title">历史趋势</div>
+        <div class="fund-metric-chart-legend">
+          <span><i style="background:#F6C453"></i>MA5</span>
+          <span><i style="background:#5DADE2"></i>MA10</span>
+          <span><i style="background:#AF7AC5"></i>MA20</span>
+        </div>
+      </div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function closeFundMetricDetailModal() {
+  const modal = document.getElementById('fund-metric-detail-modal');
+  if (modal) modal.classList.remove('show');
+  currentFundMetricDetail = null;
+}
+
+function openFundMetricDetail(index) {
+  const published = getPublishedFundDashboard();
+  const card = published && published.cards ? published.cards[index] : null;
+  const host = document.getElementById('fund-metric-detail-modal-content');
+  const modal = document.getElementById('fund-metric-detail-modal');
+  if (!card || !host || !modal) return;
+  const cardMode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+  const segment = getDashboardSegmentConfig(cardMode);
+  const linkedItem = findIndicatorHubItemForCard(card, index);
+  const detail = buildFundMetricHistory(card, index);
+  currentFundMetricDetail = detail;
+  const currentValue = String(detail.value || card.value || '--');
+  const valueClass = /[A-Za-z]/.test(currentValue) || currentValue.length >= 9 ? 'fund-metric-detail-stat-value compact' : 'fund-metric-detail-stat-value';
+  const components = normalizeDashboardComponents(card.components, cardMode);
+  const sourceLines = linkedItem ? [
+    linkedItem.owner ? `来源归属：${linkedItem.owner}` : '',
+    linkedItem.category ? `指标分类：${linkedItem.category}` : '',
+    linkedItem.data_mode_label ? `数据模式：${linkedItem.data_mode_label}` : '',
+    linkedItem.id ? `命中指标：${linkedItem.id}` : '',
+  ].filter(Boolean) : buildDashboardSourceList(cardMode, components, card.sources).map(item => `来源：${item}`);
+  const explanationLines = [
+    card.assessment ? `当前判断：${card.assessment}` : '',
+    card.alert ? `提醒项：${card.alert}` : '',
+    card.hint ? `补充说明：${card.hint}` : '',
+    card.prompt ? `提示词：${card.prompt}` : '',
+  ].filter(Boolean);
+  const buildDetailItemHtml = (title, copy) => `
+    <div class="fund-metric-detail-item">
+      <div class="fund-metric-detail-item-head">
+        <strong style="color:var(--text-main)">${escapeHtml(title || '--')}</strong>
+      </div>
+      <div class="fund-metric-detail-copy">${escapeHtml(copy || '--')}</div>
+    </div>
+  `;
+  const buildDetailGroupHtml = (title, note, body) => {
+    if (!String(body || '').trim()) return '';
+    return `
+      <div class="fund-metric-detail-group">
+        <div class="fund-metric-detail-group-head">
+          <div>
+            <div class="fund-metric-detail-group-title">${escapeHtml(title || '--')}</div>
+            ${note ? `<div class="fund-metric-detail-group-note">${escapeHtml(note)}</div>` : ''}
+          </div>
+        </div>
+        <div class="fund-metric-detail-list">${body}</div>
+      </div>
+    `;
+  };
+  const factorRuleRows = (segment.factorRules || []).map((entry) => {
+    const raw = String(entry || '').trim();
+    if (!raw) return '';
+    const parts = raw.split(/\s*=\s*/);
+    if (parts.length >= 2) {
+      return buildDetailItemHtml(parts.shift(), parts.join(' = '));
+    }
+    return buildDetailItemHtml('因子规则', raw);
+  }).join('');
+  const thresholdRows = (segment.thresholds || []).map((entry) => {
+    const raw = String(entry || '').trim();
+    if (!raw) return '';
+    const match = raw.match(/^(\S+)\s+(.+)$/);
+    if (match) {
+      return buildDetailItemHtml(match[1], match[2]);
+    }
+    return buildDetailItemHtml('分数映射', raw);
+  }).join('');
+  const componentRows = components.map((item, componentIndex) => {
+    const weightText = Math.abs(Number(item.weight || 1) - 1) < 0.01 ? '默认权重' : `权重 ${Number(item.weight || 1)}`;
+    const operatorText = componentIndex === 0 || item.operator === 'base' ? '起始组件' : `组合符 ${item.operator}`;
+    return `
+      <div class="fund-metric-detail-item">
+        <div class="fund-metric-detail-item-head">
+          <strong style="color:var(--text-main)">${escapeHtml(item.label || `组件 ${componentIndex + 1}`)}</strong>
+        </div>
+        <div class="fund-metric-detail-copy">指标：${escapeHtml(item.metric || '--')} · 窗口：${escapeHtml(item.window || '--')} · 聚合：${escapeHtml(item.aggregation || '--')}</div>
+        <div class="fund-metric-detail-copy">数据源：${escapeHtml(item.source || '--')} · ${escapeHtml(weightText)} · ${escapeHtml(operatorText)}</div>
+      </div>
+    `;
+  }).join('');
+  host.innerHTML = `
+    <div class="fund-metric-detail-head">
+      <div>
+        <div class="fund-metric-detail-title">${escapeHtml(detail.name)}</div>
+        <div class="fund-metric-detail-subtitle">${escapeHtml(segment.detailTitle)} · 算法说明 · 数据源 · 详细解读</div>
+      </div>
+      <button class="fund-metric-detail-close" type="button" onclick="closeFundMetricDetailModal()">×</button>
+    </div>
+    <div class="fund-metric-detail-grid">
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">1. 卡片定位</div>
+        <div class="fund-metric-detail-summary">
+          <div class="fund-metric-detail-stat">
+            <div>
+              <div class="fund-metric-detail-stat-label">当前值</div>
+              <div class="${valueClass}">${escapeHtml(currentValue)}</div>
+            </div>
+          </div>
+          <div class="fund-metric-detail-stat">
+            <div class="fund-metric-detail-stat-label">当前状态</div>
+            <div class="fund-metric-detail-stat-badge">${renderFundMetricStatus(detail.status || card.status)}</div>
+          </div>
+        </div>
+        <div class="fund-metric-detail-copy">所属层级：${escapeHtml(segment.title)}</div>
+        <div class="fund-metric-detail-copy">核心问题：${escapeHtml(segment.question || segment.note)}</div>
+        <div class="fund-metric-detail-copy">${escapeHtml(segment.scope || '')}</div>
+        <div class="fund-metric-detail-copy">输出口径：${escapeHtml(segment.outputExplain || '输出的是一个面向粉丝的结构化判断结果。')}</div>
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">2. 算法说明</div>
+        ${buildDetailGroupHtml(
+          '计算框架',
+          '先看总分怎么合成，再看解释文案按什么口径输出。',
+          buildDetailItemHtml('组合方式', String(card.formula || '').trim() || buildDashboardFormulaText(cardMode, components) || '当前卡片按预设指标组合规则生成。')
+          + buildDetailItemHtml('评分口径', segment.scoreMethod || segment.detailNote)
+          + buildDetailItemHtml('格子提示词', card.prompt || segment.promptPlaceholder || '暂无提示词')
+        )}
+        ${buildDetailGroupHtml(
+          '因子拆解',
+          '把总分拆成几个核心因子，便于看每部分在回答什么问题。',
+          factorRuleRows
+        )}
+        ${buildDetailGroupHtml(
+          '结果映射',
+          '分数不是直接展示给用户，而是映射成可读结论。',
+          thresholdRows
+        )}
+        ${buildDetailGroupHtml(
+          '组件构成',
+          '如果当前卡片绑定了白盒组件，这里展示具体指标、窗口和聚合方式。',
+          componentRows
+        )}
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">3. 数据源</div>
+        <div class="fund-metric-detail-list">
+          ${sourceLines.map((entry) => `
+            <div class="fund-metric-detail-item">
+              <div class="fund-metric-detail-copy" style="margin-top:0">${escapeHtml(entry)}</div>
+            </div>
+          `).join('') || '<div class="fund-metric-detail-item">当前没有可展示的数据源说明。</div>'}
+        </div>
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">4. 详细解读</div>
+        <div class="fund-metric-detail-history-list">
+          ${explanationLines.map((entry) => `
+            <div class="fund-metric-detail-history-row">
+              <div class="fund-metric-detail-history-text">${escapeHtml(entry)}</div>
+            </div>
+          `).join('') || '<div class="fund-metric-detail-item">暂无详细解读。</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function getDashboardConfigVersion(config) {
+  if (!config) return '';
+  return [
+    inferDashboardMode(config),
+    normalizeDashboardLayout(config.layout),
+    config.updatedAt || '',
+    config.publisher || '',
+    (config.cards || []).map(card => `${card.prompt || ''}|${card.name || ''}|${card.value || ''}`).join('^'),
+  ].join('::');
+}
+
+function normalizeWorkbenchDashboardSlots(layout, cards) {
+  const normalizedLayout = normalizeDashboardLayout(layout);
+  return Array.from({ length: getDashboardCardTarget(normalizedLayout) }, (_, index) => {
+    const card = cards && cards[index];
+    const mode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+    if (!card) return buildEmptyDashboardCard('', mode);
+    const hasContent = !!(card.name || card.value || card.assessment || card.alert || card.hint);
+    const prompt = String(card.prompt || '').trim();
+    if (!hasContent && !prompt) return buildEmptyDashboardCard('', mode);
+    return {
+      ...buildEmptyDashboardCard('', mode),
+      ...card,
+      mode,
+      segmentId: mode,
+      prompt,
+      isEmpty: !hasContent && !prompt,
+    };
+  });
+}
+
+function ensureWorkbenchDashboardEditor(config) {
+  const sourceMode = inferDashboardMode(config || { mode: currentWorkbenchDashboardMode });
+  currentWorkbenchDashboardMode = sourceMode;
+  syncDashboardWorkbenchHeader(config);
+  renderDashboardModeRow();
+  const version = getDashboardConfigVersion(config);
+  if (!currentWorkbenchDashboardSlots.length || currentWorkbenchDashboardSourceVersion !== version) {
+    currentWorkbenchDashboardLayout = normalizeDashboardLayout(config.layout || currentWorkbenchDashboardLayout);
+    currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, config.cards || []);
+    currentWorkbenchDashboardSourceVersion = version;
+  }
+}
+
+function isWorkbenchDashboardCellFilled(card) {
+  return !!(card && !card.isEmpty && (card.name || card.value || card.assessment || String(card.prompt || '').trim()));
+}
+
+function renderWorkbenchDashboardBoard() {
+  const layout = normalizeDashboardLayout(currentWorkbenchDashboardLayout);
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(layout, currentWorkbenchDashboardSlots);
+  document.querySelectorAll('[data-dashboard-layout-button]').forEach(button => {
+    button.classList.toggle('active', button.getAttribute('data-dashboard-layout-button') === layout);
+  });
+  return `
+    <div class="wb-dashboard-summary-grid cols-${layout.charAt(0)}">
+      ${currentWorkbenchDashboardSlots.map((card, index) => {
+        const cardMode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+        const segment = getDashboardSegmentConfig(cardMode);
+        return isWorkbenchDashboardCellFilled(card) ? `
+        <div class="wb-dashboard-summary-card filled" onclick="openDashboardCellModal(${index})">
+          <div class="wb-dashboard-summary-head">
+            <div class="wb-dashboard-summary-title">${escapeHtml(card.name || `${segment.shortTitle} ${index + 1}`)}</div>
+            <span class="wb-dashboard-summary-tag">${escapeHtml(segment.shortTitle)} ${index + 1}</span>
+          </div>
+          <div class="wb-dashboard-summary-value">${escapeHtml(card.value || '--')}</div>
+          <div class="wb-dashboard-summary-text">${escapeHtml(card.assessment || `点击继续补充${segment.shortTitle}提示词。`)}</div>
+          <div class="wb-dashboard-summary-edit">点击编辑提示词</div>
+        </div>
+      ` : `
+        <div class="wb-dashboard-summary-card empty" onclick="openDashboardCellModal(${index})">
+          <div>
+            <div class="wb-dashboard-summary-plus">+</div>
+            <div class="wb-dashboard-summary-empty-title">添加${escapeHtml(segment.shortTitle)}信号</div>
+            <div class="wb-dashboard-summary-empty-desc">点击输入提示词，保存后自动生成${escapeHtml(segment.shortTitle)}摘要。</div>
+          </div>
+        </div>
+      `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function selectFundDashboardLayout(layout) {
+  const normalizedLayout = normalizeDashboardLayout(layout);
+  currentWorkbenchDashboardLayout = normalizedLayout;
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(normalizedLayout, currentWorkbenchDashboardSlots);
+  renderWorkbenchFundDashboard();
+}
+
+function selectFundDashboardMode(mode) {
+  const nextMode = normalizeDashboardMode(mode);
+  currentWorkbenchDashboardMode = nextMode;
+  renderDashboardModeRow();
+  renderWorkbenchFundDashboard();
+}
+
+function buildDashboardPromptListFromSlots() {
+  return normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots).map(card => String(card.prompt || '').trim());
+}
+
+function openDashboardCellModal(index) {
+  const activeUser = getActiveDemoUser();
+  if (!isDavCapableUser(activeUser)) {
+    showToast('只有大V身份可以编辑核心指标面板');
+    return;
+  }
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots);
+  dashboardCellEditingIndex = index;
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (!host || !modal) return;
+  const cardMode = inferDashboardCardMode(currentWorkbenchDashboardSlots[index], currentWorkbenchDashboardMode || getDefaultDashboardCardMode(index));
+  dashboardCellDraftMode = cardMode;
+  const segment = getDashboardSegmentConfig(cardMode);
+  const card = currentWorkbenchDashboardSlots[index] || buildEmptyDashboardCard('');
+  const modeOptions = ['market', 'industry', 'signal-stock'].map((mode) => {
+    const item = getDashboardSegmentConfig(mode);
+    return `<button class="btn-outline ${dashboardCellDraftMode === mode ? 'wb-dashboard-layout-btn active' : ''}" style="padding:6px 8px;font-size:11px" type="button" onclick="setDashboardCellMode('${mode}')">${escapeHtml(item.title)}</button>`;
+  }).join('');
+  const seedOptions = (Array.isArray(DASHBOARD_SEED_CARDS) ? DASHBOARD_SEED_CARDS : []).slice(0, 8).map((seed, seedIndex) => `
+    <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="fillDashboardCellFromSeed(${index}, ${seedIndex})">${escapeHtml(seed.name || `指标${seedIndex + 1}`)}</button>
+  `).join('');
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${escapeHtml(segment.editorTitle)} ${index + 1}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">${isWorkbenchDashboardCellFilled(card) ? `当前摘要：${escapeHtml(card.name || '未命名指标')} · ${escapeHtml(card.value || '--')}` : `当前${escapeHtml(segment.shortTitle)}格子为空，输入提示词后会自动生成对应摘要。`}</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">格子类型</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${modeOptions}</div>
+    </div>
+    ${seedOptions ? `<div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">快速引用指标湖</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${seedOptions}</div>
+    </div>` : ''}
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">提示词</label>
+      <textarea id="dashboard-cell-prompt-input" class="knowledge-modal-textarea" placeholder="${escapeHtml(segment.promptPlaceholder || DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length])}">${escapeHtml(card.prompt || '')}</textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeDashboardCellModal()">取消</button>
+      <button class="btn-gold" onclick="saveDashboardCellPrompt()">保存并生成</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function setDashboardCellMode(mode) {
+  dashboardCellDraftMode = normalizeDashboardMode(mode);
+  if (dashboardCellEditingIndex < 0) return;
+  openDashboardCellModal(dashboardCellEditingIndex);
+}
+
+function fillDashboardCellFromSeed(cellIndex, seedIndex) {
+  const seed = (Array.isArray(DASHBOARD_SEED_CARDS) ? DASHBOARD_SEED_CARDS : [])[seedIndex];
+  if (!seed) return;
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots);
+  currentWorkbenchDashboardSlots[cellIndex] = {
+    ...buildEmptyDashboardCard('', dashboardCellDraftMode || currentWorkbenchDashboardMode),
+    ...seed,
+    mode: dashboardCellDraftMode || currentWorkbenchDashboardMode,
+    segmentId: dashboardCellDraftMode || currentWorkbenchDashboardMode,
+    prompt: seed.prompt || `直接引用指标湖信号：${seed.name || '指标'}`,
+    isEmpty: false,
+  };
+  const input = document.getElementById('dashboard-cell-prompt-input');
+  if (input) input.value = currentWorkbenchDashboardSlots[cellIndex].prompt || '';
+  const host = document.getElementById('dashboard-cell-modal-content');
+  if (host) {
+    const summary = currentWorkbenchDashboardSlots[cellIndex];
+    const note = host.querySelector('.modal-title + div');
+    if (note) note.textContent = `当前摘要：${summary.name || '未命名指标'} · ${summary.value || '--'}`;
+  }
+}
+
+function closeDashboardCellModal() {
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+  dashboardCellEditingIndex = -1;
+}
+
+function saveDashboardCellPrompt() {
+  const activeUser = getActiveDemoUser();
+  if (!isDavCapableUser(activeUser)) {
+    showToast('只有大V身份可以编辑核心指标面板');
+    return;
+  }
+  if (dashboardCellEditingIndex < 0) return;
+  const input = document.getElementById('dashboard-cell-prompt-input');
+  const promptText = input ? input.value.trim() : '';
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots);
+  currentWorkbenchDashboardSlots[dashboardCellEditingIndex] = buildDashboardCardFromPrompt(promptText, dashboardCellEditingIndex, dashboardCellDraftMode || currentWorkbenchDashboardMode);
+  closeDashboardCellModal();
+  generateFundDashboard();
+}
+
+function renderFundMacroDashboard() {
+  const host = document.getElementById('feed-macro-dashboard');
+  if (!host) return;
+  const published = getPublishedFundDashboard();
+  if (!published || !Array.isArray(published.cards) || !published.cards.length) {
+    host.innerHTML = `
+      <div class="fund-column-card">
+        <div class="fund-column-head">
+          <div>
+            <div class="fund-column-title">今日核心指标面板</div>
+            <div class="fund-column-subtitle">这里严格只展示后台已发布的格子。当前还没有可展示的已发布版本。</div>
+          </div>
+          <span class="tag tag-gold">未发布</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  const primaryMode = inferDashboardMode(published);
+  const segment = getDashboardSegmentConfig(primaryMode);
+  const composition = buildDashboardCompositionSummary(published.cards || []);
+  host.innerHTML = `
+    <div class="fund-column-card">
+      <div class="fund-column-head">
+        <div>
+          <div class="fund-column-title">${escapeHtml(published.title || '今日核心指标面板')}</div>
+          <div class="fund-column-subtitle">当前仪表盘支持市场状态、行业景气、信号个股混搭展示。组合结构：${escapeHtml(composition)}。普通投资者只看到当前生效版本。</div>
+        </div>
+        <span class="tag tag-gold">${escapeHtml(`${isMixedDashboardModes(published.cards || []) ? '混合策略' : segment.shortTitle} · ${normalizeDashboardLayout(published.layout).toUpperCase()}`)}</span>
+      </div>
+      ${renderDashboardCards(published, {
+        toolbarTag: `${buildDashboardCompositionSummary(published.cards || [])} · ${normalizeDashboardLayout(published.layout).toUpperCase()} 已发布`,
+        toolbarNote: published.note || '',
+      })}
+    </div>
+  `;
+}
+
+function removeLegacyWorkbenchDashboardMarkup() {
+  const selectors = [
+    '.wb-dashboard-card',
+    '#wb-dashboard-section-title',
+    '#wb-dashboard-section-desc',
+    '#wb-smart-layout-row',
+    '#wb-dashboard-preview',
+    '#wb-smart-indicator-library',
+    '.wb-dashboard-actions',
+    '.wb-dashboard-meta',
+  ];
+  document.querySelectorAll(selectors.join(',')).forEach((node) => node.remove());
+}
+
+function renderWorkbenchFundDashboard() {
+  return;
+  const previewHost = document.getElementById('wb-dashboard-preview');
+  const metaHost = document.getElementById('wb-dashboard-meta');
+  if (!previewHost || !metaHost) return;
+  const activeUser = getActiveDemoUser();
+  if (!isDavCapableUser(activeUser)) {
+    previewHost.innerHTML = '';
+    metaHost.textContent = '当前为投资者身份，核心指标面板只展示已发布版本。';
+    return;
+  }
+  const tenantState = getTenantFundDashboardState();
+  const draft = tenantState.draft;
+  const published = tenantState.published;
+  ensureWorkbenchDashboardEditor(draft || published || { mode: currentWorkbenchDashboardMode, layout: currentWorkbenchDashboardLayout, cards: currentWorkbenchDashboardSlots });
+  const activeConfig = draft || published || { cards: currentWorkbenchDashboardSlots };
+  const composition = buildDashboardCompositionSummary(activeConfig.cards || []);
+  metaHost.textContent = draft
+    ? `草稿已生成 · ${composition} · ${normalizeDashboardLayout(draft.layout).toUpperCase()} · 点击任意格子可继续修改，发布后会同步到基本面首页顶部`
+    : published
+      ? `当前展示已发布版本 · ${composition} · ${published.updatedAt || '刚刚同步'}`
+      : `当前为混合格子 demo · 点击格子输入提示词，并为每个格子单独选择类型`;
+  previewHost.innerHTML = renderWorkbenchDashboardBoard();
+}
+
+async function generateFundDashboard(layout) {
+  const activeUser = getActiveDemoUser();
+  if (!isDavCapableUser(activeUser)) {
+    showToast('只有大V身份可以生成核心指标面板');
+    return;
+  }
+  const normalizedLayout = normalizeDashboardLayout(layout || currentWorkbenchDashboardLayout);
+  currentWorkbenchDashboardLayout = normalizedLayout;
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(normalizedLayout, currentWorkbenchDashboardSlots);
+  const promptList = buildDashboardPromptListFromSlots();
+  const cards = currentWorkbenchDashboardSlots.map((card, index) => {
+    if (isWorkbenchDashboardCellFilled(card) && card.name && card.value) {
+      return {
+        ...card,
+        mode: inferDashboardCardMode(card, getDefaultDashboardCardMode(index)),
+        segmentId: inferDashboardCardMode(card, getDefaultDashboardCardMode(index)),
+        isEmpty: false,
+      };
+    }
+    return buildDashboardCardFromPrompt(promptList[index], index, inferDashboardCardMode(card, getDefaultDashboardCardMode(index)));
+  });
+  const tenantState = getTenantFundDashboardState();
+  tenantState.draft = {
+    mode: getDashboardPrimaryMode(cards),
+    segmentId: getDashboardPrimaryMode(cards),
+    layout: normalizedLayout,
+    title: buildDashboardTitle(normalizedLayout, promptList, cards),
+    note: buildDashboardNote(promptList, cards),
+    cards,
+    updatedAt: '刚刚生成',
+    publisher: activeUser.name,
+  };
+  persistTenantFundDashboardState();
+  currentWorkbenchDashboardSourceVersion = getDashboardConfigVersion(tenantState.draft);
+  try {
+    await syncTenantDashboardState('save_draft', tenantState.draft);
+    renderWorkbenchFundDashboard();
+    showToast(`已生成混合仪表盘 ${normalizedLayout.toUpperCase()} 草稿`);
+  } catch (error) {
+    renderWorkbenchFundDashboard();
+    showToast('草稿已生成，但同步后端失败');
+  }
+}
+
+async function publishFundDashboard() {
+  const activeUser = getActiveDemoUser();
+  if (!isDavCapableUser(activeUser)) {
+    showToast('只有大V身份可以发布核心指标面板');
+    return;
+  }
+  const tenantState = getTenantFundDashboardState();
+  if (!tenantState.draft) {
+    showToast('请先生成一个指标面板草稿');
+    return;
+  }
+  try {
+    const payload = await syncTenantDashboardState('publish', tenantState.draft);
+    const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    tenantState.published = state.published || tenantState.published;
+    tenantState.draft = state.draft;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('已发布到基本面首页顶部');
+  } catch (error) {
+    showToast('发布失败，请稍后重试');
+  }
+}
+
+async function resetFundDashboardDraft() {
+  const activeUser = getActiveDemoUser();
+  if (!isDavCapableUser(activeUser)) {
+    showToast('当前身份没有草稿编辑权限');
+    return;
+  }
+  const tenantState = getTenantFundDashboardState();
+  try {
+    const payload = await syncTenantDashboardState('reset_draft');
+    const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    tenantState.published = state.published || tenantState.published;
+    tenantState.draft = state.draft;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    showToast('已恢复到当前发布版');
+  } catch (error) {
+    showToast('恢复失败，请稍后重试');
+  }
+}
+
+function renderFundamentalKolColumn() {
+  const host = document.getElementById('feed-fundamental-column');
+  if (!host) return;
+  const activeUser = getActiveDemoUser();
+  const advisorName = activeUser.tenant.advisor;
+  const backendEntries = Array.isArray((FUNDAMENTAL_COLUMN_DATA || {}).entries) ? FUNDAMENTAL_COLUMN_DATA.entries : [];
+  const entries = backendEntries.length ? backendEntries : getTenantKnowledgeEntries();
+  const readyEntries = entries.filter(entry => entry.status === 'ready');
+  const displayEntries = (readyEntries.length ? readyEntries : entries).slice(0, 4);
+  const summaryText = backendEntries.length
+    ? ((FUNDAMENTAL_COLUMN_DATA || {}).summary || `今日基本面解读优先引用 ${advisorName} 租户当前最重要的指标湖信号和异动。`)
+    : (readyEntries.length
+      ? `今日基本面解读优先引用 ${advisorName} 租户已经沉淀完成的知识卡，把估值、盈利质量、验证节点和争议点整理成可直接阅读的专栏。`
+      : `当前专栏会优先展示 ${advisorName} 最近录入但仍在清洗中的知识内容，等同步完成后会自动切换到正式知识卡。`);
+  const columnCards = displayEntries.map((entry, index) => {
+    const status = getKnowledgeStatusMeta(entry.status || 'ready');
+    const angleLabel = ['估值视角', '盈利视角', '验证节点'][index] || '研究视角';
+    return `
+      <div class="fund-column-item">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div>
+            <div class="fund-column-item-title">${escapeHtml(entry.title || '')}</div>
+            <div class="fund-column-item-meta">${escapeHtml(entry.angle || angleLabel)} · ${escapeHtml(entry.source || '')} · ${escapeHtml(entry.sourceDetail || '')}</div>
+          </div>
+          <span class="knowledge-status ${status.className}">${status.label}</span>
+        </div>
+        <div class="fund-column-item-desc">${escapeHtml(entry.summary || '')}</div>
+      </div>
+    `;
+  }).join('');
+  const actionBlock = activeUser.role === 'dav'
+    ? `
+      <div class="fund-column-actions">
+        <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="openKnowledgeIntake('voice')">语音录入</button>
+        <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="openKnowledgeIntake('manual')">纯文本编写</button>
+        <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="switchTab('knowledge')">查看知识专区</button>
+      </div>
+    `
+    : `
+      <div class="fund-column-actions">
+        <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="switchTab('knowledge')">查看知识专区</button>
+        <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="openDmChat(1,'${advisorName}','👑','种子投顾')">追问投顾</button>
+      </div>
+    `;
+  host.innerHTML = `
+    <div class="fund-column-card">
+      <div class="fund-column-head">
+        <div>
+          <div class="fund-column-title">${escapeHtml(advisorName)} · 大V知识专栏</div>
+          <div class="fund-column-subtitle">作为今日基本面解读入口，优先展示租户内大V沉淀的长期知识和最新判断。</div>
+        </div>
+        <span class="tag tag-gold">${activeUser.role === 'dav' ? '当前主理人视角' : '所属租户专栏'}</span>
+      </div>
+      <div class="fund-column-summary">
+        <div class="fund-column-summary-title">今日解读摘要</div>
+        <div class="fund-column-summary-text">${escapeHtml(summaryText)}</div>
+      </div>
+      <div class="fund-column-grid">
+        ${columnCards || `
+          <div class="fund-column-item">
+            <div class="fund-column-item-title">暂无今日专栏内容</div>
+            <div class="fund-column-item-desc">${activeUser.role === 'dav' ? '你可以直接提交语音、文件或网页 URL，生成今日基本面解读。' : '当前租户大V还没有同步新的基本面专栏。'}</div>
+          </div>
+        `}
+      </div>
+      ${actionBlock}
+    </div>
+  `;
+}
+
+function renderKnowledgeExperience() {
+  renderFundMacroDashboard();
+  renderKnowledgeWorkbench();
+  renderKnowledgeStructure();
+  renderKnowledgeZone();
+  const activeUser = getActiveDemoUser() || {};
+  if (activeUser.role === 'dav') {
+    loadKnowledgeStructure({ silent: true }).catch(() => {});
+  }
+}
+
+function renderHermesWorkspace() {
+  ensureHermesSessionBootstrap();
+  renderHermesCredits();
+  renderHermesSessionBar();
+  renderHermesAssistantModeTabs();
+  renderHermesQuickActions();
+  renderHermesCapabilityChips();
+  renderHermesSuggestionChips();
+  renderHermesComposerContext();
+  renderHermesComposerSubmit();
+  renderHermesThread();
+  syncHermesComposerClearance();
+}
+
+function renderHermesAssistantModeTabs() {
+  const host = document.getElementById('hermes-assistant-mode-tabs');
+  if (!host) return;
+  const modes = [
+    { id: 'consultation', label: '咨询', desc: '研究问答，可参考关联K线标注' },
+    { id: 'task', label: '任务', desc: '用户互动归纳' },
+  ].filter((mode) => mode.id !== 'task' || isDavCapableUser(getActiveDemoUser()));
+  if (hermesAssistantMode === 'task' && !modes.some((mode) => mode.id === 'task')) {
+    hermesAssistantMode = 'consultation';
+  }
+  host.innerHTML = modes.map((mode) => `
+    <button type="button" role="tab" aria-selected="${hermesAssistantMode === mode.id}"
+      class="hermes-assistant-mode-tab ${hermesAssistantMode === mode.id ? 'active' : ''}"
+      onclick="selectHermesAssistantMode('${mode.id}')" title="${escapeAttr(mode.desc)}">${escapeHtml(mode.label)}</button>
+  `).join('');
+}
+
+function selectHermesAssistantMode(mode) {
+  if (mode === 'task' && !isDavCapableUser(getActiveDemoUser())) {
+    showToast('任务能力仅向当前租户的大V开放');
+    return;
+  }
+  hermesAssistantMode = mode === 'task' ? 'task' : 'consultation';
+  renderHermesWorkspace();
+}
+
+function getHermesQuickActionTarget() {
+  const items = Object.values(WATCHLIST_DETAILS_MAP || {})
+    .filter((item) => item && String(item.code || '').trim());
+  return items[0] || null;
+}
+
+function getHermesQuickActionWatchlistTargets(limit = 3) {
+  return Object.values(WATCHLIST_DETAILS_MAP || {})
+    .filter((item) => item && String(item.code || '').trim())
+    .slice(0, limit)
+    .map((item) => `${String(item.name || item.code).trim()}（${String(item.code).trim()}）`);
+}
+
+function renderHermesQuickActions() {
+  const host = document.getElementById('hermes-quick-actions');
+  if (!host) return;
+  const consultationActions = [
+    { id: 'market_today', icon: '☀️', label: '今日大盘' },
+    { id: 'stock_today', icon: '📍', label: '今日个股' },
+    { id: 'stock_deep', icon: '🔎', label: '个股深研' },
+    { id: 'watchlist_summary', icon: '🧺', label: '自选看点' },
+    { id: 'indicator_explain', icon: '📊', label: '指标解读' },
+    { id: 'report_upload', icon: '📄', label: '上传报告解读' },
+  ];
+  const taskActions = [
+    { id: 'interactions_today', icon: '🗓️', label: '今日互动简报' },
+    { id: 'interactions_yesterday', icon: '↩️', label: '昨日复盘' },
+    { id: 'interactions_week', icon: '🧭', label: '本周主题' },
+    { id: 'interactions_month', icon: '📅', label: '本月高频问题' },
+    { id: 'interactions_year', icon: '📈', label: '全年互动趋势' },
+    { id: 'interactions_all', icon: '🗂️', label: '全部互动总览' },
+  ];
+  const isTaskMode = hermesAssistantMode === 'task';
+  const actions = isTaskMode ? taskActions : consultationActions;
+  const hint = isTaskMode
+    ? '点击后按当前租户互动数据直接生成'
+    : '点击后按对应研究能力直接执行';
+  host.innerHTML = `
+    <div class="hermes-quick-actions-head"><strong>${isTaskMode ? '互动任务' : '快捷咨询'}</strong><span>${hint}</span></div>
+    <div class="hermes-quick-action-list">
+      ${actions.map((action) => `<button type="button" class="hermes-quick-action" onclick="runHermesQuickAction('${action.id}')"><span class="hermes-quick-action-icon">${action.icon}</span>${escapeHtml(action.label)}</button>`).join('')}
+    </div>
+  `;
+}
+
+async function runHermesQuickAction(actionId) {
+  const action = String(actionId || '').trim();
+  const taskQuestions = {
+    interactions_today: '请归纳今日用户评论与个股 K 线标注，生成一份运营简报。',
+    interactions_yesterday: '请归纳昨日用户评论与个股 K 线标注，生成一份运营复盘。',
+    interactions_week: '请归纳本周用户评论与个股 K 线标注，提炼高频主题、情绪和后续选题建议。',
+    interactions_month: '请归纳本月用户评论与个股 K 线标注，分析高频问题、用户关注方向和内容建议。',
+    interactions_year: '请归纳今年用户评论与个股 K 线标注，分析互动趋势、核心主题和内容规划建议。',
+    interactions_all: '请归纳所有用户评论与个股 K 线标注，输出互动总览、主要主题和后续运营建议。',
+  };
+  if (taskQuestions[action]) {
+    fillHermesQuestionInput(taskQuestions[action], { focus: false });
+    runHermesAnalysis();
+    return;
+  }
+  if (action === 'market_today') {
+    selectHermesSkill('basic');
+    fillHermesQuestionInput('请分析今天上证指数和深证成份指数的表现、板块资金与市场情绪展望。', { focus: false });
+    runHermesAnalysis();
+    return;
+  }
+  if (action === 'indicator_explain') {
+    selectHermesSkill('basic');
+    fillHermesQuestionInput('请解读上证指数的最新变化，并说明它对市场的含义。', { focus: false });
+    runHermesAnalysis();
+    return;
+  }
+  if (action === 'report_upload') {
+    selectHermesSkill('report_interpretation');
+    fillHermesQuestionInput('请解读我刚上传的报告，提炼核心结论、关键数据、风险与后续关注点。', { focus: false });
+    await openHermesFilePicker();
+    return;
+  }
+  const primary = getHermesQuickActionTarget();
+  if (!primary) {
+    showToast('请先添加至少一只自选股，再使用个股快捷研究。');
+    return;
+  }
+  const name = String(primary.name || primary.code).trim();
+  const code = String(primary.code || '').trim();
+  if (action === 'stock_today') {
+    selectHermesSkill('basic');
+    fillHermesQuestionInput(`请对今天${name}（${code}）做个股观察，说明行情、核心逻辑、重要要闻和风险。`, { focus: false });
+  } else if (action === 'stock_deep') {
+    selectHermesSkill('basic');
+    fillHermesQuestionInput(`请对${name}（${code}）做一份个股深化研究，输出最近一期的结构化分析报告。`, { focus: false });
+  } else if (action === 'watchlist_summary') {
+    const targets = getHermesQuickActionWatchlistTargets();
+    const subject = targets.length > 1 ? targets.join('、') : `${name}（${code}）`;
+    selectHermesSkill('basic');
+    fillHermesQuestionInput(`请对${subject}做精炼看点摘要，提炼各标的近期关注重点。`, { focus: false });
+  } else {
+    return;
+  }
+  runHermesAnalysis();
+}
+
+function switchFeedBoardTab(index, group = 'feed') {
+  const selector = group === 'market' ? '[data-board-group="market"]' : '[data-board-group="feed"]';
+  document.querySelectorAll(selector + '.fund-board-tab').forEach((tab, idx) => {
+    tab.classList.toggle('active', idx === index);
+  });
+  document.querySelectorAll(selector + '.fund-board-panel').forEach((panel, idx) => {
+    panel.classList.toggle('active', idx === index);
+  });
+}
+
+function openKnowledgeIntake(type) {
+  knowledgeIntakeType = KNOWLEDGE_INPUT_TYPES[type] ? type : 'voice';
+  knowledgeRecording = false;
+  knowledgeUploadSamples = [];
+  knowledgeUrlPreview = null;
+  knowledgeEditingId = '';
+  knowledgeDraft = buildKnowledgeDraft();
+  renderKnowledgeIntakeModal();
+  const modal = document.getElementById('knowledge-intake-modal');
+  if (modal) modal.classList.add('show');
+}
+
+function openKnowledgeEntryEditor(entryId) {
+  const entry = getKnowledgeEntryById(entryId);
+  if (!entry) return;
+  knowledgeEditingId = entry.id;
+  knowledgeIntakeType = KNOWLEDGE_INPUT_TYPES[entry.type] ? entry.type : 'voice';
+  knowledgeRecording = false;
+  knowledgeDraft = buildKnowledgeDraft(entry);
+  knowledgeUploadSamples = Array.isArray(entry.files) ? entry.files.slice(0) : [];
+  if (knowledgeIntakeType === 'url' && entry.url) {
+    let domain = 'example.com';
+    try {
+      domain = new URL(entry.url).host || domain;
+    } catch (e) {}
+    knowledgeUrlPreview = {
+      url: entry.url,
+      domain,
+      title: entry.title,
+      summary: entry.summary,
+    };
+  } else {
+    knowledgeUrlPreview = null;
+  }
+  renderKnowledgeIntakeModal();
+  const modal = document.getElementById('knowledge-intake-modal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeKnowledgeIntake() {
+  const modal = document.getElementById('knowledge-intake-modal');
+  if (modal) modal.classList.remove('show');
+  knowledgeRecording = false;
+}
+
+function renderKnowledgeIntakeModal() {
+  const cfg = KNOWLEDGE_INPUT_TYPES[knowledgeIntakeType];
+  const host = document.getElementById('knowledge-intake-content');
+  if (!cfg || !host) return;
+  const isEditing = !!knowledgeEditingId;
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${cfg.icon} ${isEditing ? '微调知识内容' : cfg.label}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">${isEditing ? '这里可以直接修改过去已入库的知识内容，保存后会重新同步到知识专区和 Hermes 上下文。' : cfg.desc}</div>
+    <div class="knowledge-source-selector">
+      ${Object.entries(KNOWLEDGE_INPUT_TYPES).map(([type, item]) => `
+        <div class="knowledge-source-pill ${type === knowledgeIntakeType ? 'active' : ''}" onclick="switchKnowledgeIntakeType('${type}')">
+          ${item.icon} ${item.label}
+        </div>
+      `).join('')}
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">知识标题</label>
+      <input id="knowledge-title-input" class="knowledge-modal-input" placeholder="例如：${cfg.defaultTitle}" value="${escapeHtml(knowledgeDraft.title)}" />
+    </div>
+    ${renderKnowledgeIntakeTypePanel()}
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">结构化备注</label>
+      <textarea id="knowledge-summary-input" class="knowledge-modal-textarea" placeholder="${cfg.placeholder}">${escapeHtml(knowledgeDraft.summary)}</textarea>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">处理选项</label>
+      <select id="knowledge-processing-mode" class="knowledge-modal-input">
+        <option value="none" ${knowledgeDraft.processingMode === 'none' ? 'selected' : ''}>1. 不加工，直接保留原文</option>
+        <option value="algorithm" ${knowledgeDraft.processingMode !== 'none' && knowledgeDraft.processingMode !== 'llm' ? 'selected' : ''}>2. 算法加工，做语义分析并套模板</option>
+        <option value="llm" ${knowledgeDraft.processingMode === 'llm' ? 'selected' : ''}>3. 大模型加工，生成结构化知识</option>
+      </select>
+      <div class="knowledge-rich-help" style="margin-top:8px">算法加工会做纯文本语义分析并生成模板化结构；大模型加工会调用 admin 配置的通用模型。</div>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">同步去向</label>
+      <div class="knowledge-chip-row">
+        <span class="knowledge-chip">租户知识队列</span>
+        <span class="knowledge-chip">知识专区</span>
+        <span class="knowledge-chip">Hermes 上下文</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeKnowledgeIntake()">取消</button>
+      <button class="btn-gold" onclick="submitKnowledgeIntake()">${isEditing ? '保存微调' : '提交入库'}</button>
+    </div>
+  `;
+  ensureKnowledgeEditors();
+}
+
+function renderKnowledgeIntakeTypePanel() {
+  if (knowledgeIntakeType === 'voice') {
+    return `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">录音面板</label>
+        <div class="knowledge-record-panel">
+          <div class="knowledge-record-toolbar">
+            <div class="knowledge-record-status">
+              <span class="knowledge-live-dot" style="opacity:${knowledgeRecording ? '1' : '0.35'}"></span>
+              ${knowledgeVoiceUploading ? '正在转写刚才的语音，请稍候' : (knowledgeRecording ? '正在录音，系统会自动转写' : '准备录音，可直接口述观点')}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+              <button class="btn-outline" ${knowledgeRecording || knowledgeVoiceUploading || (!String(knowledgeDraft.body || '').trim() && !String(knowledgeDraft.summary || '').trim()) ? 'disabled' : ''} style="padding:7px 12px;font-size:12px" onclick="clearKnowledgeVoiceDraft()">清空</button>
+              <button class="${knowledgeRecording ? 'btn-gold' : 'btn-outline'}" ${knowledgeVoiceUploading ? 'disabled' : ''} style="padding:7px 12px;font-size:12px" onclick="toggleKnowledgeVoiceCapture()">${knowledgeVoiceUploading ? '转写中...' : (knowledgeRecording ? '结束录音' : '开始录音')}</button>
+            </div>
+          </div>
+          <label class="knowledge-check-row" style="margin-top:10px;display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#6b7280">
+            <input type="checkbox" id="knowledge-voice-llm-enhancement" ${knowledgeDraft.useVoiceLlmEnhancement ? 'checked' : ''} onchange="toggleKnowledgeVoiceLlmEnhancement(this.checked)" ${knowledgeRecording || knowledgeVoiceUploading ? 'disabled' : ''} />
+            <span>启用大模型深度整理。关闭后仍会保留基础规则纠错、术语清洗和可编辑转写文本。</span>
+          </label>
+          <div style="margin-top:8px;font-size:11px;line-height:1.7;color:#9B7A1C;background:rgba(200,169,110,0.10);border:1px solid rgba(200,169,110,0.16);border-radius:10px;padding:8px 10px">
+            口述录制功能当前处于测试阶段，建议在安静环境下分段录入，并在提交前简单检查转写结果。
+          </div>
+          <div class="knowledge-wave"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    `;
+  }
+  if (knowledgeIntakeType === 'file') {
+    return `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">文件面板</label>
+        <div class="knowledge-upload-panel">
+          <div class="knowledge-upload-drop">
+            支持 PDF / DOCX / XLSX / TXT / MD / HTML<br>点击下方按钮选择真实文件
+            <div class="knowledge-action-row">
+              <button class="btn-outline" style="flex:1;padding:8px 10px;font-size:12px" onclick="openKnowledgeFilePicker(false)">选择文件</button>
+              <button class="btn-gold" style="flex:1;padding:8px 10px;font-size:12px" onclick="openKnowledgeFilePicker(true)">批量导入</button>
+            </div>
+          </div>
+          <div class="knowledge-chip-row" id="knowledge-file-preview">
+            ${knowledgeUploadSamples.length ? knowledgeUploadSamples.map(file => `<span class="knowledge-chip">${escapeHtml(file)}</span>`).join('') : '<span class="knowledge-chip">尚未选择文件</span>'}
+          </div>
+          ${KNOWLEDGE_USER_PREVIEW_ENABLED ? '' : '<div class="knowledge-rich-help" style="margin-top:10px">解析预览已关闭。文件会继续上传并进入后台清洗，但用户侧不展示抽取内容。</div>'}
+        </div>
+      </div>
+    `;
+  }
+  if (knowledgeIntakeType === 'manual') {
+    return `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">纯文本面板</label>
+        <div class="knowledge-rich-shell">
+          <div class="knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，和 web 后台使用同一套 Quill 编辑器。</div>
+          <div id="knowledge-body-editor" class="knowledge-rich-editor"></div>
+          <div class="knowledge-rich-help">正文会同时保留纯文本内容，用于 embedding 入库。</div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">网页 URL 面板</label>
+        <div class="knowledge-url-panel">
+        <input id="knowledge-url-input" class="knowledge-modal-input" placeholder="https://example.com/research-note" value="${escapeHtml(knowledgeDraft.url)}" />
+        <div class="knowledge-action-row">
+          <button class="btn-gold" style="flex:1;padding:8px 10px;font-size:12px" onclick="previewKnowledgeUrl()">抓取网页摘要</button>
+        </div>
+        <div id="knowledge-url-preview">
+          ${renderKnowledgeUrlPreview()}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function syncKnowledgeDraftFromModal() {
+  const titleInput = document.getElementById('knowledge-title-input');
+  const summaryInput = document.getElementById('knowledge-summary-input');
+  const urlInput = document.getElementById('knowledge-url-input');
+  const processingModeInput = document.getElementById('knowledge-processing-mode');
+  syncKnowledgeDraftFromEditors();
+  knowledgeDraft = {
+    title: titleInput ? titleInput.value : knowledgeDraft.title,
+    summary: summaryInput ? summaryInput.value : knowledgeDraft.summary,
+    body: knowledgeDraft.body,
+    bodyHtml: knowledgeDraft.bodyHtml,
+    processingMode: processingModeInput ? (processingModeInput.value || 'algorithm') : (knowledgeDraft.processingMode || 'algorithm'),
+    url: urlInput ? urlInput.value : knowledgeDraft.url,
+    useVoiceLlmEnhancement: Object.prototype.hasOwnProperty.call(knowledgeDraft, 'useVoiceLlmEnhancement') ? !!knowledgeDraft.useVoiceLlmEnhancement : true,
+  };
+}
+
+function toggleKnowledgeVoiceLlmEnhancement(checked) {
+  knowledgeDraft.useVoiceLlmEnhancement = !!checked;
+}
+
+function renderKnowledgeUrlPreview() {
+  if (!KNOWLEDGE_USER_PREVIEW_ENABLED) {
+    return '<div class="knowledge-preview-box"><div class="knowledge-preview-desc">解析预览已关闭。提交后系统仍会抓取网页并进入后台处理。</div></div>';
+  }
+  if (!knowledgeUrlPreview) {
+    return '<div class="knowledge-preview-box"><div class="knowledge-preview-desc">输入网页 URL 后可预览将被沉淀的标题、来源域名和摘要。</div></div>';
+  }
+  const modeText = Array.isArray(knowledgeUrlPreview.extraction_modes) && knowledgeUrlPreview.extraction_modes.length
+    ? ` · 解析方式：${knowledgeUrlPreview.extraction_modes.join(', ')}`
+    : '';
+  return `
+    <div class="knowledge-preview-box">
+      <div class="knowledge-preview-title">${escapeHtml(knowledgeUrlPreview.title)}</div>
+      <div class="knowledge-preview-desc">${escapeHtml(knowledgeUrlPreview.domain)}${escapeHtml(modeText)} · ${escapeHtml(knowledgeUrlPreview.summary)}</div>
+    </div>
+  `;
+}
+
+function switchKnowledgeIntakeType(type) {
+  if (!KNOWLEDGE_INPUT_TYPES[type]) return;
+  syncKnowledgeDraftFromModal();
+  if (type === 'manual' && !String(richHtmlToPlainText(knowledgeDraft.bodyHtml || '')).trim()) {
+    const voiceText = String(knowledgeDraft.body || '').trim();
+    if (voiceText) {
+      knowledgeDraft.bodyHtml = plainTextToRichHtml(voiceText);
+    }
+  }
+  knowledgeIntakeType = type;
+  knowledgeRecording = false;
+  if (type !== 'file') {
+    knowledgeUploadSamples = [];
+    knowledgeUploadBodies = [];
+    knowledgeUploadMeta = [];
+  }
+  if (type !== 'url') knowledgeUrlPreview = null;
+  renderKnowledgeIntakeModal();
+}
+
+function toggleKnowledgeVoiceCapture() {
+  if (knowledgeVoiceUploading) return;
+  syncKnowledgeDraftFromModal();
+  const blockedReason = getH5VoiceBlockedReason();
+  if (blockedReason) {
+    showToast(blockedReason);
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('当前浏览器不支持录音');
+    return;
+  }
+  if (knowledgeRecording && knowledgeVoiceRecorder) {
+    knowledgeVoiceRecorder.stop();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    knowledgeVoiceChunks = [];
+    knowledgeVoiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    knowledgeRecording = true;
+    knowledgeVoiceRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        knowledgeVoiceChunks.push(event.data);
+      }
+    };
+    knowledgeVoiceRecorder.onerror = () => {
+      knowledgeRecording = false;
+      knowledgeVoiceUploading = false;
+      stream.getTracks().forEach((track) => track.stop());
+      renderKnowledgeIntakeModal();
+      showToast('录音失败，请重试');
+    };
+    knowledgeVoiceRecorder.onstop = async () => {
+      knowledgeRecording = false;
+      knowledgeVoiceUploading = true;
+      renderKnowledgeIntakeModal();
+      const blob = new Blob(knowledgeVoiceChunks, { type: knowledgeVoiceRecorder.mimeType || 'audio/webm' });
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        const data = await uploadKnowledgeVoiceBlob(blob);
+        if (!data.async || !data.job_code) throw new Error('voice_transcribe_job_missing');
+        showToast('语音已提交，正在后台转写');
+        startAsyncJobPolling(data.job_code, {
+          onSuccess(job) {
+            const result = job.result || {};
+            const transcript = String(result.display_transcript || result.enhanced_transcript || result.transcript || '').trim();
+            const hadBody = String(knowledgeDraft.body || '').trim();
+            if (!knowledgeDraft.title.trim()) {
+              knowledgeDraft.title = '最新语音纪要整理';
+            }
+            knowledgeDraft.body = appendTranscribedText(knowledgeDraft.body, transcript || '语音转写已完成，请继续补充观点和验证节点。');
+            if (!knowledgeDraft.summary.trim()) {
+              knowledgeDraft.summary = knowledgeDraft.body ? knowledgeDraft.body.slice(0, 120) : '系统已完成语音转写，待进一步整理摘要。';
+            }
+            renderKnowledgeIntakeModal();
+            showToast(hadBody ? '录音已结束，转写结果已追加' : '录音已结束，转写结果已回填');
+          },
+          onFailed(job) {
+            showToast(job.error_message || '语音转写失败');
+          },
+        });
+      } catch (error) {
+        showToast(error.message || '语音转写失败');
+      } finally {
+        knowledgeVoiceUploading = false;
+        knowledgeVoiceRecorder = null;
+        knowledgeVoiceChunks = [];
+        renderKnowledgeIntakeModal();
+      }
+    };
+    knowledgeVoiceRecorder.start();
+    renderKnowledgeIntakeModal();
+  }).catch(() => {
+    showToast('未获得麦克风权限');
+  });
+}
+
+function openKnowledgeFilePicker(multiple) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv,.html,.htm';
+  input.multiple = !!multiple;
+  input.onchange = async () => {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    syncKnowledgeDraftFromModal();
+    knowledgeUploadSamples = [];
+    knowledgeUploadBodies = [];
+    knowledgeUploadMeta = [];
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      const resp = await fetch('/api/kol/knowledge/file-preview', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        showToast((data && data.error) || `文件解析失败：${file.name}`);
+        continue;
+      }
+      const preview = data.preview || {};
+      knowledgeUploadSamples.push(preview.filename || file.name);
+      knowledgeUploadBodies.push(preview.body || '');
+      knowledgeUploadMeta.push(preview);
+      if (KNOWLEDGE_USER_PREVIEW_ENABLED) {
+        if (!knowledgeDraft.title) knowledgeDraft.title = preview.filename || file.name;
+        if (!knowledgeDraft.summary) knowledgeDraft.summary = preview.summary || '';
+        if (!knowledgeDraft.body) knowledgeDraft.body = preview.body || preview.summary || '';
+      }
+    }
+    const mergedBody = knowledgeUploadBodies.filter(Boolean).join('\n\n');
+    const effectiveBody = mergedBody || String(knowledgeDraft.body || '').trim();
+    if (effectiveBody) {
+      knowledgeDraft.body = effectiveBody;
+      knowledgeDraft.bodyHtml = mergePlainTextIntoRichHtml(knowledgeDraft.bodyHtml || '', effectiveBody);
+      knowledgeIntakeType = 'manual';
+    }
+    renderKnowledgeIntakeModal();
+    if (knowledgeUploadSamples.length) showToast(`已解析 ${knowledgeUploadSamples.length} 个文件，可继续手动修改`);
+  };
+  input.click();
+}
+
+async function previewKnowledgeUrl() {
+  syncKnowledgeDraftFromModal();
+  const url = (knowledgeDraft.url || '').trim();
+  if (!url) {
+    showToast('请先输入 URL');
+    return;
+  }
+  const resp = await fetch('/api/kol/knowledge/url-preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '网页抓取失败');
+    return;
+  }
+  knowledgeUrlPreview = data.preview || null;
+  if (knowledgeUrlPreview) {
+    if (!knowledgeDraft.title) knowledgeDraft.title = knowledgeUrlPreview.title || '';
+    if (!knowledgeDraft.summary) knowledgeDraft.summary = knowledgeUrlPreview.summary || '';
+    const effectiveBody = knowledgeUrlPreview.body || knowledgeUrlPreview.summary || '';
+    if (effectiveBody) {
+      knowledgeDraft.body = effectiveBody;
+      knowledgeDraft.bodyHtml = mergePlainTextIntoRichHtml(knowledgeDraft.bodyHtml || '', effectiveBody);
+      knowledgeIntakeType = 'manual';
+    } else if (knowledgeUrlPreview && KNOWLEDGE_USER_PREVIEW_ENABLED && !knowledgeDraft.body) {
+      knowledgeDraft.body = knowledgeUrlPreview.body || knowledgeUrlPreview.summary || '';
+    }
+  }
+  renderKnowledgeIntakeModal();
+  if (knowledgeUrlPreview) showToast('网页内容已提取，可继续手动修改');
+}
+
+async function saveManualKnowledgeEntry(payload) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!tenantSlug) throw new Error('tenant_missing');
+  const resp = await fetch('/api/kol/knowledge/manual', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tenant_slug: tenantSlug,
+      ...payload,
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error(data.error || 'knowledge_manual_save_failed');
+  return data;
+}
+
+async function ingestKnowledgeEntry(payload) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!tenantSlug) throw new Error('tenant_missing');
+  const resp = await fetch('/api/kol/knowledge/ingest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tenant_slug: tenantSlug,
+      ...payload,
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error(data.error || 'knowledge_ingest_failed');
+  return data;
+}
+
+async function submitKnowledgeIntake() {
+  const activeUser = getActiveDemoUser();
+  const cfg = KNOWLEDGE_INPUT_TYPES[knowledgeIntakeType];
+  syncKnowledgeDraftFromModal();
+  const rawTitle = (knowledgeDraft.title || '').trim();
+  const rawSummary = (knowledgeDraft.summary || '').trim();
+  const rawBody = (knowledgeDraft.body || '').trim();
+  const editingEntry = knowledgeEditingId ? getKnowledgeEntryById(knowledgeEditingId) : null;
+  if (knowledgeIntakeType === 'file' && !knowledgeUploadSamples.length) {
+    showToast('请先选择至少一个文件');
+    return;
+  }
+  if (knowledgeIntakeType === 'url' && !knowledgeUrlPreview) {
+    showToast('请先抓取网页摘要');
+    return;
+  }
+  if (knowledgeIntakeType === 'manual' && !rawBody && !rawSummary) {
+    showToast('请先输入正文或摘要');
+    return;
+  }
+  const title = rawTitle || cfg.defaultTitle;
+  const summary = rawSummary || cfg.placeholder.replace('例如：', '');
+  const effectiveKnowledgeBody = rawBody || (knowledgeIntakeType === 'file'
+    ? knowledgeUploadBodies.join('\n\n')
+    : knowledgeIntakeType === 'url'
+      ? ((knowledgeUrlPreview && knowledgeUrlPreview.body) || summary)
+      : summary);
+  if (knowledgeIntakeType === 'manual') {
+    try {
+      const payload = await saveManualKnowledgeEntry({
+        id: editingEntry ? editingEntry.id : '',
+        title,
+        summary,
+        body: rawBody || summary,
+        raw_html: knowledgeDraft.bodyHtml || '',
+        skip_ai_processing: (knowledgeDraft.processingMode || 'algorithm') === 'none',
+        processing_mode: knowledgeDraft.processingMode || 'algorithm',
+      });
+      if (!payload.async || !payload.job_code) throw new Error('knowledge_job_missing');
+      const optimisticId = editingEntry ? editingEntry.id : `kb-pending-${Date.now()}`;
+      addOrReplaceKnowledgeEntry({
+        ...(editingEntry || {}),
+        id: optimisticId,
+        tenantId: activeUser.tenant.id,
+        type: 'manual',
+        title,
+        summary,
+      body: rawBody || summary,
+      raw_input: rawBody || summary,
+      raw_html: knowledgeDraft.bodyHtml || '',
+      status: '同步中',
+        destination: '同步中',
+        time: '刚刚',
+      source: '纯文本编写',
+      sourceDetail: '来源：纯文本编写',
+      skip_ai_processing: (knowledgeDraft.processingMode || 'algorithm') === 'none',
+      processing_mode: knowledgeDraft.processingMode || 'algorithm',
+      });
+      renderKnowledgeExperience();
+      closeKnowledgeIntake();
+      knowledgeEditingId = '';
+      knowledgeDraft = buildKnowledgeDraft();
+      showToast(editingEntry ? '知识微调已提交，后台处理中' : '知识已提交入库，后台处理中');
+      startAsyncJobPolling(payload.job_code, {
+        onSuccess(job) {
+          const result = job.result || {};
+          const hubItems = result.knowledge_hub && Array.isArray(result.knowledge_hub.items) ? result.knowledge_hub.items : [];
+          if (hubItems.length) {
+            knowledgeEntryStore = hubItems.map((item, index) => mapKnowledgeEntryForTenant(item, activeUser.tenant.id, index));
+          }
+          knowledgeStructureState.loaded = false;
+          renderKnowledgeExperience();
+          refreshKnowledgeStructure(false);
+          openReviewIngestResultModal(editingEntry ? '知识微调成功，已写入向量库' : '知识入库成功，已写入向量库', [
+            `embedding 引擎：${result.embedding_engine || '-'}`,
+            `embedding 模型：${result.embedding_model || '-'}`,
+            `存储方式：${(result.vector_record && result.vector_record.storage_mode) || '-'}`,
+            `namespace：${(result.vector_record && result.vector_record.vector_namespace) || '-'}`,
+            `知识标题：${title}`,
+            `知识摘要：${summary}`,
+            `正文预览：${(rawBody || summary || '').slice(0, 180)}`,
+          ]);
+        },
+        onFailed(job) {
+          const failedEntry = getKnowledgeEntryById(optimisticId);
+          if (failedEntry) {
+            failedEntry.status = '失败';
+            failedEntry.destination = '同步失败';
+            renderKnowledgeExperience();
+          }
+          openReviewIngestResultModal('知识入库失败', [
+            `任务编号：${job.job_code || '-'}`,
+            `异常详情：${job.error_message || job.summary || '知识入库失败'}`,
+          ]);
+          showToast(job.error_message || '知识入库失败');
+        },
+      });
+      return;
+    } catch (error) {
+      showToast(error.message || '知识入库失败');
+      return;
+    }
+  }
+  let sourceDetail = '';
+  if (knowledgeIntakeType === 'voice') {
+    const minutes = editingEntry && editingEntry.voiceMinutes ? editingEntry.voiceMinutes : 6;
+    sourceDetail = `来源：语音转写 · ${minutes}分钟`;
+  } else if (knowledgeIntakeType === 'file') {
+    sourceDetail = `来源：文件上传 · ${knowledgeUploadSamples.join(' / ')}`;
+  } else {
+    sourceDetail = `来源：网页 URL · ${knowledgeUrlPreview.domain}`;
+  }
+  try {
+    const payload = await ingestKnowledgeEntry({
+      id: editingEntry ? editingEntry.id : '',
+      knowledge_type: knowledgeIntakeType,
+      title,
+      summary,
+      body: effectiveKnowledgeBody,
+      raw_html: knowledgeDraft.bodyHtml || '',
+      source_label: cfg.label,
+      source_detail: sourceDetail,
+      tags: cfg.defaultTags.slice(0),
+      files: knowledgeIntakeType === 'file' ? knowledgeUploadSamples.slice(0) : [],
+      url: knowledgeIntakeType === 'url' && knowledgeUrlPreview ? knowledgeUrlPreview.url : '',
+      voice_minutes: knowledgeIntakeType === 'voice' ? (editingEntry && editingEntry.voiceMinutes ? editingEntry.voiceMinutes : 6) : undefined,
+      parse_meta: knowledgeIntakeType === 'file' ? knowledgeUploadMeta.slice(0, 5) : (knowledgeIntakeType === 'url' ? knowledgeUrlPreview : null),
+      skip_ai_processing: (knowledgeDraft.processingMode || 'algorithm') === 'none',
+      processing_mode: knowledgeDraft.processingMode || 'algorithm',
+    });
+    if (!payload.async || !payload.job_code) throw new Error('knowledge_job_missing');
+    const optimisticId = editingEntry ? editingEntry.id : `kb-pending-${Date.now()}`;
+    addOrReplaceKnowledgeEntry({
+      ...(editingEntry || {}),
+      id: optimisticId,
+      tenantId: activeUser.tenant.id,
+      type: knowledgeIntakeType,
+      title,
+      source: cfg.label,
+      sourceDetail,
+      summary,
+      status: '同步中',
+      time: '刚刚',
+      tags: cfg.defaultTags.slice(0),
+      destination: editingEntry ? '重新同步中' : '同步中',
+      body: effectiveKnowledgeBody,
+      raw_input: effectiveKnowledgeBody,
+      raw_html: knowledgeDraft.bodyHtml || '',
+      files: knowledgeIntakeType === 'file' ? knowledgeUploadSamples.slice(0) : [],
+      url: knowledgeIntakeType === 'url' && knowledgeUrlPreview ? knowledgeUrlPreview.url : '',
+      voiceMinutes: knowledgeIntakeType === 'voice' ? (editingEntry && editingEntry.voiceMinutes ? editingEntry.voiceMinutes : 6) : undefined,
+      processing_mode: knowledgeDraft.processingMode || 'algorithm',
+    });
+    renderKnowledgeExperience();
+    closeKnowledgeIntake();
+    knowledgeDraft = buildKnowledgeDraft();
+    knowledgeEditingId = '';
+    showToast(editingEntry ? '知识微调已提交，后台处理中' : '知识已进入租户清洗队列');
+    startAsyncJobPolling(payload.job_code, {
+      onSuccess(job) {
+        const result = job.result || {};
+        const hubItems = result.knowledge_hub && Array.isArray(result.knowledge_hub.items) ? result.knowledge_hub.items : [];
+        if (hubItems.length) {
+          knowledgeEntryStore = hubItems.map((item, index) => mapKnowledgeEntryForTenant(item, activeUser.tenant.id, index));
+        }
+        knowledgeStructureState.loaded = false;
+        renderKnowledgeExperience();
+        refreshKnowledgeStructure(false);
+        openReviewIngestResultModal(editingEntry ? '知识微调成功，已写入向量库' : '知识入库成功，已写入向量库', [
+          `embedding 引擎：${result.embedding_engine || '-'}`,
+          `embedding 模型：${result.embedding_model || '-'}`,
+          `存储方式：${(result.vector_record && result.vector_record.storage_mode) || '-'}`,
+          `namespace：${(result.vector_record && result.vector_record.vector_namespace) || '-'}`,
+          `知识标题：${title}`,
+          `知识摘要：${summary}`,
+          `正文预览：${(effectiveKnowledgeBody || '').slice(0, 180)}`,
+        ]);
+      },
+      onFailed(job) {
+        const failedEntry = getKnowledgeEntryById(optimisticId);
+        if (failedEntry) {
+          failedEntry.status = '失败';
+          failedEntry.destination = '同步失败';
+          renderKnowledgeExperience();
+        }
+        openReviewIngestResultModal('知识入库失败', [
+          `任务编号：${job.job_code || '-'}`,
+          `异常详情：${job.error_message || job.summary || '知识入库失败'}`,
+        ]);
+        showToast(job.error_message || '知识入库失败');
+      },
+    });
+  } catch (error) {
+    showToast(error.message || '知识入库失败');
+  }
+}
+
+function renderMarketDavResearchGuide(user) {
+  const guide = document.getElementById('market-dav-research-guide');
+  if (!guide) return;
+  guide.style.display = user && user.role === 'dav' ? '' : 'none';
+}
+
+function renderDemoProfile(user) {
+  if (!user) {
+    currentDemoUser = null;
+    document.body.dataset.demoRole = '';
+    window.CURRENT_DEMO_PROFILE = null;
+    renderMarketDavResearchGuide(null);
+    h5OnboardingState = normalizeH5OnboardingState({});
+    renderH5OnboardingModal();
+    setH5ShellLoggedOut(true);
+    renderH5Watermark();
+    renderH5LoginScreen();
+    return;
+  }
+  const nextOwnerKey = getWatchlistOwnerKey(user);
+  const isSameWatchlistOwner = Boolean(userWatchlistOwnerKey && userWatchlistOwnerKey === nextOwnerKey);
+  const canReuseInitialWatchlist = userWatchlistBootstrapAvailable
+    && (!userWatchlistOwnerKey || userWatchlistOwnerKey === nextOwnerKey);
+  const canReuseCurrentWatchlist = isSameWatchlistOwner && userWatchlistLoaded;
+  if (userWatchlistOwnerKey && userWatchlistOwnerKey !== nextOwnerKey) {
+    // Invalidate in-flight responses when the signed-in profile changes.
+    userWatchlistRequestSeq += 1;
+    userWatchlistLoadPromise = null;
+    userWatchlistLoadPromiseOwnerKey = '';
+    userWatchlistLoadError = '';
+    userWatchlistLoaded = false;
+    WATCHLIST_DETAILS_MAP = {};
+  }
+  userWatchlistOwnerKey = nextOwnerKey;
+  if (canReuseInitialWatchlist) {
+    WATCHLIST_DETAILS_MAP = {...INITIAL_WATCHLIST_DETAILS_MAP};
+    userWatchlistLoaded = true;
+    userWatchlistBootstrapAvailable = false;
+  }
+  currentDemoUser = user;
+  bootH5Experience();
+  document.body.dataset.demoRole = user.role || '';
+  renderMarketDavResearchGuide(user);
+  applySiteFeatureFlags();
+  window.CURRENT_DEMO_PROFILE = user;
+  syncH5OnboardingStateFromProfile(user);
+  setH5ShellLoggedOut(false);
+  renderH5Watermark();
+  const el = (id) => document.getElementById(id);
+  if (el('global-profile-avatar')) el('global-profile-avatar').textContent = user.avatar;
+  if (el('profile-avatar-lg')) el('profile-avatar-lg').textContent = user.avatar;
+  if (el('profile-name')) el('profile-name').textContent = user.name;
+  if (el('profile-tenant-brief')) el('profile-tenant-brief').textContent = user.role === 'dav'
+    ? `大V投顾身份 · 当前管理：${user.tenant.name}`
+    : `投资者身份 · 当前归属：${user.tenant.name}`;
+  if (el('profile-posts')) el('profile-posts').textContent = formatInt(user.posts);
+  if (el('profile-likes')) el('profile-likes').textContent = formatInt(user.likes);
+  if (el('profile-following')) el('profile-following').textContent = formatInt(user.following);
+  if (el('profile-followers')) el('profile-followers').textContent = formatInt(user.followers);
+  if (el('profile-posts-label')) el('profile-posts-label').textContent = user.statLabels[0];
+  if (el('profile-likes-label')) el('profile-likes-label').textContent = user.statLabels[1];
+  if (el('profile-following-label')) el('profile-following-label').textContent = user.statLabels[2];
+  if (el('profile-followers-label')) el('profile-followers-label').textContent = user.statLabels[3];
+  if (el('tenant-card-title')) el('tenant-card-title').textContent = user.tenantCardTitle;
+  if (el('tenant-name')) el('tenant-name').textContent = user.tenant.name;
+  if (el('tenant-desc')) el('tenant-desc').textContent = user.tenant.desc;
+  if (el('tenant-tier-tag')) el('tenant-tier-tag').textContent = user.membership;
+  if (el('tenant-advisor')) el('tenant-advisor').textContent = user.tenant.advisor;
+  if (el('tenant-focus')) el('tenant-focus').textContent = user.tenant.focus;
+  if (el('tenant-rights')) el('tenant-rights').textContent = user.tenant.rights;
+  if (el('tenant-relationship')) el('tenant-relationship').textContent = user.relationship;
+  if (el('profile-identity-tag')) el('profile-identity-tag').textContent = user.role === 'dav' ? '大V投顾' : '投资者';
+  if (el('profile-role-value')) el('profile-role-value').textContent = user.role === 'dav' ? '大V投顾用户' : '投资者用户';
+  if (el('profile-compute')) el('profile-compute').textContent = `⚡ ${formatInt(user.computeCredits)} 次可用`;
+  if (el('profile-service-brief')) el('profile-service-brief').textContent = user.role === 'dav'
+    ? '工作台管理 · 洞见发布 · Hermes 模板'
+    : '洞见 · Hermes 摘要';
+  renderFeaturedInsightCard();
+  renderCoreIndicatorVisibility();
+  loadFeedMarketEconomy();
+  if (el('profile-overview-card')) el('profile-overview-card').style.display = user.role === 'dav' ? 'none' : '';
+  if (el('profile-workbench-entry')) el('profile-workbench-entry').style.display = user.role === 'dav' || user.role === 'admin' ? 'flex' : 'none';
+  if (el('profile-workbench-overview-item')) el('profile-workbench-overview-item').style.display = user.role === 'dav' || user.role === 'admin' ? '' : 'none';
+  if (el('profile-workbench-label')) el('profile-workbench-label').textContent = user.workbenchLabel;
+  if (el('profile-workbench-meta')) {
+    el('profile-workbench-meta').textContent = user.role === 'dav'
+      ? 'H5 轻量协同 / Web 完整经营后台'
+      : user.workbenchHint;
+  }
+  if (el('knowledge-dav-intake-card')) el('knowledge-dav-intake-card').style.display = user.role === 'dav' ? 'block' : 'none';
+  if (el('knowledge-dav-graph-card')) el('knowledge-dav-graph-card').style.display = user.role === 'dav' ? 'block' : 'none';
+  const badgesWrap = el('profile-badges-wrap');
+  if (badgesWrap) {
+    badgesWrap.innerHTML = (user.systemBadges || user.badges || []).map(badge => `<div class="badge-chip">${badge}</div>`).join('');
+  }
+  renderDemoUserSwitchList();
+  syncTenantScopedAdvisorViews();
+  renderFundMacroDashboard();
+  refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true, rerenderReviews: true });
+  renderH5Commerce(user);
+  userWatchlistLoaded = canReuseInitialWatchlist || canReuseCurrentWatchlist;
+  userWatchlistLoadError = '';
+  if (!canReuseInitialWatchlist && !canReuseCurrentWatchlist) WATCHLIST_DETAILS_MAP = {};
+  try {
+    renderWatchlist();
+  } catch (error) {
+    console.error('renderWatchlist failed', error);
+  }
+  loadPersistedUserWatchlist();
+  renderReviewExperience();
+  renderKnowledgeExperience();
+  renderHermesWorkspace();
+  renderWorkbenchOpsStats();
+  renderFanStockSectorChart();
+  loadDmConversations();
+  if (typeof currentDmKol !== 'undefined' && currentDmKol && !canAccessAdvisor(currentDmKol.name)) {
+    closeDmChat();
+  }
+}
+
+function buildFallbackAccountSettingsPayload(user) {
+  const profile = user || currentDemoUser || {};
+  const tenant = profile.tenant || {};
+  return {
+    editable: {
+      display_name: profile.name || profile.username || '投研用户',
+      avatar: profile.avatar || '👤',
+      bio: profile.bio || '',
+      custom_tags: Array.isArray(profile.customTags) ? profile.customTags.slice() : [],
+    },
+    readonly: {
+      role_label: profile.roleLabel || (profile.role === 'dav' ? '大V投顾' : '投资者'),
+      tenant_name: tenant.name || '--',
+      advisor_name: tenant.advisor || profile.advisor_name || '--',
+      membership: profile.membership || '--',
+      relationship: profile.relationship || '--',
+      rights: tenant.rights || '--',
+      phone_masked: profile.phone_masked || '--',
+    },
+    system_badges: Array.isArray(profile.systemBadges || profile.badges) ? (profile.systemBadges || profile.badges).slice() : [],
+  };
+}
+
+function buildFallbackHelpCenterPayload(role) {
+  const normalizedRole = String(role || 'investor').trim().toLowerCase() || 'investor';
+  return {
+    title: '帮助中心',
+    subtitle: '按功能快速查找，不堆砌说明文字。',
+    role: normalizedRole,
+    categories: ['全部', '账号', '消息', '小金智能体', '洞见', '指标', '知识'],
+    articles: [
+      { id: 'account', category: '账号', title: '账号设置怎么修改', summary: '修改昵称、头像、简介和自定义关注标签。', bullets: ['租户关系和权益不在这里改。', '系统标签自动生成。', '自定义关注标签由自己维护。'], action_label: '打开账号设置', action_type: 'account_settings' },
+      { id: 'dm', category: '消息', title: '消息通知在哪里看', summary: '消息通知会直接进入消息板块。', bullets: ['投资者默认只和所属大V互动。', '大V可在消息板块处理私信和提醒。'], action_label: '打开消息板块', action_type: 'switch_tab', action_value: 'dm' },
+      { id: 'hermes', category: '小金智能体', title: '小金智能体能做什么', summary: '先由配置的 LLM 识别意图，再按六类场景分发。', bullets: ['支持今日个股观察、今日大盘观察、个股深化研究、个股看点、多支自选股综合分析和多轮闲聊。', '研究类内容由 Gangtise 返回，闲聊和产品帮助由 LLM 处理。', '会话保留上下文；对象或时间不明确时先追问，不盲猜。'], action_label: '打开小金智能体', action_type: 'switch_tab', action_value: 'hermes' },
+      { id: 'hermes-scenarios', category: '小金智能体', title: '六类场景怎么区分', summary: '简单介绍与详细综合分析是不同任务，系统会按用户目的选择能力。', bullets: ['“今天某只股票怎么样”是今日个股观察；“今天上证怎么样”是今日大盘观察。', '“深入研究”是最近一期公司一页通，不是当日报告；“简单介绍”是看点摘要，最多 6000 个证券。', '明确要求多支股票详细综合分析时，调用复盘使用的 Gangtise 多股分析能力。'], action_label: '打开小金智能体', action_type: 'switch_tab', action_value: 'hermes' },
+      { id: 'review', category: '洞见', title: '洞见怎么生成', summary: '先输入或导入素材，再选择直接编辑或智能优化，保存草稿后随时发布。', bullets: ['小金智能体回答可一键加入洞见笔记草稿。', '智能优化只处理用户提供的正文，不分析自选股。', '草稿可以反复修改，确认后再发布给粉丝。'], action_label: '打开洞见', action_type: 'switch_tab', action_value: 'review' },
+      { id: 'indicator', category: '指标', title: '智能指标怎么理解', summary: '提示词先约束逻辑，再由系统生成可确认结果。', bullets: ['已有原始指标可直接预览。', '新逻辑先临时生成再确认。'], action_label: '打开 Dashboard', action_type: 'switch_tab', action_value: 'feed' },
+      { id: 'knowledge', category: '知识', title: '知识专区怎么用', summary: '统一管理知识内容、来源和图谱关系。', bullets: ['大V看租户图谱。', 'Admin 看平台总图和单租户细图。', '小金智能体首轮意图判断直接由配置的 LLM 完成，不使用 embedding 做场景初筛。'], action_label: '打开知识', action_type: 'switch_tab', action_value: 'knowledge' },
+    ],
+  };
+}
+
+function closeAccountSettingsModal() {
+  const modal = document.getElementById('account-settings-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function focusAccountCustomTagInput() {
+  const input = document.getElementById('account-settings-custom-tag-input');
+  if (input) input.focus();
+}
+
+function renderAccountCustomTags() {
+  const host = document.getElementById('account-settings-custom-tags');
+  if (!host) return;
+  const tags = Array.isArray(currentAccountSettingsState.customTags) ? currentAccountSettingsState.customTags : [];
+  host.innerHTML = `
+    ${tags.map((tag, index) => `
+      <span class="profile-tag-chip">
+        ${escapeHtml(tag)}
+        <button type="button" onclick="removeAccountCustomTag(${index})">×</button>
+      </span>
+    `).join('')}
+    <input id="account-settings-custom-tag-input" class="profile-tag-input" placeholder="${tags.length ? '继续输入标签，回车确认' : '输入标签后回车，例如：港股互联网'}" onkeydown="handleAccountCustomTagInputKeydown(event)" onblur="commitAccountCustomTagInput()">
+    ${!tags.length ? '<span class="profile-tag-placeholder">建议只保留 3-6 个最重要的关注标签，避免信息过散。</span>' : ''}
+  `;
+}
+
+function populateAccountSettingsModal(payload) {
+  const data = payload || buildFallbackAccountSettingsPayload(currentDemoUser);
+  const editable = data.editable || {};
+  const readonly = data.readonly || {};
+  currentAccountSettingsState.editable = JSON.parse(JSON.stringify(editable));
+  currentAccountSettingsState.readonly = JSON.parse(JSON.stringify(readonly));
+  currentAccountSettingsState.customTags = Array.isArray(editable.custom_tags) ? editable.custom_tags.slice() : [];
+  currentAccountSettingsState.systemBadges = Array.isArray(data.system_badges) ? data.system_badges.slice() : [];
+  const role = currentDemoUser && currentDemoUser.role === 'dav' ? '对外简介' : '个人简介';
+  const avatarInput = document.getElementById('account-settings-avatar');
+  const nameInput = document.getElementById('account-settings-display-name');
+  const bioInput = document.getElementById('account-settings-bio');
+  if (document.getElementById('account-settings-bio-label')) document.getElementById('account-settings-bio-label').textContent = role;
+  if (avatarInput) avatarInput.value = editable.avatar || '';
+  if (nameInput) nameInput.value = editable.display_name || '';
+  if (bioInput) bioInput.value = editable.bio || '';
+  const mapping = {
+    'account-settings-role-label': readonly.role_label,
+    'account-settings-relationship': readonly.relationship,
+    'account-settings-tenant-name': readonly.tenant_name,
+    'account-settings-advisor-name': readonly.advisor_name,
+    'account-settings-phone': readonly.phone_masked,
+    'account-settings-rights': readonly.rights,
+  };
+  Object.keys(mapping).forEach((id) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = mapping[id] || '--';
+  });
+  const systemBadgesHost = document.getElementById('account-settings-system-badges');
+  if (systemBadgesHost) {
+    systemBadgesHost.innerHTML = (currentAccountSettingsState.systemBadges || []).map((badge) => `<div class="badge-chip">${escapeHtml(badge)}</div>`).join('');
+  }
+  renderAccountCustomTags();
+}
+
+async function openAccountSettingsModal() {
+  if (!currentDemoUser) {
+    showToast('请先登录');
+    return;
+  }
+  populateAccountSettingsModal(buildFallbackAccountSettingsPayload(currentDemoUser));
+  const modal = document.getElementById('account-settings-modal');
+  if (modal) modal.classList.add('show');
+  try {
+    const resp = await fetch('/api/h5/account-settings');
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'load_account_settings_failed');
+    populateAccountSettingsModal(data.settings);
+  } catch (error) {
+    showToast(error.message === 'not_logged_in' ? '请先登录' : '已使用当前页面资料作为设置初始值');
+  }
+}
+
+function addAccountCustomTag(rawValue) {
+  const values = String(rawValue || '')
+    .split(/[，,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!values.length) return;
+  const tags = Array.isArray(currentAccountSettingsState.customTags) ? currentAccountSettingsState.customTags.slice() : [];
+  values.forEach((value) => {
+    const normalized = value.length > 12 ? value.slice(0, 12) : value;
+    if (tags.some((item) => String(item).toLowerCase() === normalized.toLowerCase())) return;
+    if (tags.length >= 8) return;
+    tags.push(normalized);
+  });
+  currentAccountSettingsState.customTags = tags;
+  renderAccountCustomTags();
+}
+
+function removeAccountCustomTag(index) {
+  const tags = Array.isArray(currentAccountSettingsState.customTags) ? currentAccountSettingsState.customTags.slice() : [];
+  if (index < 0 || index >= tags.length) return;
+  tags.splice(index, 1);
+  currentAccountSettingsState.customTags = tags;
+  renderAccountCustomTags();
+}
+
+function commitAccountCustomTagInput() {
+  const input = document.getElementById('account-settings-custom-tag-input');
+  if (!input) return;
+  const value = input.value || '';
+  input.value = '';
+  addAccountCustomTag(value);
+}
+
+function handleAccountCustomTagInputKeydown(event) {
+  if (!event) return;
+  if (event.key === 'Enter' || event.key === ',') {
+    event.preventDefault();
+    commitAccountCustomTagInput();
+  }
+}
+
+async function saveH5AccountSettings() {
+  if (!currentDemoUser) {
+    showToast('请先登录');
+    return;
+  }
+  const saveBtn = document.getElementById('account-settings-save-btn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '保存中...';
+  }
+  try {
+    const payload = {
+      avatar: (document.getElementById('account-settings-avatar') || {}).value || '',
+      display_name: (document.getElementById('account-settings-display-name') || {}).value || '',
+      bio: (document.getElementById('account-settings-bio') || {}).value || '',
+      custom_tags: Array.isArray(currentAccountSettingsState.customTags) ? currentAccountSettingsState.customTags.slice() : [],
+    };
+    const resp = await fetch('/api/h5/account-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'save_account_settings_failed');
+    DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
+    window.CURRENT_DEMO_PROFILE = data.profile || window.CURRENT_DEMO_PROFILE;
+    renderDemoProfile(data.profile || getDefaultDemoUser());
+    closeAccountSettingsModal();
+    showToast('账号设置已保存');
+  } catch (error) {
+    showToast(error.message || '保存失败');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '保存';
+    }
+  }
+}
+
+function openProfileNotificationCenter() {
+  closeAccountSettingsModal();
+  closeHelpCenterModal();
+  switchTab('dm');
+  showToast('已进入消息板块');
+}
+
+function closeHelpCenterModal() {
+  const modal = document.getElementById('help-center-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function renderHelpCenterCategories() {
+  const host = document.getElementById('help-center-categories');
+  const payload = h5HelpCenterState.payload || buildFallbackHelpCenterPayload(currentDemoUser && currentDemoUser.role);
+  if (!host) return;
+  const categories = Array.isArray(payload.categories) && payload.categories.length ? payload.categories : ['全部'];
+  host.innerHTML = categories.map((category) => `
+    <button
+      type="button"
+      class="help-center-chip ${h5HelpCenterState.category === category ? 'active' : ''}"
+      onclick="selectHelpCenterCategory('${escapeAttr(category)}')"
+    >${escapeHtml(category)}</button>
+  `).join('');
+}
+
+function runHelpCenterAction(actionType, actionValue) {
+  if (actionType === 'account_settings') {
+    closeHelpCenterModal();
+    openAccountSettingsModal();
+    return;
+  }
+  if (actionType === 'switch_tab' && actionValue) {
+    closeHelpCenterModal();
+    switchTab(actionValue);
+    return;
+  }
+}
+
+function renderHelpCenterArticles() {
+  const host = document.getElementById('help-center-list');
+  const payload = h5HelpCenterState.payload || buildFallbackHelpCenterPayload(currentDemoUser && currentDemoUser.role);
+  if (!host) return;
+  const query = String(h5HelpCenterState.query || '').trim().toLowerCase();
+  const category = h5HelpCenterState.category || '全部';
+  const articles = Array.isArray(payload.articles) ? payload.articles : [];
+  const filtered = articles.filter((item) => {
+    if (category !== '全部' && item.category !== category) return false;
+    if (!query) return true;
+    const haystack = [item.title, item.summary].concat(Array.isArray(item.bullets) ? item.bullets : []).join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
+  if (!filtered.length) {
+    host.innerHTML = '<div class="help-center-empty">没有找到匹配内容。可以换个关键词，或直接去 Hermes / 洞见 / 知识专区查看对应功能。</div>';
+    return;
+  }
+  host.innerHTML = filtered.map((item) => `
+    <div class="help-center-card">
+      <div class="help-center-card-top">
+        <div>
+          <div class="help-center-card-title">${escapeHtml(item.title || '')}</div>
+          <div class="help-center-card-summary">${escapeHtml(item.summary || '')}</div>
+        </div>
+        <div class="help-center-card-category">${escapeHtml(item.category || '说明')}</div>
+      </div>
+      <div class="help-center-card-bullets">
+        ${(Array.isArray(item.bullets) ? item.bullets : []).map((bullet) => `<div class="help-center-card-bullet">• ${escapeHtml(bullet)}</div>`).join('')}
+      </div>
+      ${item.action_label ? `<div class="modal-actions" style="margin-top:10px"><button class="btn-outline" type="button" onclick="runHelpCenterAction('${escapeAttr(item.action_type || '')}','${escapeAttr(item.action_value || '')}')">${escapeHtml(item.action_label)}</button></div>` : ''}
+    </div>
+  `).join('');
+}
+
+function handleHelpCenterSearch(value) {
+  h5HelpCenterState.query = value || '';
+  renderHelpCenterArticles();
+}
+
+function selectHelpCenterCategory(category) {
+  h5HelpCenterState.category = category || '全部';
+  renderHelpCenterCategories();
+  renderHelpCenterArticles();
+}
+
+async function openHelpCenterModal() {
+  const modal = document.getElementById('help-center-modal');
+  if (modal) modal.classList.add('show');
+  const role = currentDemoUser && currentDemoUser.role ? currentDemoUser.role : 'investor';
+  if (document.getElementById('help-center-search-input')) document.getElementById('help-center-search-input').value = '';
+  h5HelpCenterState.query = '';
+  h5HelpCenterState.category = '全部';
+  h5HelpCenterState.payload = buildFallbackHelpCenterPayload(role);
+  if (document.getElementById('help-center-subtitle')) {
+    document.getElementById('help-center-subtitle').textContent = h5HelpCenterState.payload.subtitle || '按功能快速查找，不堆砌说明文字。';
+  }
+  renderHelpCenterCategories();
+  renderHelpCenterArticles();
+  try {
+    const resp = await fetch(`/api/h5/help-center?role=${encodeURIComponent(role)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'load_help_center_failed');
+    h5HelpCenterState.loaded = true;
+    h5HelpCenterState.role = role;
+    h5HelpCenterState.payload = data.help_center || buildFallbackHelpCenterPayload(role);
+    if (document.getElementById('help-center-subtitle')) {
+      document.getElementById('help-center-subtitle').textContent = h5HelpCenterState.payload.subtitle || '按功能快速查找，不堆砌说明文字。';
+    }
+    renderHelpCenterCategories();
+    renderHelpCenterArticles();
+  } catch (error) {
+    showToast('帮助中心已使用当前页面内置说明');
+  }
+}
+
+async function loginH5User(userId) {
+  if (!userId || h5LoginPendingUser) return;
+  const historyAccount = getH5LoginHistoryAccount(userId);
+  if (!historyAccount) return;
+  let requiresPasswordInput = false;
+  h5LoginPendingUser = userId;
+  h5PasswordDraftUsername = historyAccount.username;
+  h5RememberPassword = historyAccount.password_saved === true;
+  renderH5LoginScreen();
+  try {
+    if (historyAccount.password_saved && historyAccount.password) {
+      setH5LoginStatus('正在进入最近登录账号...', 'normal');
+      await loginH5Password({ username: historyAccount.username, password: historyAccount.password });
+      return;
+    }
+    requiresPasswordInput = true;
+    setH5LoginStatus('账号已回填，请输入密码后登录。', 'normal');
+    showToast('账号已回填');
+  } catch (error) {
+    setH5LoginStatus('最近账号登录失败，请重新输入密码。', 'error');
+    showToast('登录失败');
+  } finally {
+    h5LoginPendingUser = '';
+    renderH5LoginScreen();
+    if (requiresPasswordInput) {
+      const passwordField = document.getElementById('h5-login-password');
+      if (passwordField) passwordField.focus();
+    }
+  }
+}
+
+async function logoutH5User() {
+  try {
+    const resp = await fetch('/api/h5/logout', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) throw new Error(data.error || 'h5_logout_failed');
+    currentDemoUser = null;
+    window.CURRENT_DEMO_PROFILE = null;
+    hermesUsageSnapshot = null;
+    hermesCredits = 0;
+    h5OnboardingState = normalizeH5OnboardingState({});
+    renderH5OnboardingModal();
+    renderH5Watermark();
+    window.location.href = '/login';
+  } catch (error) {
+    showToast('退出失败');
+  }
+}
+
+async function switchDemoProfileUser(userId, options) {
+  options = options || {};
+  const nextUser = DEMO_PROFILE_USERS.find(user => user.username === userId);
+  if (!nextUser) return;
+  try {
+    const resp = await fetch('/api/demo-profile/switch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({profile_id: userId}),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) throw new Error(data.error || 'switch_demo_profile_failed');
+    DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
+    window.CURRENT_DEMO_PROFILE = data.current_profile || nextUser;
+    renderDemoProfile(getDefaultDemoUser());
+    await refreshHermesCredits({ silent: true });
+    if (!options.silentToast) {
+      showToast(`已切换到${nextUser.roleLabel}：${nextUser.username}`);
+    }
+    return window.CURRENT_DEMO_PROFILE;
+  } catch (error) {
+    throw error;
+  }
+}
+
+function handleH5LoginQueryFeedback() {
+  const params = new URLSearchParams(window.location.search || '');
+  const loginSuccess = String(params.get('login_success') || '').trim();
+  const loginError = String(params.get('login_error') || '').trim();
+  if (!loginSuccess && !loginError) return;
+  if (loginSuccess === 'wechat') {
+    setH5LoginStatus('微信登录成功。', 'success');
+    showToast('微信登录成功');
+  }
+  if (loginError) {
+    const errorMap = {
+      wechat_login_disabled: '微信登录当前未开启。',
+      wechat_not_configured: '微信登录尚未配置完整。',
+      wechat_code_missing: '微信授权码缺失，请重试。',
+      wechat_state_invalid: '微信登录状态失效，请重新发起登录。',
+      wechat_token_failed: '微信授权换取失败，请稍后再试。',
+      wechat_user_unbound: '当前微信账号尚未绑定平台用户。',
+      wechat_user_disabled: '当前微信账号不可登录。',
+      wechat_callback_failed: '微信登录回调失败，请稍后重试。',
+      database_unavailable: '当前数据库不可用，请稍后再试。',
+    };
+    const message = errorMap[loginError] || '登录未完成，请重试。';
+    setH5LoginStatus(message, 'error');
+    showToast(message);
+  }
+  params.delete('login_success');
+  params.delete('login_error');
+  const nextSearch = params.toString();
+  const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState({}, '', nextUrl);
+}
+
+function switchTab(tab) {
+  const activeUserForRoute = getSafeActiveDemoUser();
+  if (tab === 'workbench' && activeUserForRoute.role === 'investor') {
+    tab = 'profile';
+    showToast('当前粉丝账号不开放大V工作台入口');
+  }
+  let activePage = document.getElementById('page-' + tab);
+  if (activePage && activePage.dataset.feature && !isFeatureEnabled(activePage.dataset.feature)) {
+    tab = getFirstEnabledTab();
+    activePage = document.getElementById('page-' + tab);
+  }
+  // Hide all pages
+  ALL_TABS.forEach(t => {
+    const pageEl = document.getElementById('page-' + t);
+    if (pageEl) pageEl.classList.remove('active');
+  });
+  document.getElementById('page-fund-news-list')?.classList.remove('active');
+
+  // Remove active from all bottom nav items
+  document.querySelectorAll('.h5-nav-item').forEach(el => el.classList.remove('active'));
+
+  // Show selected page
+  if (activePage) activePage.classList.add('active');
+
+  // Activate bottom nav item
+  const navItem = document.getElementById('nav-' + tab);
+  if (navItem) navItem.classList.add('active');
+
+  if (tab === 'review') {
+    renderReviewExperience();
+  }
+
+  if (tab === 'market') {
+    switchMarketView('watchlist');
+    if (String((currentDemoUser || {}).role || '').toLowerCase() === 'dav') loadH5MarketDisplayConfig();
+  }
+
+  if (tab === 'knowledge') {
+    renderKnowledgeExperience();
+  }
+
+  if (tab === 'hermes') {
+    ensureHermesSessionBootstrap();
+    loadHermesSessionList({ silent: true }).catch(() => {});
+    renderHermesWorkspace();
+    scrollHermesThreadToBottom({ behavior: 'auto' });
+  }
+
+  if (tab === 'workbench') {
+    window.requestAnimationFrame(() => {
+      renderWorkbenchOpsStats();
+      renderFanStockSectorChart();
+      if (window.GangtiseEcharts && typeof window.GangtiseEcharts.flush === 'function') {
+        window.GangtiseEcharts.flush(document.getElementById('wb-fan-stock-sector-chart'));
+      }
+    });
+  }
+
+  if (typeof syncHeaderContext === 'function') syncHeaderContext(tab);
+
+  // Load DM list when entering DM tab
+  if (tab === 'dm') {
+    // Always reset to list view when entering
+    document.getElementById('dm-list-view').style.display = 'block';
+    document.getElementById('dm-chat-view').style.display = 'none';
+    loadDmConversations();
+  }
+}
+
+function getCurrentFanStockObservationPayload() {
+  const payload = currentTenantDashboardPayload && typeof currentTenantDashboardPayload === 'object'
+    ? currentTenantDashboardPayload
+    : (INITIAL_TENANT_DASHBOARD || {});
+  const observation = payload && typeof payload === 'object' ? payload.fan_stock_observation : null;
+  return observation && typeof observation === 'object' ? observation : {};
+}
+
+function getCurrentWorkbenchStatsPayload() {
+  const payload = currentTenantDashboardPayload && typeof currentTenantDashboardPayload === 'object'
+    ? currentTenantDashboardPayload
+    : (INITIAL_TENANT_DASHBOARD || {});
+  const stats = payload && typeof payload === 'object' ? payload.stats : null;
+  return stats && typeof stats === 'object' ? stats : {};
+}
+
+function getCurrentWorkbenchCommentAnalytics() {
+  const payload = currentTenantDashboardPayload && typeof currentTenantDashboardPayload === 'object'
+    ? currentTenantDashboardPayload
+    : (INITIAL_TENANT_DASHBOARD || {});
+  const analytics = payload && typeof payload === 'object' ? payload.watchlist_comment_analytics : null;
+  return analytics && typeof analytics === 'object' ? analytics : {};
+}
+
+function renderWorkbenchOpsStats() {
+  const stats = getCurrentWorkbenchStatsPayload();
+  const revenueValue = document.getElementById('wb-stat-revenue-value');
+  const revenueMeta = document.getElementById('wb-stat-revenue-meta');
+  const paidValue = document.getElementById('wb-stat-paid-value');
+  const paidMeta = document.getElementById('wb-stat-paid-meta');
+  const commentValue = document.getElementById('wb-stat-comments-value');
+  const commentMeta = document.getElementById('wb-stat-comments-meta');
+  const viewValue = document.getElementById('wb-stat-views-value');
+  const viewMeta = document.getElementById('wb-stat-views-meta');
+  if (revenueValue) revenueValue.textContent = `¥${formatInt(stats.monthly_revenue || 0)}`;
+  if (revenueMeta) {
+    const price = Number(stats.registration_price || 0);
+    revenueMeta.textContent = price > 0
+      ? `单价 ¥${formatInt(price)} · 环比 ${Number(stats.revenue_change || 0).toFixed(1)}%`
+      : '请先在用户管理中设置注册定价';
+  }
+  if (paidValue) paidValue.textContent = formatInt(stats.vip_subscribers || 0);
+  if (paidMeta) paidMeta.textContent = `本月新增 ${formatInt(stats.new_paid_samples_month || 0)} 位`;
+  if (commentValue) commentValue.textContent = formatInt(stats.stock_comment_count || 0);
+  if (commentMeta) commentMeta.textContent = `覆盖 ${formatInt(stats.stock_comment_stock_count || 0)} 只股票`;
+  if (viewValue) viewValue.textContent = formatInt(stats.today_views || 0);
+  if (viewMeta) viewMeta.textContent = `活跃粉丝 ${formatInt(stats.today_active_viewers || 0)} 位`;
+}
+
+function closeWorkbenchOpsModal() {
+  closeH5ModalById('workbench-ops-modal');
+}
+
+function renderWorkbenchOpsBarChart(hostId, items, valueLabel = '数量') {
+  const host = document.getElementById(hostId);
+  const list = Array.isArray(items) ? items : [];
+  if (!host || !window.GangtiseEcharts || !list.length) return;
+  window.GangtiseEcharts.render(host, {
+    color: ['#2F74C0'],
+    tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>${escapeHtml(valueLabel)}：${params.value}`),
+    grid: window.GangtiseEcharts.gridBase({ top: 24, left: 18, right: 18, bottom: 34 }),
+    xAxis: {
+      type: 'category',
+      data: list.map((item) => item.label),
+      ...window.GangtiseEcharts.axisBase({ splitLine: { show: false }, axisLabel: { color: '#445468', fontSize: 11 } }),
+    },
+    yAxis: {
+      type: 'value',
+      ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 11 } }),
+    },
+    series: [{
+      name: valueLabel,
+      type: 'bar',
+      barWidth: '46%',
+      itemStyle: { color: 'rgba(47,116,192,0.80)', borderRadius: [8, 8, 0, 0] },
+      label: { show: true, position: 'top', color: '#2F74C0', fontSize: 11 },
+      data: list.map((item) => Number(item.value || 0)),
+    }],
+  });
+}
+
+function renderWorkbenchBarChartDeferred(hostId, items, valueLabel = '数量', options = {}) {
+  const list = Array.isArray(items) ? items : [];
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  if (!list.length) {
+    host.innerHTML = `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--gray-400)">暂无${escapeHtml(valueLabel)}数据</div>`;
+    return;
+  }
+  const renderFallback = () => {
+    const target = document.getElementById(hostId);
+    if (!target) return;
+    target.innerHTML = buildWorkbenchBarChartFallbackMarkup(list, valueLabel);
+  };
+  if (!window.GangtiseEcharts || typeof window.GangtiseEcharts.render !== 'function') {
+    renderFallback();
+    return;
+  }
+  const renderNow = () => {
+    const target = document.getElementById(hostId);
+    if (!target || !window.GangtiseEcharts || typeof window.GangtiseEcharts.render !== 'function') {
+      renderFallback();
+      return;
+    }
+    const rotate = Boolean(options.rotateLabels);
+    window.GangtiseEcharts.render(target, {
+      color: ['#2F74C0'],
+      tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>${escapeHtml(valueLabel)}：${params.value}`),
+      grid: window.GangtiseEcharts.gridBase({ top: 24, left: 16, right: 18, bottom: rotate ? 52 : 44 }),
+      xAxis: {
+        type: 'category',
+        data: list.map((item) => item.label),
+        ...window.GangtiseEcharts.axisBase({
+          splitLine: { show: false },
+          axisLabel: { color: '#445468', fontSize: 11, interval: 0, rotate: rotate ? 20 : 0 },
+        }),
+      },
+      yAxis: {
+        type: 'value',
+        ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 11 } }),
+      },
+      series: [{
+        name: valueLabel,
+        type: 'bar',
+        barWidth: '46%',
+        itemStyle: { color: 'rgba(47,116,192,0.80)', borderRadius: [8, 8, 0, 0] },
+        label: { show: true, position: 'top', color: '#2F74C0', fontSize: 11 },
+        data: list.map((item) => Number(item.value || 0)),
+      }],
+    });
+    if (window.GangtiseEcharts && typeof window.GangtiseEcharts.flush === 'function') {
+      window.GangtiseEcharts.flush(target.parentElement || target);
+    }
+  };
+  window.requestAnimationFrame(() => window.requestAnimationFrame(renderNow));
+}
+
+function buildWorkbenchBarChartFallbackMarkup(items, valueLabel = '数量') {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return '';
+  const maxValue = Math.max(...list.map((item) => Number(item.value || 0)), 1);
+  return `
+    <div role="img" aria-label="${escapeHtml(valueLabel)}行业板块分布" style="height:100%;display:flex;align-items:flex-end;gap:12px;padding:10px 12px 24px;box-sizing:border-box;border-bottom:1px solid rgba(47,116,192,0.14)">
+      ${list.map((item) => {
+        const value = Number(item.value || 0);
+        const height = Math.max(8, Math.round((value / maxValue) * 150));
+        return `<div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px">
+          <span style="font-size:11px;color:#2F74C0;font-weight:700">${value}</span>
+          <span style="display:block;width:100%;max-width:46px;height:${height}px;background:linear-gradient(180deg,#4B8BC9,#2F74C0);border-radius:7px 7px 2px 2px"></span>
+          <span title="${escapeHtml(String(item.label || ''))}" style="width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-size:11px;color:#445468">${escapeHtml(String(item.label || '未分类'))}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function buildCommentSectorDistributionFallback(comments) {
+  const detailMap = WATCHLIST_DETAILS_MAP || {};
+  const counter = new Map();
+  (Array.isArray(comments) ? comments : []).forEach((item) => {
+    const code = normalizeStockLookupValue(item && item.stock_code ? item.stock_code : '');
+    if (!code) return;
+    const detail = detailMap[code] || {};
+    const sector = String(detail.industry || detail.focus || detail.board || '未分类').trim() || '未分类';
+    counter.set(sector, (counter.get(sector) || 0) + 1);
+  });
+  return Array.from(counter.entries())
+    .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0]), 'zh-Hans-CN'))
+    .map(([label, value]) => ({ label, value }));
+}
+
+function renderH5ActivityBarChart(hostId, items, kind) {
+  const host = document.getElementById(hostId);
+  const list = Array.isArray(items) ? items : [];
+  if (!host) return;
+  if (!list.length) {
+    host.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--gray-400)">当前暂无可统计的用户活动</div>';
+    return;
+  }
+  if (!window.GangtiseEcharts || typeof window.GangtiseEcharts.render !== 'function') {
+    host.innerHTML = buildWorkbenchBarChartFallbackMarkup(list.map((item) => ({ label: item.label, value: Number(item.comments || 0) + Number(item.annotations || 0) })), '用户活动');
+    return;
+  }
+  window.GangtiseEcharts.render(host, {
+    color: ['#2F74C0', '#C8A96E'],
+    tooltip: window.GangtiseEcharts.tooltipBase((params) => `${escapeHtml(params[0].name)}<br>${params.map((item) => `${escapeHtml(item.seriesName)}：${item.value}`).join('<br>')}`),
+    legend: { top: 0, right: 8, textStyle: { color: '#64748B', fontSize: 11 } },
+    grid: window.GangtiseEcharts.gridBase({ top: 34, left: 18, right: 18, bottom: 46 }),
+    xAxis: {
+      type: 'category',
+      data: list.map((item) => item.label),
+      ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10, rotate: list.length > 6 ? 28 : 0 } }),
+    },
+    yAxis: { type: 'value', ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10 } }) },
+    series: [
+      { name: '评论', type: 'bar', barMaxWidth: 18, itemStyle: { color: 'rgba(47,116,192,0.78)', borderRadius: [6, 6, 0, 0] }, data: list.map((item) => Number(item.comments || 0)) },
+      { name: '标注', type: 'bar', barMaxWidth: 18, itemStyle: { color: 'rgba(200,169,110,0.82)', borderRadius: [6, 6, 0, 0] }, data: list.map((item) => Number(item.annotations || 0)) },
+    ],
+  }, { onClick: (params) => {
+    if (params && params.name) openH5ActivityBucketModal(kind, String(params.name));
+  } });
+}
+
+function openH5ActivityBucketModal(kind, label) {
+  const analytics = getCurrentWorkbenchCommentAnalytics();
+  const bucketKey = kind === 'sector' ? 'sector' : 'day';
+  const records = (Array.isArray(analytics.activity_records) ? analytics.activity_records : [])
+    .filter((item) => item && String(item[bucketKey] || '') === String(label || ''));
+  const comments = records.filter((item) => item.type === 'comment');
+  const annotations = records.filter((item) => item.type === 'annotation');
+  const modal = document.getElementById('workbench-ops-modal');
+  const host = document.getElementById('workbench-ops-modal-content');
+  if (!modal || !host) return;
+  const renderRecords = (items, emptyText) => {
+    const sorted = items.slice().sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+    return sorted.length ? sorted.map((item) => `<div style="border:1px solid rgba(47,116,192,0.10);border-radius:10px;padding:10px;background:#F7FBFF"><div style="font-size:11px;color:var(--gray-400)">${escapeHtml(item.author_role || '')} · ${escapeHtml(item.author || '')} · ${escapeHtml(item.timestamp || '')}</div><div style="font-size:11px;color:var(--gray-400);margin-top:4px">${escapeHtml(item.stock_name || '')}</div><div style="font-size:12px;color:var(--text-main);line-height:1.6;margin-top:4px">${escapeHtml(item.content || '未填写内容')}</div></div>`).join('') : `<div style="font-size:12px;color:var(--gray-400);padding:16px 0">${emptyText}</div>`;
+  };
+  host.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div><div style="font-size:16px;font-weight:700;color:var(--white)">${escapeHtml(label)} · 活动明细</div><div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:6px">${kind === 'sector' ? '行业板块' : '日期'}范围内共 ${records.length} 条活动。</div></div>
+      <button class="btn-outline" type="button" style="padding:6px 12px;font-size:12px;white-space:nowrap" onclick="closeWorkbenchOpsModal()">关闭</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:14px;border-bottom:1px solid rgba(47,116,192,0.12);padding-bottom:10px">
+      <button class="btn-outline active" type="button" style="padding:7px 10px;font-size:11px" data-h5-activity-tab="comments" onclick="switchH5ActivityModalTab('comments')">评论 ${comments.length}</button>
+      <button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" data-h5-activity-tab="annotations" onclick="switchH5ActivityModalTab('annotations')">标注 ${annotations.length}</button>
+    </div>
+    <div id="h5-activity-comments" style="display:grid;gap:8px;margin-top:12px">${renderRecords(comments, '该范围暂无评论。')}</div>
+    <div id="h5-activity-annotations" style="display:none;gap:8px;margin-top:12px">${renderRecords(annotations, '该范围暂无标注。')}</div>
+  `;
+  modal.classList.add('show');
+}
+
+function switchH5ActivityModalTab(tab) {
+  const showAnnotations = tab === 'annotations';
+  const comments = document.getElementById('h5-activity-comments');
+  const annotations = document.getElementById('h5-activity-annotations');
+  if (comments) comments.style.display = showAnnotations ? 'none' : 'grid';
+  if (annotations) annotations.style.display = showAnnotations ? 'grid' : 'none';
+  document.querySelectorAll('[data-h5-activity-tab]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.h5ActivityTab === (showAnnotations ? 'annotations' : 'comments'));
+  });
+}
+
+function openWorkbenchOpsModal(kind) {
+  const modal = document.getElementById('workbench-ops-modal');
+  const host = document.getElementById('workbench-ops-modal-content');
+  if (!modal || !host) return;
+  const stats = getCurrentWorkbenchStatsPayload();
+  const commentAnalytics = getCurrentWorkbenchCommentAnalytics();
+  if (kind === 'views') {
+    const distribution = Array.isArray(stats.today_view_distribution) ? stats.today_view_distribution : [];
+    host.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:var(--white)">今日浏览分布</div>
+          <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:6px">只统计当前租户粉丝用户今天的浏览行为，按入口页面做分布归并。</div>
+        </div>
+        <button class="btn-outline" type="button" style="padding:6px 12px;font-size:12px;white-space:nowrap" onclick="closeWorkbenchOpsModal()">关闭</button>
+      </div>
+      <div class="profile-settings-static-grid" style="margin-top:12px">
+        <div class="profile-settings-static-card">
+          <div class="wb-stat-label">今日浏览</div>
+          <div class="wb-stat-value" style="font-size:22px">${formatInt(stats.today_views || 0)}</div>
+        </div>
+        <div class="profile-settings-static-card">
+          <div class="wb-stat-label">活跃粉丝</div>
+          <div class="wb-stat-value" style="font-size:22px">${formatInt(stats.today_active_viewers || 0)}</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;border:1px solid rgba(47,116,192,0.12);border-radius:14px;background:#FFFFFF;padding:12px">
+        <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:8px">浏览量柱状图</div>
+        <div id="wb-ops-views-chart" style="width:100%;height:240px"></div>
+      </div>
+    `;
+    modal.classList.add('show');
+    renderWorkbenchOpsBarChart('wb-ops-views-chart', distribution, '浏览量');
+    return;
+  }
+  const summary = commentAnalytics.summary || {};
+  const labels = Array.isArray(commentAnalytics.label_distribution) ? commentAnalytics.label_distribution : [];
+  const sentiments = Array.isArray(commentAnalytics.sentiment_distribution) ? commentAnalytics.sentiment_distribution : [];
+  const sectors = Array.isArray(commentAnalytics.sector_distribution) && commentAnalytics.sector_distribution.length
+    ? commentAnalytics.sector_distribution
+    : buildCommentSectorDistributionFallback(Array.isArray(commentAnalytics.recent_comments) ? commentAnalytics.recent_comments : []);
+  const keywords = Array.isArray(commentAnalytics.keyword_cloud) ? commentAnalytics.keyword_cloud : [];
+  host.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--white)">个股留言分析</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:6px">留言来自租户内自选股评论，可查看标签、情绪和行业板块分布。</div>
+      </div>
+      <button class="btn-outline" type="button" style="padding:6px 12px;font-size:12px;white-space:nowrap" onclick="closeWorkbenchOpsModal()">关闭</button>
+    </div>
+    <div class="profile-settings-static-grid" style="margin-top:12px">
+      <div class="profile-settings-static-card">
+        <div class="wb-stat-label">留言总量</div>
+        <div class="wb-stat-value" style="font-size:22px">${formatInt(summary.total_comments || 0)}</div>
+      </div>
+      <div class="profile-settings-static-card">
+        <div class="wb-stat-label">涉及个股</div>
+        <div class="wb-stat-value" style="font-size:22px">${formatInt(summary.stock_count || 0)}</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;border:1px solid rgba(47,116,192,0.12);border-radius:14px;background:#FFFFFF;padding:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-main)">关键词云</div>
+      <div class="keyword-cloud" style="margin-top:10px">
+        ${keywords.length ? keywords.slice(0, 18).map((item) => `<span class="keyword-tag">${escapeHtml(item.keyword || '')} · ${formatInt(item.value || 0)}</span>`).join('') : '<span style="font-size:12px;color:var(--gray-400)">暂无留言关键词</span>'}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px">
+      <div style="border:1px solid rgba(47,116,192,0.12);border-radius:14px;background:#FFFFFF;padding:12px">
+        <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:8px">标签分布</div>
+        <div id="wb-ops-comment-label-chart" style="width:100%;height:220px"></div>
+      </div>
+      <div style="border:1px solid rgba(47,116,192,0.12);border-radius:14px;background:#FFFFFF;padding:12px">
+        <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:8px">情绪分布</div>
+        <div id="wb-ops-comment-sentiment-chart" style="width:100%;height:220px"></div>
+      </div>
+      <div style="border:1px solid rgba(47,116,192,0.12);border-radius:14px;background:#FFFFFF;padding:12px">
+        <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:8px">行业板块分布</div>
+        <div id="wb-ops-comment-sector-chart" style="width:100%;height:220px"></div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+  renderWorkbenchOpsBarChart('wb-ops-comment-label-chart', labels.map((item) => ({ label: item.label, value: item.value })), '留言数');
+  renderWorkbenchOpsBarChart('wb-ops-comment-sentiment-chart', sentiments.map((item) => ({ label: item.label, value: item.value })), '留言数');
+  renderWorkbenchOpsBarChart('wb-ops-comment-sector-chart', sectors.map((item) => ({ label: item.label, value: item.value })), '留言数');
+}
+
+async function trackFanStockObservation(stockCode, eventType, options) {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || activeUser.role !== 'investor') return null;
+  const tenantSlug = String((activeUser.tenant || {}).slug || '').trim();
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  if (!tenantSlug || !normalizedCode) return null;
+  const opts = options || {};
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/fan-stock-observation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stock_code: normalizedCode,
+        event_type: eventType || 'watchlist_detail_view',
+        entry_point: opts.entryPoint || '',
+        source_detail: opts.sourceDetail || '',
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.ok) throw new Error(payload.error || 'fan_stock_observation_track_failed');
+    if (payload.fan_stock_observation) {
+      currentTenantDashboardPayload = {
+        ...(currentTenantDashboardPayload || {}),
+        fan_stock_observation: payload.fan_stock_observation,
+      };
+    }
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
+
+function renderFanStockSectorChart() {
+  const host = document.getElementById('wb-fan-stock-sector-chart');
+  if (!host) return;
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || activeUser.role !== 'dav') {
+    host.innerHTML = '<div class="wb-stock-sector-empty"><div class="wb-stock-sector-summary">当前为投资者身份，不展示粉丝个股观察数据。</div></div>';
+    return;
+  }
+  const analytics = getCurrentWorkbenchCommentAnalytics();
+  const summary = analytics.summary || {};
+  const sectorActivity = Array.isArray(analytics.sector_activity_distribution) ? analytics.sector_activity_distribution : [];
+  const dateActivity = Array.isArray(analytics.date_activity_distribution) ? analytics.date_activity_distribution : [];
+  if (!sectorActivity.length && !dateActivity.length) {
+    host.innerHTML = `
+      <div class="wb-stock-sector-empty">
+        <div class="wb-stock-sector-summary">${escapeHtml(analytics.summary_text || '当前还没有粉丝评论或 K 线标注统计。')}</div>
+      </div>
+    `;
+    return;
+  }
+  host.innerHTML = `
+    <div class="wb-stock-sector-summary">
+      ${escapeHtml(analytics.summary_text || '按行业板块和日期归并粉丝评论与 K 线标注，点击柱子可查看具体清单。')}
+    </div>
+    <div class="wb-stock-sector-stats">
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">留言总量</div>
+        <div class="wb-stock-sector-stat-value">${Number(summary.total_comments || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">租户内累计评论</div>
+      </div>
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">粉丝留言</div>
+        <div class="wb-stock-sector-stat-value">${Number(summary.investor_comments || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">普通用户输入</div>
+      </div>
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">涉及个股</div>
+        <div class="wb-stock-sector-stat-value">${Number(summary.stock_count || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">有讨论的标的</div>
+      </div>
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">K线标注</div>
+        <div class="wb-stock-sector-stat-value">${Number(summary.total_annotations || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">租户内 K 线标注</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;border:1px solid rgba(47,116,192,0.12);border-radius:14px;background:#FFFFFF;padding:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:8px">用户活动分布</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7">评论使用蓝色，标注使用金色。点击任意柱子查看该行业或日期下的两类明细。</div>
+      <div style="display:flex;gap:6px;margin-top:10px;border-bottom:1px solid rgba(47,116,192,0.12);padding-bottom:10px">
+        <button class="btn-outline active" type="button" style="padding:7px 10px;font-size:11px" data-h5-activity-chart-tab="sector" onclick="switchH5ActivityChartTab('sector')">行业板块</button>
+        <button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" data-h5-activity-chart-tab="date" onclick="switchH5ActivityChartTab('date')">日期趋势</button>
+      </div>
+      <div id="wb-fan-stock-sector-bar" style="width:100%;height:260px;margin-top:10px"></div>
+      <div id="wb-fan-stock-date-bar" style="width:100%;height:260px;margin-top:10px;display:none"></div>
+    </div>
+  `;
+  renderH5ActivityBarChart('wb-fan-stock-sector-bar', sectorActivity, 'sector');
+}
+
+function switchH5ActivityChartTab(tab) {
+  const isDate = tab === 'date';
+  const sectorHost = document.getElementById('wb-fan-stock-sector-bar');
+  const dateHost = document.getElementById('wb-fan-stock-date-bar');
+  if (sectorHost) sectorHost.style.display = isDate ? 'none' : '';
+  if (dateHost) dateHost.style.display = isDate ? '' : 'none';
+  document.querySelectorAll('[data-h5-activity-chart-tab]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.h5ActivityChartTab === (isDate ? 'date' : 'sector'));
+  });
+  const analytics = getCurrentWorkbenchCommentAnalytics();
+  window.requestAnimationFrame(() => renderH5ActivityBarChart(
+    isDate ? 'wb-fan-stock-date-bar' : 'wb-fan-stock-sector-bar',
+    isDate ? (analytics.date_activity_distribution || []) : (analytics.sector_activity_distribution || []),
+    isDate ? 'date' : 'sector',
+  ));
+}
+
+function openFanStockInsightStock(stockCode) {
+  const normalized = normalizeStockLookupValue(stockCode);
+  if (!normalized) return;
+  switchTab('market');
+  window.setTimeout(() => {
+    openWatchlistDetail(normalized, 'overview');
+  }, 0);
+}
+
+// ===== WATCHLIST =====
+let currentWatchlistDetail = null;
+let currentWatchlistAnnotationTarget = null;
+let pendingWatchlistRemovalCode = '';
+// Watchlist relations and annotations are server-owned. This object is only a
+// short-lived render cache for the current page session.
+let watchlistAnnotationStore = {};
+let watchlistSuggestionItems = [];
+let watchlistSuggestionMessage = '';
+let watchlistSuggestionRequestSeq = 0;
+let watchlistSuggestionTimer = null;
+const watchlistAnnotationSyncTasks = {};
+let userWatchlistLoaded = false;
+let userWatchlistLoadPromise = null;
+let userWatchlistLoadPromiseOwnerKey = '';
+let userWatchlistOwnerKey = '';
+let userWatchlistLoadError = '';
+let userWatchlistRequestSeq = 0;
+let userWatchlistBootstrapAvailable = Object.keys(INITIAL_WATCHLIST_DETAILS_MAP || {}).length > 0;
+
+function getWatchlistAnnotationBucket(tenantId, stockCode) {
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  if (!watchlistAnnotationStore[tenantId]) watchlistAnnotationStore[tenantId] = {};
+  if (!Array.isArray(watchlistAnnotationStore[tenantId][normalizedCode])) {
+    watchlistAnnotationStore[tenantId][normalizedCode] = [];
+  }
+  return watchlistAnnotationStore[tenantId][normalizedCode];
+}
+
+function getWatchlistAnnotations(tenantId, stockCode) {
+  const bucket = getWatchlistAnnotationBucket(tenantId, stockCode);
+  return bucket.slice().sort((a, b) => Number(a.candleIndex || 0) - Number(b.candleIndex || 0));
+}
+
+function replaceWatchlistAnnotations(tenantId, stockCode, items) {
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  const bucket = getWatchlistAnnotationBucket(tenantId, normalizedCode);
+  bucket.splice(0, bucket.length, ...((Array.isArray(items) ? items : []).map((item) => ({
+    id: item.id,
+    candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
+    dateLabel: item.dateLabel || item.candle_date || '',
+    content: item.content || item.note || '',
+    title: item.title || '',
+    note: item.note || '',
+    trigger: item.trigger || '',
+    created_by_user_id: item.created_by_user_id || '',
+    created_by_name: item.created_by_name || '',
+    created_by_role: item.created_by_role || '',
+    source_client: item.source_client || '',
+    updatedAt: item.updatedAt || item.updated_at || item.createdAt || item.created_at || '刚刚',
+  }))));
+}
+
+function getActiveWatchlistTenantSlug() {
+  const user = getActiveDemoUser();
+  return String((((user || {}).tenant || {}).slug) || '').trim().toLowerCase();
+}
+
+function getActiveWatchlistUserPayload() {
+  const user = getActiveDemoUser() || {};
+  return {
+    tenant_slug: String((((user || {}).tenant || {}).slug) || '').trim().toLowerCase(),
+    user_role: String(user.role || '').trim().toLowerCase(),
+    user_profile_id: String(user.username || user.id || '').trim(),
+    user_name: String(user.name || user.username || '').trim(),
+  };
+}
+
+function getWatchlistOwnerKey(user) {
+  const active = user || getActiveDemoUser() || {};
+  const tenant = String((((active || {}).tenant || {}).slug) || '').trim().toLowerCase();
+  // Registered accounts can be represented by a database id before the
+  // profile payload has been hydrated with its username.
+  const profile = String(active.username || active.id || '').trim();
+  return tenant && profile ? `${tenant}::${profile}` : '';
+}
+
+async function syncLocalWatchlistAnnotationsToServer(stockRefs) {
+  // Annotation writes are sent to the server immediately by saveWatchlistAnnotation.
+  // There is no browser-side queue to replay here.
+  return Promise.resolve();
+}
+
+function buildAnnotationId(tenantId, stockCode, candleIndex) {
+  return `${tenantId}__${normalizeStockLookupValue(stockCode)}__${candleIndex}`;
+}
+
+function getWatchlistAnnotationSummary(tenantId, stockCode) {
+  const annotations = getWatchlistAnnotations(tenantId, stockCode);
+  if (!annotations.length) return '';
+  return annotations.slice(0, 3).map(item => `${item.dateLabel || '该K线'}：${item.content || item.note || ''}`).join('；');
+}
+
+function getReviewAnnotationEntries(tenantId, stockNames) {
+  const detailsMap = WATCHLIST_DETAILS_MAP || {};
+  return (stockNames || []).map((name) => {
+    const detail = Object.values(detailsMap).find(item => item && item.name === name);
+    if (!detail) return null;
+    const annotations = getWatchlistAnnotations(tenantId, detail.code);
+    if (!annotations.length) return null;
+    return {
+      stockName: name,
+      stockCode: detail.code,
+      annotations,
+      summary: annotations.slice(0, 2).map(item => `${item.dateLabel} ${item.content || item.note || ''}`).join('；'),
+    };
+  }).filter(Boolean);
+}
+
+function getRenderedWatchlistCodes() {
+  return Array.from(document.querySelectorAll('[data-watchlist-card="true"]')).map(node => String(node.dataset.stockCode || '').toUpperCase());
+}
+
+function normalizeStockLookupValue(value) {
+  const raw = String(value || '').trim();
+  if (/^source_/i.test(raw)) return raw.toLowerCase();
+  // Annotation APIs normalize listed securities to their exchange-neutral
+  // numeric code. Keep the browser cache on that same key so a save response
+  // can immediately update the currently open chart.
+  const securityCode = raw.match(/^(\d{5,6})(?:\.(?:SH|SZ|HK))?$/i);
+  if (securityCode) return securityCode[1];
+  return raw.toUpperCase();
+}
+
+const WATCHLIST_INDICATOR_ALIAS_MAP = {
+  '上证指数': 'source_shanghai_index',
+  '上证综合指数': 'source_shanghai_index',
+  '上证综指': 'source_shanghai_index',
+  '上海综合指数': 'source_shanghai_index',
+  '沪指': 'source_shanghai_index',
+  '大盘': 'source_shanghai_index',
+  '000001.SH': 'source_shanghai_index',
+  'SH000001': 'source_shanghai_index',
+  'SH.000001': 'source_shanghai_index',
+  'sh000001': 'source_shanghai_index',
+  '深证指数': 'source_shenzhen_index',
+  '深证成指': 'source_shenzhen_index',
+  '深圳成指': 'source_shenzhen_index',
+  '深指': 'source_shenzhen_index',
+  '399001.SZ': 'source_shenzhen_index',
+  'SZ399001': 'source_shenzhen_index',
+  'SZ.399001': 'source_shenzhen_index',
+  'sz399001': 'source_shenzhen_index',
+  '沪深300': 'source_hs300',
+  '沪深300指数': 'source_hs300',
+  '000300.SH': 'source_hs300',
+  'SH000300': 'source_hs300',
+  'sh000300': 'source_hs300',
+  '上证50': 'source_sse50',
+  '上证50指数': 'source_sse50',
+  '000016.SH': 'source_sse50',
+  'SH000016': 'source_sse50',
+  'sh000016': 'source_sse50',
+  '科创50': 'source_kc50',
+  '科创50指数': 'source_kc50',
+  '000688.SH': 'source_kc50',
+  'SH000688': 'source_kc50',
+  'sh000688': 'source_kc50',
+  '创业板指': 'source_cyb',
+  '创业板指数': 'source_cyb',
+  '399006.SZ': 'source_cyb',
+  'SZ399006': 'source_cyb',
+  'sz399006': 'source_cyb',
+  '中证500': 'source_zz500',
+  '中证500指数': 'source_zz500',
+  '000905.SH': 'source_zz500',
+  'SH000905': 'source_zz500',
+  'sh000905': 'source_zz500',
+  '中证1000': 'source_zz1000',
+  '中证1000指数': 'source_zz1000',
+  '000852.SH': 'source_zz1000',
+  'SH000852': 'source_zz1000',
+  'sh000852': 'source_zz1000',
+  '中证800': 'source_zz800',
+  '中证800指数': 'source_zz800',
+  '000906.SH': 'source_zz800',
+  'SH000906': 'source_zz800',
+  'sh000906': 'source_zz800',
+  '中证A500': 'source_a500',
+  '中证A500指数': 'source_a500',
+  '000510.SH': 'source_a500',
+  'SH000510': 'source_a500',
+  'sh000510': 'source_a500',
+  '中证2000': 'source_zz2000',
+  '中证2000指数': 'source_zz2000',
+  '932000.CSI': 'source_zz2000',
+  '恒生指数': 'source_hsi',
+  '恒指': 'source_hsi',
+  '国企指数': 'source_hscei',
+  '恒生国企指数': 'source_hscei',
+  '恒生中国企业指数': 'source_hscei',
+  '红筹指数': 'source_hscci',
+  '恒生红筹指数': 'source_hscci',
+  '日经225': 'source_nikkei',
+  '日经225指数': 'source_nikkei',
+  '标普500': 'source_sp500',
+  '标普500指数': 'source_sp500',
+  'SP500': 'source_sp500',
+  'S&P500': 'source_sp500',
+  '纳斯达克指数': 'source_nasdaq',
+  '纳指': 'source_nasdaq',
+  'NASDAQ': 'source_nasdaq',
+};
+
+function resolveWatchlistIndicatorAlias(value) {
+  const query = String(value || '').trim();
+  if (!query) return '';
+  return WATCHLIST_INDICATOR_ALIAS_MAP[query] || WATCHLIST_INDICATOR_ALIAS_MAP[normalizeStockLookupValue(query)] || '';
+}
+
+function resolveWatchlistIndicatorDisplayCode(value) {
+  const indicatorCode = resolveWatchlistIndicatorAlias(value);
+  if (!indicatorCode) return '';
+  const displayMap = {
+    'source_shanghai_index': '000001.SH',
+    'source_shenzhen_index': '399001.SZ',
+    'source_hs300': '000300.SH',
+    'source_sse50': '000016.SH',
+    'source_kc50': '000688.SH',
+    'source_cyb': '399006.SZ',
+    'source_zz500': '000905.SH',
+    'source_zz1000': '000852.SH',
+    'source_zz800': '000906.SH',
+    'source_a500': '000510.SH',
+    'source_zz2000': '932000.CSI',
+    'source_hsi': 'HSI',
+    'source_hscei': 'HSCEI',
+    'source_hscci': 'HSCCI',
+    'source_nikkei': 'N225',
+    'source_sp500': 'SP500',
+    'source_nasdaq': 'NASDAQ',
+  };
+  return displayMap[indicatorCode] || indicatorCode;
+}
+
+function normalizeComparableCode(value) {
+  const normalized = normalizeStockLookupValue(value);
+  return normalized.replace(/^0+/, '') || '0';
+}
+
+function renderWatchlistSuggestionList() {
+  const host = document.getElementById('watchlist-stock-suggestion-list');
+  if (!host) return;
+  if (!watchlistSuggestionItems.length) {
+    if (!watchlistSuggestionMessage) {
+      host.style.display = 'none';
+      host.innerHTML = '';
+      return;
+    }
+    host.style.display = 'block';
+    host.innerHTML = `<div style="padding:10px 12px;color:var(--gray-400);font-size:12px;line-height:1.6">${escapeHtml(watchlistSuggestionMessage)}</div>`;
+    return;
+  }
+  host.style.display = 'block';
+  host.innerHTML = watchlistSuggestionItems.map((item, index) => `
+    <button
+      type="button"
+      style="width:100%;padding:10px 12px;border:none;border-bottom:${index === watchlistSuggestionItems.length - 1 ? 'none' : '1px solid rgba(47,116,192,0.08)'};background:#FFFFFF;text-align:left;cursor:pointer"
+      onclick="selectWatchlistSuggestionByIndex(${index})"
+    >
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text-main)">${escapeHtml(item.name || item.code || '')}</div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.code || '')} · ${escapeHtml(item.market || '')}</div>
+        </div>
+        <div style="font-size:10px;color:#2F74C0;background:rgba(47,116,192,0.08);padding:4px 8px;border-radius:999px">${escapeHtml(item.source === 'local_watchlist' ? '已有样本' : '实时检索')}</div>
+      </div>
+    </button>
+  `).join('');
+}
+
+function clearWatchlistSuggestionList() {
+  watchlistSuggestionItems = [];
+  watchlistSuggestionMessage = '';
+  renderWatchlistSuggestionList();
+}
+
+function showWatchlistSuggestionMessage(message) {
+  watchlistSuggestionItems = [];
+  watchlistSuggestionMessage = String(message || '').trim();
+  renderWatchlistSuggestionList();
+}
+
+function resolveWatchlistSuggestionFromInput(value) {
+  const query = normalizeStockLookupValue(value);
+  if (!query) return null;
+  const indicatorCode = resolveWatchlistIndicatorAlias(value);
+  if (indicatorCode) {
+    const matchedIndicator = watchlistSuggestionItems.find((item) => normalizeStockLookupValue(item.code || '') === normalizeStockLookupValue(indicatorCode));
+    if (matchedIndicator) return matchedIndicator;
+    return {
+      code: resolveWatchlistIndicatorDisplayCode(indicatorCode),
+      indicator_code: indicatorCode,
+      name: String(value || '').trim(),
+      market: 'INDICATOR',
+      source: 'local_watchlist',
+    };
+  }
+  const comparableQuery = normalizeComparableCode(query);
+  return watchlistSuggestionItems.find((item) => {
+    const code = normalizeStockLookupValue(item.code || '');
+    const name = normalizeStockLookupValue(item.name || '');
+    return code === query || name === query || normalizeComparableCode(code) === comparableQuery;
+  }) || null;
+}
+
+function selectWatchlistSuggestionByIndex(index) {
+  const item = watchlistSuggestionItems[index];
+  if (!item) return;
+  const input = document.getElementById('watchlist-stock-code-input');
+  if (input) input.value = item.name || item.code || '';
+  clearWatchlistSuggestionList();
+  openWatchlistDetail(item.code || '');
+}
+
+function handleWatchlistStockCodeInput(value) {
+  const query = String(value || '').trim();
+  if (watchlistSuggestionTimer) {
+    clearTimeout(watchlistSuggestionTimer);
+    watchlistSuggestionTimer = null;
+  }
+  if (!query) {
+    clearWatchlistSuggestionList();
+    return;
+  }
+  showWatchlistSuggestionMessage('正在检索股票...');
+  const requestSeq = ++watchlistSuggestionRequestSeq;
+  watchlistSuggestionTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch(`/api/watchlist/search?q=${encodeURIComponent(query)}&limit=8`);
+      const data = await resp.json().catch(() => ({}));
+      if (requestSeq !== watchlistSuggestionRequestSeq) return;
+      if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'watchlist_search_failed');
+      watchlistSuggestionItems = Array.isArray(data.items) ? data.items : [];
+      watchlistSuggestionMessage = watchlistSuggestionItems.length ? '' : '未找到匹配股票，请输入股票代码或选择候选结果。';
+      renderWatchlistSuggestionList();
+    } catch (error) {
+      if (requestSeq !== watchlistSuggestionRequestSeq) return;
+      showWatchlistSuggestionMessage('股票检索暂时不可用，请稍后重试。');
+    }
+  }, 160);
+}
+
+function findWatchlistCodeFromInput(value) {
+  const query = normalizeStockLookupValue(value);
+  if (!query) return '';
+  const indicatorCode = resolveWatchlistIndicatorDisplayCode(value);
+  if (indicatorCode) return indicatorCode;
+  const suggestionMatch = resolveWatchlistSuggestionFromInput(query);
+  if (suggestionMatch) return normalizeStockLookupValue(suggestionMatch.code || '');
+  const cards = Array.from(document.querySelectorAll('[data-watchlist-card="true"]'));
+  const matchedCard = cards.find(node => {
+    const code = normalizeStockLookupValue(node.dataset.stockCode || '');
+    const name = normalizeStockLookupValue(node.dataset.stockName || '');
+    return code === query
+      || normalizeComparableCode(code) === normalizeComparableCode(query)
+      || name === query;
+  });
+  if (matchedCard) return normalizeStockLookupValue(matchedCard.dataset.stockCode || '');
+  return /^(?:\d{5,6})(?:\.(?:SH|SZ|BJ|HK))?$/i.test(query) ? query : '';
+}
+
+function submitWatchlistStockCode() {
+  const input = document.getElementById('watchlist-stock-code-input');
+  const rawValue = input ? input.value : '';
+  const suggestionMatch = resolveWatchlistSuggestionFromInput(rawValue);
+  if (suggestionMatch) {
+    if (input) input.value = suggestionMatch.name || suggestionMatch.code || '';
+    clearWatchlistSuggestionList();
+    openWatchlistDetail(suggestionMatch.code || '');
+    return;
+  }
+  const stockCode = findWatchlistCodeFromInput(rawValue);
+  if (!stockCode) {
+    const query = String(rawValue || '').trim();
+    showToast(query ? '未找到匹配股票，请从候选列表选择' : '请输入股票代码或股票名称');
+    if (query) showWatchlistSuggestionMessage('未找到匹配股票，请输入股票代码或选择候选结果。');
+    return;
+  }
+  if (input) input.value = stockCode;
+  clearWatchlistSuggestionList();
+  openWatchlistDetail(stockCode);
+}
+
+function isStockInWatchlist(stockCode) {
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  return Boolean((WATCHLIST_DETAILS_MAP || {})[normalizedCode]);
+}
+
+function buildWatchlistCardHtml(detail) {
+  const hasQuote = !detail.data_unavailable
+    && Number.isFinite(Number(detail.price))
+    && Number.isFinite(Number(detail.change))
+    && Number.isFinite(Number(detail.change_pct));
+  const change = hasQuote ? Number(detail.change) : null;
+  const price = hasQuote ? Number(detail.price) : null;
+  const market = detail.market || '';
+  const focus = detail.industry || detail.focus || '个股跟踪';
+  const statusTag = isStockInWatchlist(detail.code) ? '已加入我的自选' : '支持继续加入';
+  const activeUser = getActiveDemoUser();
+  const annotations = getWatchlistAnnotations(activeUser.tenant.id, detail.code);
+  const latestAnnotation = annotations[annotations.length - 1] || null;
+  return `
+    <div
+      onclick="openWatchlistDetail('${detail.code}')"
+      data-hermes-stock="true"
+      data-watchlist-card="true"
+      data-stock-code="${detail.code}"
+      data-stock-name="${detail.name}"
+      data-stock-market="${market}"
+      data-stock-focus="${focus}"
+      style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer"
+    >
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--white)">${detail.name}</div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${detail.code} · ${market} · ${focus}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:700;color:var(--white)">${hasQuote ? price.toFixed(2) : '--'}</div>
+          <div style="font-size:12px;color:${hasQuote ? (change >= 0 ? 'var(--red)' : 'var(--green)') : 'var(--gray-400)'}">
+            ${hasQuote ? `${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(2)} (${Number(detail.change_pct).toFixed(2)}%)` : '暂无真实行情'}
+          </div>
+        </div>
+      </div>
+      ${(statusTag || annotations.length) ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        ${statusTag ? `<span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 8px;border-radius:10px">${statusTag}</span>` : ''}
+        ${annotations.length ? `<span style="font-size:10px;background:rgba(99,179,237,0.12);color:#63B3ED;padding:3px 8px;border-radius:10px">K线标注 ${annotations.length} 条</span>` : ''}
+      </div>` : ''}
+      ${latestAnnotation ? `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(47,116,192,0.08);border:1px solid rgba(47,116,192,0.12)">
+        <div style="font-size:10px;color:#63B3ED;font-weight:700">${escapeHtml(latestAnnotation.dateLabel || '--')} · 最新标注</div>
+        <div style="font-size:12px;color:var(--white);line-height:1.7;margin-top:4px">${escapeHtml(latestAnnotation.content || latestAnnotation.note || '')}</div>
+      </div>` : ''}
+      ${isStockInWatchlist(detail.code) ? `<div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.28)" onclick="event.stopPropagation();requestWatchlistRemoval('${escapeAttr(detail.code)}')">移除</button></div>` : ''}
+      <div data-review-selection-slot="true" style="display:none"></div>
+    </div>
+  `;
+}
+
+async function addCurrentStockToWatchlist() {
+  if (!currentWatchlistDetail) return;
+  const stockCode = normalizeStockLookupValue(currentWatchlistDetail.code);
+  if (!stockCode) return;
+  let saved;
+  try {
+    const tenantSlug = String((getActiveDemoUser()?.tenant || {}).slug || '').trim().toLowerCase();
+    const response = await fetch('/api/watchlist/items', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({stock_code: stockCode, stock_name: currentWatchlistDetail.name || '', tenant_slug: tenantSlug}),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_item_add_failed');
+    saved = payload.item && typeof payload.item === 'object' ? payload.item : currentWatchlistDetail;
+    WATCHLIST_DETAILS_MAP = {...(WATCHLIST_DETAILS_MAP || {}), [stockCode]: saved};
+    userWatchlistOwnerKey = getWatchlistOwnerKey();
+    userWatchlistLoadError = '';
+    userWatchlistLoaded = true;
+  } catch (error) {
+    showToast(error.message === 'database_unavailable' ? '自选股服务暂不可用，请稍后重试' : '加入自选股失败，请稍后重试');
+    return;
+  }
+  // Persistence succeeded. A rendering/analytics failure must not be reported
+  // as a failed write because the database is already the source of truth.
+  try {
+    trackFanStockObservation(stockCode, 'watchlist_add', {
+      entryPoint: 'watchlist_add',
+      sourceDetail: 'h5_watchlist',
+    });
+    renderWatchlist();
+    renderWatchlistDetail(saved, currentWatchlistSection);
+  } catch (error) {
+    console.error('watchlist persisted but UI refresh failed', error);
+  }
+  showToast('已加入自选股');
+}
+
+function requestWatchlistRemoval(stockCode) {
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  if (!normalizedCode || !isStockInWatchlist(normalizedCode)) return;
+  pendingWatchlistRemovalCode = normalizedCode;
+  if (currentWatchlistDetail && normalizeStockLookupValue(currentWatchlistDetail.code) === normalizedCode) {
+    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    return;
+  }
+  openWatchlistDetail(normalizedCode, 'overview');
+}
+
+function cancelWatchlistRemoval() {
+  pendingWatchlistRemovalCode = '';
+  if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+}
+
+async function removeCurrentStockFromWatchlist() {
+  const detail = currentWatchlistDetail || {};
+  const stockCode = normalizeStockLookupValue(detail.code || pendingWatchlistRemovalCode);
+  if (!stockCode || stockCode !== pendingWatchlistRemovalCode) return;
+  const stockName = String(detail.name || '').trim();
+  try {
+    const response = await fetch(`/api/watchlist/items/${encodeURIComponent(stockCode)}`, {method: 'DELETE'});
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_item_remove_failed');
+    const nextDetails = {...(WATCHLIST_DETAILS_MAP || {})};
+    delete nextDetails[stockCode];
+    WATCHLIST_DETAILS_MAP = nextDetails;
+    userWatchlistLoaded = true;
+    if (stockName) {
+      reviewTriggerDraft.selectedWatchlist = (reviewTriggerDraft.selectedWatchlist || []).filter((name) => name !== stockName);
+    }
+    pendingWatchlistRemovalCode = '';
+  } catch (error) {
+    showToast(error.message === 'database_unavailable' ? '自选股服务暂不可用，请稍后重试' : '移除自选股失败，请稍后重试');
+    return;
+  }
+
+  // 数据库删除已成功，后续界面刷新异常不能再被当作删除失败。
+  try {
+    renderWatchlist();
+    if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+  } catch (error) {
+    console.error('watchlist removed but UI refresh failed', error);
+  }
+  showToast(`已从自选股移除${stockName ? `：${stockName}` : ''}`);
+}
+
+function renderWatchlist() {
+  const listHost = document.getElementById('market-watchlist-list');
+  if (userWatchlistLoaded && listHost) {
+    const details = Object.values(WATCHLIST_DETAILS_MAP || {});
+    listHost.innerHTML = details.length
+      ? details.map((detail) => buildWatchlistCardHtml(detail)).join('')
+      : '<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">当前没有自选股。输入股票代码后可在详情页加入。</div>';
+  } else if (listHost) {
+    const retry = userWatchlistLoadError
+      ? `<button type="button" class="btn-outline" style="margin-top:10px;padding:6px 12px;font-size:11px" onclick="loadPersistedUserWatchlist()">重试</button>`
+      : '';
+    listHost.innerHTML = `<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">${userWatchlistLoadError || '正在加载当前用户的自选股...'}${retry}</div>`;
+  }
+  renderFundamentalWatchlistChart();
+  renderFundamentalWatchlistBoards();
+  renderFundamentalWatchlistBoards('market');
+  renderReviewWatchlistSelectionMode();
+  renderHermesWorkspace();
+}
+
+function renderFundamentalWatchlistBoards(group = 'feed') {
+  const marketGroup = group === 'market';
+  const tabsHost = document.getElementById(marketGroup ? 'market-fund-board-tabs' : 'fund-board-tabs');
+  const panelsHost = document.getElementById(marketGroup ? 'market-fund-board-panels' : 'fund-board-panels');
+  if (!tabsHost || !panelsHost) return;
+  const boards = {};
+  Object.values(WATCHLIST_DETAILS_MAP || {}).forEach((detail) => {
+    // A persisted watchlist relation must remain visible when the quote
+    // provider is unavailable. Availability only controls the card display,
+    // not whether the user's saved stock is included in the board.
+    if (!detail || !String(detail.code || '').trim()) return;
+    const boardName = String(detail.industry || detail.focus || '个股跟踪');
+    if (!boards[boardName]) boards[boardName] = [];
+    boards[boardName].push(detail);
+  });
+  const entries = Object.entries(boards);
+  const legacyList = marketGroup ? document.getElementById('market-watchlist-list') : null;
+  if (!entries.length) {
+    tabsHost.innerHTML = '';
+    panelsHost.innerHTML = '<div class="fund-board-empty">当前没有可展示的自选股行情。请先在自选股中添加标的。</div>';
+    if (legacyList) legacyList.style.display = '';
+    return;
+  }
+  if (legacyList) legacyList.style.display = 'none';
+  tabsHost.innerHTML = entries.map(([name], index) => (
+    `<button class="fund-board-tab ${index === 0 ? 'active' : ''}" data-board-group="${marketGroup ? 'market' : 'feed'}" onclick="switchFeedBoardTab(${index}, '${marketGroup ? 'market' : 'feed'}')">${escapeHtml(name)}</button>`
+  )).join('');
+  panelsHost.innerHTML = entries.map(([name, items], index) => {
+    return `<div class="fund-board-panel ${index === 0 ? 'active' : ''}" data-board-group="${marketGroup ? 'market' : 'feed'}">
+      <div class="fund-board-summary"><span>${escapeHtml(name)} · 共 ${items.length} 只自选股</span><span>查看最新行情与研究摘要</span></div>
+      <div class="fund-stock-list">${items.map((item) => {
+        const hasQuote = item.data_unavailable !== true
+          && Number.isFinite(Number(item.price))
+          && Number.isFinite(Number(item.change))
+          && Number.isFinite(Number(item.change_pct));
+        const change = Number(item.change || 0);
+        const positive = change >= 0;
+        return `<div class="fund-stock-card" onclick="openWatchlistDetailFromCard('${escapeAttr(item.code)}','overview');">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="fund-stock-name">${escapeHtml(item.name || item.code)}</div><div class="fund-stock-meta">${escapeHtml(item.code)} · ${escapeHtml(item.market || '--')} · ${escapeHtml(item.industry || item.focus || '--')}</div></div><div class="fund-stock-price-wrap"><div class="fund-stock-price">${hasQuote ? Number(item.price).toFixed(2) : '--'}</div><div class="fund-stock-change ${hasQuote ? (positive ? 'up' : 'down') : ''}">${hasQuote ? `${positive ? '▲' : '▼'} ${Math.abs(Number(item.change_pct)).toFixed(2)}%` : '暂无真实行情'}</div></div></div>
+          <div class="fund-stock-signal">${escapeHtml(item.signal_summary || '继续关注行情与研究进展')}</div>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadPersistedUserWatchlist() {
+  const ownerKey = getWatchlistOwnerKey();
+  if (!ownerKey) {
+    // A newly registered account can briefly lack profile metadata. Treat the
+    // absence of an owner key as an empty watchlist, not a failed request.
+    userWatchlistLoadError = '';
+    userWatchlistLoaded = true;
+    WATCHLIST_DETAILS_MAP = {};
+    renderWatchlist();
+    return;
+  }
+  if (userWatchlistLoadPromise && userWatchlistLoadPromiseOwnerKey === ownerKey) return userWatchlistLoadPromise;
+  const requestSeq = ++userWatchlistRequestSeq;
+  userWatchlistLoadPromiseOwnerKey = ownerKey;
+  userWatchlistLoadPromise = (async () => {
+    try {
+      const tenantSlug = encodeURIComponent(String((getActiveDemoUser()?.tenant || {}).slug || '').trim().toLowerCase());
+      const response = await fetch(`/api/watchlist/items${tenantSlug ? `?tenant_slug=${tenantSlug}` : ''}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_items_load_failed');
+      if (requestSeq !== userWatchlistRequestSeq || ownerKey !== getWatchlistOwnerKey()) return;
+      WATCHLIST_DETAILS_MAP = (Array.isArray(payload.items) ? payload.items : []).reduce((map, item) => {
+        const code = normalizeStockLookupValue(item && item.code);
+        if (code) map[code] = item;
+        return map;
+      }, {});
+      userWatchlistOwnerKey = ownerKey;
+      userWatchlistLoadError = '';
+      userWatchlistLoaded = true;
+      renderWatchlist();
+      if (reviewTriggerDraft.flowStage === 'watchlist_select') renderReviewTriggerModal(getActiveDemoUser());
+    } catch (error) {
+      if (requestSeq !== userWatchlistRequestSeq || ownerKey !== getWatchlistOwnerKey()) return;
+      console.warn('load persisted watchlist failed', error);
+      // Keep the server-rendered owner snapshot visible when the background
+      // refresh is transiently unavailable. A refresh failure must not erase
+      // a list the user was already able to see on first paint.
+      if (Object.keys(WATCHLIST_DETAILS_MAP || {}).length) {
+        userWatchlistLoadError = '';
+        userWatchlistLoaded = true;
+        showToast('自选股已保留页面快照，实时刷新暂不可用。');
+      } else {
+        const reason = String((error && error.message) || '').trim();
+        userWatchlistLoadError = reason === 'database_unavailable'
+          ? '自选股服务暂不可用，请稍后重试。'
+          : (reason === 'auth_required' || reason === 'watchlist_auth_required'
+            ? '登录状态已失效，请重新登录后查看自选股。'
+            : '自选股暂时加载失败，请点击重试。');
+        userWatchlistLoaded = false;
+      }
+      renderWatchlist();
+      if (reviewTriggerDraft.flowStage === 'watchlist_select') renderReviewTriggerModal(getActiveDemoUser());
+    } finally {
+      if (requestSeq === userWatchlistRequestSeq && ownerKey === getWatchlistOwnerKey()) {
+        userWatchlistLoadPromise = null;
+        userWatchlistLoadPromiseOwnerKey = '';
+      }
+    }
+  })();
+  return userWatchlistLoadPromise;
+}
+
+let marketOverviewLoaded = false;
+let marketSectorLoaded = false;
+let marketMacroLoaded = false;
+let marketEtfLoaded = false;
+let marketEtfItems = [];
+let marketEtfCategory = '宽基指数';
+let marketOverviewRetryCount = 0;
+let marketSectorRetryCount = 0;
+let marketMacroRetryCount = 0;
+let marketEconomyRetryCount = 0;
+
+function switchMarketView(view) {
+  const overview = view === 'overview';
+  const sectors = view === 'sectors';
+  const macro = view === 'macro';
+  const etf = view === 'etf';
+  const overviewPanel = document.getElementById('market-overview-panel');
+  const sectorPanel = document.getElementById('market-sector-panel');
+  const macroPanel = document.getElementById('market-macro-panel');
+  const etfPanel = document.getElementById('market-etf-panel');
+  const watchlistPanel = document.getElementById('market-watchlist-panel');
+  const overviewTab = document.getElementById('market-overview-tab');
+  const sectorTab = document.getElementById('market-sector-tab');
+  const macroTab = document.getElementById('market-macro-tab');
+  const etfTab = document.getElementById('market-etf-tab');
+  const watchlistTab = document.getElementById('market-watchlist-tab');
+  if (overviewPanel) overviewPanel.style.display = overview ? '' : 'none';
+  if (sectorPanel) sectorPanel.style.display = sectors ? '' : 'none';
+  if (macroPanel) macroPanel.style.display = macro ? '' : 'none';
+  if (etfPanel) etfPanel.style.display = etf ? '' : 'none';
+  if (watchlistPanel) watchlistPanel.style.display = overview || sectors || macro || etf ? 'none' : '';
+  if (overviewTab) {
+    overviewTab.classList.toggle('active', overview);
+    overviewTab.setAttribute('aria-selected', overview ? 'true' : 'false');
+    overviewTab.style.background = overview ? 'var(--gold)' : 'transparent';
+    overviewTab.style.color = overview ? 'var(--navy)' : 'var(--gray-400)';
+  }
+  if (sectorTab) {
+    sectorTab.classList.toggle('active', sectors);
+    sectorTab.setAttribute('aria-selected', sectors ? 'true' : 'false');
+    sectorTab.style.background = sectors ? 'var(--gold)' : 'transparent';
+    sectorTab.style.color = sectors ? 'var(--navy)' : 'var(--gray-400)';
+  }
+  if (macroTab) {
+    macroTab.classList.toggle('active', macro);
+    macroTab.setAttribute('aria-selected', macro ? 'true' : 'false');
+    macroTab.style.background = macro ? 'var(--gold)' : 'transparent';
+    macroTab.style.color = macro ? 'var(--navy)' : 'var(--gray-400)';
+  }
+  if (etfTab) {
+    etfTab.classList.toggle('active', etf);
+    etfTab.setAttribute('aria-selected', etf ? 'true' : 'false');
+    etfTab.style.background = etf ? 'var(--gold)' : 'transparent';
+    etfTab.style.color = etf ? 'var(--navy)' : 'var(--gray-400)';
+  }
+  if (watchlistTab) {
+    const active = !overview && !sectors && !macro && !etf;
+    watchlistTab.classList.toggle('active', active);
+    watchlistTab.setAttribute('aria-selected', active ? 'true' : 'false');
+    watchlistTab.style.background = active ? 'var(--gold)' : 'transparent';
+    watchlistTab.style.color = active ? 'var(--navy)' : 'var(--gray-400)';
+  }
+  if (overview && !marketOverviewLoaded) loadMarketOverview();
+  if (sectors && !marketSectorLoaded) loadMarketSectors();
+  if (macro && !marketMacroLoaded) loadMarketMacro();
+  if (etf && !marketEtfLoaded) loadMarketEtf();
+}
+
+function renderMarketEtf(items) {
+  const host = document.getElementById('market-etf-list');
+  const categoryHost = document.getElementById('market-etf-category-tabs');
+  if (!host || !categoryHost) return;
+  marketEtfItems = Array.isArray(items) ? items : [];
+  const categories = Array.from(new Set(marketEtfItems.map((item) => String(item.category || '').trim()).filter(Boolean)));
+  categoryHost.innerHTML = categories.map((category) => {
+    const active = category === marketEtfCategory;
+    return `<button type="button" aria-selected="${active ? 'true' : 'false'}" style="flex:0 0 auto;border:0;border-radius:7px;padding:7px 10px;background:${active ? 'var(--gold)' : 'transparent'};color:${active ? 'var(--navy)' : 'var(--gray-400)'};font-size:11px;font-weight:700;cursor:pointer" onclick="marketEtfCategory='${escapeHtml(category)}';renderMarketEtf(marketEtfItems)">${escapeHtml(category)}</button>`;
+  }).join('');
+  if (!categories.includes(marketEtfCategory)) marketEtfCategory = categories[0] || '';
+  const rows = marketEtfItems.filter((item) => String(item.category || '') === marketEtfCategory);
+  if (!rows.length) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">暂无 ETF 目录数据</div>';
+    return;
+  }
+  const formatVolume = (value) => {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number <= 0) return '--';
+    if (number >= 100000000) return `${(number / 100000000).toFixed(2)}亿`;
+    if (number >= 10000) return `${(number / 10000).toFixed(2)}万`;
+    return Math.round(number).toLocaleString('zh-CN');
+  };
+  host.innerHTML = rows.map((item) => {
+    const available = item && item.available;
+    const changePct = Number(item.change_pct);
+    const positive = Number.isFinite(changePct) && changePct >= 0;
+    const value = available && Number.isFinite(Number(item.price)) ? Number(item.price).toFixed(4) : '--';
+    const changeText = available && item.change_available === false ? '暂无涨跌' : (available && Number.isFinite(changePct) ? `${positive ? '+' : ''}${changePct.toFixed(2)}%` : '暂无真实行情');
+    const action = available ? ` onclick="openWatchlistDetail('${escapeHtml(item.security_code || item.code || '')}','overview','etf-detail')"` : '';
+    return `<button type="button"${action} style="text-align:left;width:100%;min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white);cursor:${available ? 'pointer' : 'default'};opacity:${available ? '1' : '0.72'}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.security_code || '--')} · ${escapeHtml(item.category || 'ETF')}</div></div>
+        <div style="text-align:right;flex:0 0 auto"><div style="font-size:16px;font-weight:700">${value}</div><div style="font-size:11px;color:${positive ? 'var(--red)' : 'var(--green)'}">${changeText}</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--gray-400);margin-top:9px"><span>成交量 ${formatVolume(item.volume)}</span><span>${escapeHtml(item.updated_at || '--')}</span></div>
+    </button>`;
+  }).join('');
+}
+
+async function loadMarketEtf() {
+  const host = document.getElementById('market-etf-list');
+  if (!host) return;
+  try {
+    const response = await fetch(`/api/etf-overview${marketSnapshotTenantQuery()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'etf_overview_failed');
+    marketEtfLoaded = true;
+    renderMarketEtf(payload.items || []);
+    const sourceNote = document.getElementById('market-etf-source-note');
+    if (sourceNote && payload.updated_at) sourceNote.textContent = `ETF 目录参考统一 ETF 看板，价格、涨跌和成交量只读取 Gangtise OpenAPI 真实日线行情。最近交易日：${payload.updated_at}`;
+  } catch (error) {
+    marketEtfLoaded = false;
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">ETF 行情暂时不可用，请点击重试</div><div style="grid-column:1/-1;text-align:center"><button type="button" class="btn-gold" style="font-size:12px;padding:8px 14px" onclick="loadMarketEtf()">重试</button></div>';
+  }
+}
+
+function renderMarketOverview(items) {
+  const host = document.getElementById('market-overview-list');
+  if (!host) return;
+  const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available);
+  const sourceNote = document.getElementById('market-overview-source-note');
+  if (sourceNote && rows.some((item) => item && item.demo)) sourceNote.textContent = '当前为演示数据，仅用于页面演示；真实市场快照入库后自动替换。';
+  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = 'AKShare 市场快照正在同步，当前停止展示过期数据。';
+  if (!rows.length && host.querySelector('[data-market-index-code]')) return;
+  host.innerHTML = rows.map((item) => {
+    const available = item && item.available;
+    const change = Number(item.change || 0);
+    const pct = Number(item.change_pct || 0);
+    const value = available && Number.isFinite(Number(item.price)) ? Number(item.price).toFixed(2) : '--';
+    return `<button type="button" data-market-index-code="${escapeHtml(item.indicator_code || '')}" style="text-align:left;width:100%;min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white);cursor:${available ? 'pointer' : 'default'}" onclick="${available ? `openWatchlistDetail('${escapeHtml(item.indicator_code || item.code || '')}')` : ''}">
+      <div style="display:flex;justify-content:space-between;gap:8px;min-width:0">
+        <div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.code || '--')} · ${escapeHtml(item.market || '--')}</div></div>
+        <div style="text-align:right;flex:0 0 auto"><div style="font-size:16px;font-weight:700">${value}</div><div style="font-size:11px;color:${change >= 0 ? 'var(--red)' : 'var(--green)'}">${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(2)} (${pct.toFixed(2)}%)</div></div>
+      </div>
+      ${available ? `<div style="display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--gray-400);margin-top:9px"><span>更新：${escapeHtml(item.updated_at || '--')}</span><span>查看日K线</span></div>` : ''}
+    </button>`;
+  }).join('');
+  if (!rows.length) host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">市场数据正在由后台同步，请稍后查看</div>';
+}
+
+async function loadMarketOverview() {
+  const host = document.getElementById('market-overview-list');
+  if (!host) return;
+  try {
+    const response = await fetch(`/api/market-overview${marketSnapshotTenantQuery()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_overview_failed');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    marketOverviewLoaded = items.some((item) => item && item.available);
+    if (marketOverviewLoaded) marketOverviewRetryCount = 0;
+    renderMarketOverview(items);
+    if (!marketOverviewLoaded && marketOverviewRetryCount < 10) {
+      marketOverviewRetryCount += 1;
+      window.setTimeout(loadMarketOverview, 2500);
+    }
+  } catch (error) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行情暂时不可用，请稍后重试</div>';
+  }
+}
+
+function renderMarketMacro(items) {
+  const host = document.getElementById('market-macro-list');
+  if (!host) return;
+  const hiddenMacroCodes = new Set(['source_urban_unemployment', 'source_real_estate_investment_yoy']);
+  const rows = (Array.isArray(items) ? items : []).filter((item) => item && !hiddenMacroCodes.has(String(item.indicator_code || '')));
+  const sourceNote = document.getElementById('market-macro-source-note');
+  if (sourceNote && rows.some((item) => item && item.stale)) sourceNote.textContent = '宏观数据正在同步，当前展示最近一次 AKShare 真实快照。';
+  host.innerHTML = rows.map((item) => {
+    const available = Boolean(item && item.available);
+    const value = available && Number.isFinite(Number(item.value)) ? Number(item.value).toFixed(2) : '--';
+    const unit = String((item && item.unit) || '');
+    const history = (Array.isArray(item.history_series) ? item.history_series : [])
+      .filter((point) => point && Number.isFinite(Number(point.value)));
+    const latestValue = Number(item && item.value);
+    const previousValue = history.length >= 2 ? Number(history[history.length - 2].value) : NaN;
+    const change = Number.isFinite(latestValue) && Number.isFinite(previousValue) ? latestValue - previousValue : NaN;
+    const direction = Number.isFinite(change) ? (change > 0 ? 'up' : (change < 0 ? 'down' : 'flat')) : 'flat';
+    const arrow = direction === 'up' ? '▲' : (direction === 'down' ? '▼' : '—');
+    const changeText = Number.isFinite(change) ? `${arrow} ${change > 0 ? '+' : ''}${change.toFixed(2)}${unit}` : '— 暂无上期数据';
+    const changeColor = direction === 'up' ? 'var(--red)' : (direction === 'down' ? 'var(--green)' : 'var(--gray-400)');
+    return `<div style="min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white);opacity:${available ? '1' : '0.72'}">
+      <div style="display:flex;justify-content:space-between;gap:8px;min-width:0;align-items:flex-start">
+        <div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">宏观经济${unit ? ` · ${escapeHtml(unit)}` : ''}</div></div>
+        <div style="text-align:right;flex:0 0 auto"><div style="font-size:16px;font-weight:700">${value}${unit ? `<span style="font-size:11px;margin-left:3px;color:var(--gray-300)">${escapeHtml(unit)}</span>` : ''}</div><div style="font-size:11px;color:${changeColor}">${available ? changeText : '等待同步'}</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:9px;font-size:10px;color:var(--gray-400)"><span>${available ? (Number.isFinite(change) ? `较上期 ${change > 0 ? '+' : ''}${change.toFixed(2)}${escapeHtml(unit)}` : '暂无上期数据') : escapeHtml(item.message || '暂未获取到精确口径数据')}</span><span>${escapeHtml(item.updated_at || '--')}</span></div>
+    </div>`;
+  }).join('');
+  if (!rows.length) host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">暂无已发布的宏观指标</div>';
+}
+
+async function loadMarketMacro() {
+  const host = document.getElementById('market-macro-list');
+  if (!host) return;
+  try {
+    const response = await fetch(`/api/macro-overview${marketSnapshotTenantQuery()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'macro_overview_failed');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    marketMacroLoaded = items.length > 0 || Boolean((payload.tenant_display_config || {}).configured);
+    if (marketMacroLoaded) marketMacroRetryCount = 0;
+    renderMarketMacro(items);
+    if (!marketMacroLoaded && marketMacroRetryCount < 10) {
+      marketMacroRetryCount += 1;
+      window.setTimeout(loadMarketMacro, 2500);
+    }
+  } catch (error) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实宏观数据暂时不可用，请稍后重试</div>';
+  }
+}
+
+async function refreshMarketSnapshot() {
+  showToast('正在刷新市场与行业数据');
+  try {
+    const response = await fetch('/api/market-snapshot/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}});
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_snapshot_refresh_failed');
+    marketOverviewLoaded = true;
+    marketSectorLoaded = true;
+    renderMarketOverview((payload.overview || {}).items || []);
+    renderMarketSectors((payload.sectors || {}).items || []);
+    renderMarketMacro((payload.macro || {}).items || []);
+    showToast(`已更新 ${Number((payload.result || {}).updated || 0)} 条真实行情`);
+  } catch (error) {
+    showToast(error.message || '市场数据刷新失败');
+  }
+}
+
+function renderMarketSectors(items) {
+  const host = document.getElementById('market-sector-list');
+  if (!host) return;
+  const rows = Array.isArray(items) ? items : [];
+  const sourceNote = document.getElementById('market-sector-source-note');
+  if (sourceNote && rows.some((item) => item && item.demo)) sourceNote.textContent = '当前为演示数据，仅用于页面演示；真实行业快照入库后自动替换。';
+  const renderColumn = (title, columnItems, color) => `<div style="min-width:0">
+    <div style="display:flex;align-items:center;gap:6px;margin:0 0 8px 2px;font-size:12px;font-weight:700;color:${color}"><span style="width:6px;height:6px;border-radius:50%;background:${color}"></span>${title}</div>
+    <div style="display:grid;gap:8px">
+    ${columnItems.map((item) => {
+    const change = Number(item.change || 0);
+    const pct = Number(item.change_pct || 0);
+    const positive = change >= 0;
+    return `<div style="min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white)">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.sector || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.code || '--')} · 一级行业</div></div><div style="text-align:right;flex:0 0 auto"><div style="font-size:16px;font-weight:700">${Number(item.value || 0).toFixed(2)}</div><div style="font-size:11px;color:${positive ? 'var(--red)' : 'var(--green)'}">${positive ? '▲' : '▼'} ${Math.abs(pct).toFixed(2)}%</div></div></div>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:9px;font-size:10px;color:var(--gray-400)"><span>点位变动 ${positive ? '+' : ''}${change.toFixed(2)}</span><span>${escapeHtml(item.updated_at || '--')}</span></div>
+    </div>`;
+    }).join('') || '<div style="padding:16px 10px;border:1px dashed rgba(200,169,110,0.18);border-radius:10px;color:var(--gray-400);font-size:11px;text-align:center">暂无真实数据</div>'}
+    </div>
+  </div>`;
+  if (!rows.length) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">当前没有达到真实行业行情展示条件的数据</div>';
+    return;
+  }
+  const gains = rows.filter(item => Number(item.change_pct || 0) >= 0).sort((a, b) => Number(b.change_pct || 0) - Number(a.change_pct || 0));
+  const losses = rows.filter(item => Number(item.change_pct || 0) < 0).sort((a, b) => Number(a.change_pct || 0) - Number(b.change_pct || 0));
+  host.style.gridTemplateColumns = 'repeat(2,minmax(0,1fr))';
+  host.innerHTML = renderColumn('涨幅', gains, 'var(--red)') + renderColumn('跌幅', losses, 'var(--green)');
+}
+
+async function loadMarketSectors() {
+  const host = document.getElementById('market-sector-list');
+  if (!host) return;
+  try {
+    const response = await fetch(`/api/market-sectors${marketSnapshotTenantQuery()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_sector_overview_failed');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    marketSectorLoaded = items.length > 0;
+    if (marketSectorLoaded) marketSectorRetryCount = 0;
+    renderMarketSectors(items);
+    // Industry data is a PostgreSQL snapshot. Do not poll the provider from
+    // the page; an Admin must run the market snapshot task manually.
+  } catch (error) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行业行情暂时不可用，请稍后重试</div>';
+  }
+}
+
+function calcMovingAverage(series, windowSize) {
+  return series.map((item, index) => {
+    if (index + 1 < windowSize) return null;
+    const slice = series.slice(index + 1 - windowSize, index + 1);
+    const sum = slice.reduce((total, row) => total + Number(row.close || 0), 0);
+    return Number((sum / windowSize).toFixed(2));
+  });
+}
+
+function buildWatchlistComputedMetrics(series, maxWindow = 90) {
+  const list = Array.isArray(series)
+    ? series
+        .map((item) => ({
+          ...item,
+          open: Number(item?.open || 0),
+          high: Number(item?.high || 0),
+          low: Number(item?.low || 0),
+          close: Number(item?.close || 0),
+        }))
+        .filter((item) => Number.isFinite(item.close) && item.close > 0)
+    : [];
+  if (!list.length) {
+    return `
+      <div style="grid-column:1/-1;background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:10px;padding:12px;font-size:12px;color:var(--gray-400);text-align:center">
+        暂无可计算的 K 线数据
+      </div>
+    `;
+  }
+  const windowSize = Math.min(list.length, maxWindow);
+  const windowSeries = list.slice(-windowSize);
+  const latest = list[list.length - 1];
+  const first = windowSeries[0] || latest;
+  const highs = windowSeries.map((item) => Number(item.high || item.close || 0));
+  const lows = windowSeries.map((item) => Number(item.low || item.close || 0));
+  const rangeHigh = highs.length ? Math.max(...highs) : Number(latest.close || 0);
+  const rangeLow = lows.length ? Math.min(...lows) : Number(latest.close || 0);
+  const amplitude = rangeLow > 0 ? ((rangeHigh - rangeLow) / rangeLow) * 100 : 0;
+  const trendPct = Number(first.close || 0) > 0 ? ((Number(latest.close || 0) - Number(first.close || 0)) / Number(first.close || 0)) * 100 : 0;
+  const trendLabel = trendPct > 0.5 ? '上涨' : trendPct < -0.5 ? '下跌' : '震荡';
+  const cards = [
+    {
+      label: '最近收盘价',
+      value: Number(latest.close || 0).toFixed(2),
+      note: '最近一个交易日结束时的价格',
+    },
+    {
+      label: `近${windowSize}个交易日价格范围`,
+      value: `${Number(rangeLow || 0).toFixed(2)} ~ ${Number(rangeHigh || 0).toFixed(2)}`,
+      note: '这段时间出现过的最低价到最高价',
+    },
+    {
+      label: `近${windowSize}个交易日波动范围`,
+      value: `${Math.abs(Number(amplitude || 0)).toFixed(2)}%`,
+      note: '最高价和最低价之间相差了多少',
+    },
+    {
+      label: `近${windowSize}个交易日大致方向`,
+      value: trendLabel,
+      note: `从最早到最近的收盘价变化 ${trendPct >= 0 ? '+' : ''}${Number(trendPct || 0).toFixed(2)}%`,
+    },
+  ];
+  return cards.map(metric => `
+    <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:10px;padding:10px">
+      <div style="font-size:10px;color:var(--gray-400)">${metric.label}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--gold);margin-top:4px">${metric.value}</div>
+      <div style="font-size:10px;color:var(--gray-400);margin-top:4px;line-height:1.6">${metric.note}</div>
+    </div>
+  `).join('');
+}
+
+function buildWatchlistKlineSvg(series, options) {
+  const config = options || {};
+  const list = Array.isArray(series) ? series : [];
+  if (!list.length) {
+    return `
+      <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:18px;text-align:center;font-size:12px;color:var(--gray-400)">
+        暂无 K 线数据
+      </div>
+    `;
+  }
+  const chartPayload = {
+    candles: list,
+    ma5: buildMovingAverageSeries(list, 5),
+    ma10: buildMovingAverageSeries(list, 10),
+    ma20: buildMovingAverageSeries(list, 20),
+    anomalies: [],
+  };
+  const shell = buildInlineChartShell('watchlist-kline', '220px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildKlineOption(chartPayload, {
+      candleLabel: config.candleLabel || '日K线',
+      annotations: Array.isArray(config.annotations) ? config.annotations : [],
+    }), {
+      onClick: (params) => {
+        const annotationCandleIndex = params && params.seriesName === '标注'
+          ? Number(params.data && params.data.candleIndex)
+          : NaN;
+        const candleIndex = Number.isInteger(annotationCandleIndex)
+          ? annotationCandleIndex
+          : (params && params.seriesType === 'candlestick' ? params.dataIndex : NaN);
+        if (Number.isInteger(candleIndex)) openWatchlistAnnotationModal(candleIndex);
+      },
+    });
+  });
+  return `
+    <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--text-main)">${escapeHtml(config.candleLabel || '日K线走势')}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>5天平均价</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>10天平均价</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>20天平均价</span>
+        </div>
+      </div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function isCnStockMarketOpenNow() {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) return false;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return (minutes >= 9 * 60 + 30 && minutes < 11 * 60 + 30) || (minutes >= 13 * 60 && minutes < 15 * 60);
+}
+
+function buildWatchlistIntradaySvg(series, unavailableMessage, source, tradeDate) {
+  const rows = Array.isArray(series) ? series.filter(item => item && typeof item === 'object') : [];
+  if (!rows.length) {
+    return `
+      <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:12px;padding:18px;text-align:center;font-size:12px;color:var(--gray-400)">
+        ${escapeHtml(unavailableMessage || '当前暂未获取到分时数据')}
+      </div>
+    `;
+  }
+  const shell = buildInlineChartShell('watchlist-intraday', '220px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildLineOption(rows, {
+      seriesName: '分时曲线',
+      valueLabel: '最新价',
+      lineColor: '#2F74C0',
+    }));
+  });
+  const latest = rows[rows.length - 1] || {};
+  const first = rows[0] || latest;
+  const changePct = Number(first.value || 0) > 0 ? ((Number(latest.value || 0) - Number(first.value || 0)) / Number(first.value || 0)) * 100 : 0;
+  return `
+    <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--text-main)">分时曲线</div>
+        <div style="font-size:11px;color:var(--gray-400)">当前涨跌 ${changePct >= 0 ? '+' : ''}${Number(changePct || 0).toFixed(2)}%</div>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${escapeHtml(tradeDate || String(rows[0].date || '').slice(0, 10))} · AKShare 分钟K · ${rows.length} 个分钟点</div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+async function openWatchlistDetail(stockCode, section, detailType) {
+  const page = document.getElementById('watchlist-detail-page');
+  const host = document.getElementById('watchlist-detail-content');
+  if (!page || !host) return;
+  currentWatchlistSection = section || 'overview';
+  switchMarketView('watchlist');
+  const watchlistPanel = document.getElementById('market-watchlist-panel');
+  if (watchlistPanel) watchlistPanel.style.display = 'none';
+  page.style.display = '';
+  host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>';
+  try {
+    const tenantSlug = getActiveWatchlistTenantSlug();
+    const userPayload = getActiveWatchlistUserPayload();
+    const search = new URLSearchParams();
+    if (tenantSlug) search.set('tenant_slug', tenantSlug);
+    if (userPayload.user_role) search.set('user_role', userPayload.user_role);
+    if (userPayload.user_profile_id) search.set('user_profile_id', userPayload.user_profile_id);
+    const detailPath = detailType === 'etf-detail' ? '/api/etf-detail/' : '/api/watchlist/';
+    const resp = await fetch(detailPath + encodeURIComponent(stockCode) + (String(search) ? `?${String(search)}` : ''));
+    const data = await resp.json();
+    currentWatchlistDetail = data;
+    const activeUser = getActiveDemoUser() || {};
+    if (tenantSlug && Array.isArray(data.annotations)) {
+      replaceWatchlistAnnotations(((activeUser || {}).tenant || {}).id, data.annotation_key || data.indicator_code || data.code || stockCode, data.annotations);
+    }
+    renderWatchlistDetail(data, section);
+    syncLocalWatchlistAnnotationsToServer([data.annotation_key || data.indicator_code || data.code || stockCode]).catch(() => null);
+    trackFanStockObservation(stockCode, 'watchlist_detail_view', {
+      entryPoint: 'watchlist_detail',
+      sourceDetail: section || 'overview',
+    });
+  } catch (e) {
+    host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载失败，请稍后重试</div>';
+  }
+}
+
+function closeWatchlistDetailPage() {
+  const page = document.getElementById('watchlist-detail-page');
+  const list = document.getElementById('market-watchlist-panel');
+  if (page) page.style.display = 'none';
+  if (list) list.style.display = '';
+  currentWatchlistDetail = null;
+  currentWatchlistSection = 'overview';
+}
+
+function renderWatchlistKlineAnalysis(analysis) {
+  const result = analysis && typeof analysis === 'object' ? analysis : {};
+  const trends = result.trends && typeof result.trends === 'object' ? result.trends : {};
+  const rolling = result.rolling_returns && typeof result.rolling_returns === 'object' ? result.rolling_returns : {};
+  const volatility = result.volatility && typeof result.volatility === 'object' ? result.volatility : {};
+  const events = Array.isArray(result.events) ? result.events : [];
+  const limitations = Array.isArray(result.limitations) ? result.limitations : [];
+  const numberText = (value, suffix = '') => value === null || value === undefined || value === '' ? '--' : `${escapeHtml(String(value))}${suffix}`;
+  const friendlyTrend = (label) => ({
+    '上行': '上涨',
+    '下行': '下跌',
+    '震荡': '震荡',
+    '样本不足': '数据不足',
+  }[String(label || '')] || '暂时无法判断');
+  const friendlyProfile = (profile) => ({
+    '趋势型': '趋势明确',
+    '震荡型': '震荡为主',
+    '题材脉冲型': '波动较大',
+  }[String(profile || '')] || '暂不判断');
+  const friendlyEventStrength = (strength) => ({
+    '强异动': '双重异动',
+    '弱异动': '单项异动',
+  }[String(strength || '')] || '需关注');
+  const friendlyEventDriver = (driver) => String(driver || '') === '待人工归因' ? '看公告/新闻' : String(driver || '待判断');
+  const friendlyEventValidity = (validity) => String(validity || '') === '待样本检验' ? '继续观察' : String(validity || '继续观察');
+  const numericValues = (items) => Array.isArray(items) ? items.filter((value) => Number.isFinite(Number(value))).map(Number) : [];
+  const histogram = (items) => {
+    const values = numericValues(items);
+    if (!values.length) return '<div class="watch-analysis-muted">目前可用的20日数据还不够，暂不画分布图。</div>';
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    const bins = Array.from({length: 8}, () => 0);
+    values.forEach((value) => bins[Math.min(7, Math.floor(((value - min) / span) * 8))] += 1);
+    const peak = Math.max(...bins, 1);
+    return `<div class="watch-analysis-bars">${bins.map((count) => `<div class="watch-analysis-bar" style="height:${Math.max(4, (count / peak) * 100)}%" title="${count} 条"></div>`).join('')}</div><div class="watch-analysis-chart-caption"><span>${min.toFixed(2)}%</span><span>${values.length} 个滚动样本</span><span>${max.toFixed(2)}%</span></div>`;
+  };
+  const trendCards = [
+    ['较长一段时间（约90个交易日）', trends.long],
+    ['中间一段时间（约60个交易日）', trends.medium],
+    ['最近一段时间（约20个交易日）', trends.short],
+  ].map(([title, item]) => `
+    <div class="watch-analysis-card">
+      <div class="watch-analysis-label">${title}</div>
+      <div class="watch-analysis-value">${escapeHtml(friendlyTrend(item && item.label))}</div>
+      <div class="watch-analysis-note">这段时间的平均价格约为 ${numberText(item && item.ma)}；使用了 ${numberText(item && item.sample_size, ' 个交易日')}。</div>
+    </div>
+  `).join('');
+  const returnsSummary = (items) => {
+    const values = Array.isArray(items) ? items.filter((value) => Number.isFinite(Number(value))).map(Number) : [];
+    if (!values.length) return '数据不足';
+    const latest = values[values.length - 1];
+    const high = Math.max(...values);
+    const low = Math.min(...values);
+    return `最新 ${latest >= 0 ? '+' : ''}${latest.toFixed(2)}%<br>区间 ${low.toFixed(2)}% 至 ${high.toFixed(2)}%`;
+  };
+  const eventRows = events.length ? events.map((event) => `
+    <tr>
+      <td>${escapeHtml(event.date || '--')}</td>
+      <td>${numberText(event.change_pct, '%')}</td>
+      <td><span class="watch-analysis-badge">${escapeHtml(friendlyEventStrength(event.strength))}</span></td>
+      <td>${escapeHtml(friendlyEventDriver(event.driver))}<br><span class="watch-analysis-muted">${escapeHtml(friendlyEventValidity(event.signal_validity))}</span></td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" class="watch-analysis-muted">当前样本没有识别出异动，或历史数据不足。</td></tr>';
+  return `
+    <div class="watch-section-card">
+      <div class="watch-section-title">这只股票最近是什么状态</div>
+      <div class="watch-section-desc">把不同时间长度的走势放在一起看，帮助判断它是持续上涨、持续下跌，还是主要在一个区间里来回波动。</div>
+      <div class="watch-analysis-grid" style="margin-top:10px">
+        ${trendCards}
+        <div class="watch-analysis-card wide">
+          <div class="watch-analysis-label">一句话判断</div>
+          <div class="watch-analysis-value" style="font-size:15px">${escapeHtml(friendlyProfile(result.profile))}</div>
+          <div class="watch-analysis-note">${result.trend_alignment ? '各周期方向一致。' : '各周期方向不一，谨慎观察。'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">最近涨跌幅度和稳定程度</div>
+      <div class="watch-analysis-grid">
+        <div class="watch-analysis-card"><div class="watch-analysis-label">最近20个交易日，涨跌幅大致分布</div><div class="watch-analysis-value" style="font-size:14px">${returnsSummary(rolling['20d'])}</div>${histogram(rolling['20d'])}<div class="watch-analysis-note">柱子越集中，说明涨跌幅度越接近；柱子越分散，说明每天的波动差异越大。</div></div>
+        <div class="watch-analysis-card"><div class="watch-analysis-label">每天涨跌的起伏程度</div><div class="watch-analysis-value">${numberText(volatility.daily_pct_std, '%')}</div><div class="watch-analysis-note">这个数越大，说明每天价格变化越剧烈，持有时更容易遇到大幅波动。</div></div>
+      </div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">哪些日子出现了明显变化</div>
+      <div class="watch-section-desc">系统把明显偏离平时涨跌幅、或成交量明显放大的日期标出来。它只是提醒你回看当天发生了什么，不代表一定会继续上涨或下跌。</div>
+      <div style="overflow-x:auto;margin-top:10px">
+        <table class="watch-analysis-table"><thead><tr><th>日期</th><th>涨跌</th><th>异动</th><th>备注</th></tr></thead><tbody>${eventRows}</tbody></table>
+      </div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">成交量和风险提醒</div>
+      <div class="watch-analysis-grid">
+        <div class="watch-analysis-card"><div class="watch-analysis-label">过去这段时间最多从高点跌过多少</div><div class="watch-analysis-value">${numberText(result.max_drawdown_pct, '%')}</div><div class="watch-analysis-note">表示历史上从前面高点跌下来时，曾经出现过的最大跌幅；不是未来一定会跌这么多。</div></div>
+        <div class="watch-analysis-card"><div class="watch-analysis-label">本次判断用了哪些数据</div><div class="watch-analysis-value" style="font-size:14px">${numberText(result.sample_size, ' 个交易日')}</div><div class="watch-analysis-note">${escapeHtml(result.date_start || '--')} 到 ${escapeHtml(result.date_end || '--')}</div></div>
+        <div class="watch-analysis-card wide"><div class="watch-analysis-label">看盘时可以这样理解</div><div class="watch-analysis-note">上涨时成交量变大、回调时成交量变小，通常说明上涨更有承接；下跌时成交量突然变大，要留意卖出压力。成交量较小的股票，买卖大笔资金时也可能更难成交。</div></div>
+      </div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">使用前请注意</div>
+      <ul class="watch-analysis-limitations">${(limitations.length ? limitations : ['过去的走势只是参考，不能保证未来也会这样走。']).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+    </div>
+  `;
+}
+
+function renderWatchlistDetail(data, section) {
+  const host = document.getElementById('watchlist-detail-content');
+  if (!host || !data) return;
+  if (section) currentWatchlistSection = section;
+  const activeUser = getActiveDemoUser() || {role: 'investor', tenant: {id: ''}};
+  const isInvestorView = activeUser.role === 'investor';
+  const activeSection = currentWatchlistSection || 'overview';
+  const commentItems = Array.isArray(data.comments) ? data.comments : [];
+  const commentSettings = data.comment_settings || {};
+  const allowFanToFan = commentSettings.allow_fan_to_fan !== false;
+  const annotationKey = data.annotation_key || data.indicator_code || data.code;
+  const hasRealMarketPrice = data.data_unavailable !== true && Number.isFinite(Number(data.price)) && Number(data.price) > 0;
+  // The session cache is hydrated from the server on open and is updated after
+  // each write. Rendering from it avoids stale markers after an edit or delete.
+  const annotations = getWatchlistAnnotations(activeUser.tenant.id, annotationKey).map((item) => ({
+      ...item,
+      candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
+  }));
+  const klineChart = buildWatchlistKlineSvg(data.kline || [], {
+    candleLabel: `${data.name || '标的'} 日K线${data.kline_contains_intraday ? '（含盘中）' : ''}`,
+    annotations,
+  });
+  const intradayChart = buildWatchlistIntradaySvg(
+    data.intraday_series || [],
+    data.intraday_message || '',
+    data.intraday_source || '',
+    String(data.intraday_trade_date || '').trim(),
+  );
+  const analysisSeries = data.history_kline && Array.isArray(data.history_kline.candles)
+    ? data.history_kline.candles
+    : (data.kline || []);
+  const computedMetricCards = buildWatchlistComputedMetrics(analysisSeries, 90);
+  const overviewSection = `
+    <div class="watch-section-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <div>
+          <div class="watch-section-title">最近行情概览</div>
+          <div class="watch-section-desc">下面的内容只根据真实行情计算，不是预测。${data.kline_contains_intraday ? ` 当前价格包含盘中行情，更新至 ${escapeHtml(String(data.kline_intraday_updated_at || '').slice(11, 16) || '--')}。` : ''}${activeUser.role === 'dav' ? ' 点击任一 K 线可添加或编辑标注。' : ''}</div>
+        </div>
+      </div>
+      ${klineChart}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 10px">${computedMetricCards}</div>
+    </div>
+  `;
+  const intradaySection = `
+    <div class="watch-section-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <div>
+          <div class="watch-section-title">分时曲线</div>
+          <div class="watch-section-desc">交易时段显示当日真实分钟数据；闭市或非交易日展示最近有效交易日的真实分钟数据。</div>
+        </div>
+      </div>
+      ${intradayChart}
+    </div>
+  `;
+  const commentNotice = isInvestorView
+    ? (allowFanToFan
+        ? '当前已开放租户内粉丝与大V共同评论。你可以看到其他粉丝在这只股票下的讨论。'
+        : `当前粉丝互评已关闭。你只会看到 ${activeUser.tenant.advisor} 的评论和你自己的评论。`)
+    : '当前为大V视角，你可以查看并管理该租户在这只股票下的全部评论。';
+  const commentCards = commentItems.length ? commentItems.map((item) => `
+    <div class="watch-research-item">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div>
+          <div class="watch-research-meta">${escapeHtml(item.created_by_role_label || '')} · ${escapeHtml(item.created_by_name || '租户用户')} · ${escapeHtml(item.updated_at || item.created_at || '刚刚')}</div>
+          <div class="watch-research-title" style="margin-top:6px;font-size:13px">${escapeHtml(item.comment_text || '')}</div>
+          ${item.pending ? '<div class="watch-research-desc" style="margin-top:4px;color:#2F74C0">发送中...</div>' : ''}
+        </div>
+        ${item.can_delete ? `<button class="btn-outline" style="padding:5px 8px;font-size:11px;white-space:nowrap" onclick="deleteWatchlistComment('${data.code}', '${String(item.id || '')}')">删除</button>` : ''}
+      </div>
+    </div>
+  `).join('') : `<div style="font-size:12px;color:var(--gray-400)">当前还没有评论，先留下第一条判断。</div>`;
+  const commentsSection = `
+    <div class="watch-section-card">
+      <div class="watch-section-title">租户评论</div>
+      <div class="watch-section-desc">${commentNotice}</div>
+      <div style="margin-top:12px;border:1px solid rgba(47,116,192,0.12);border-radius:12px;padding:10px;background:#F7FBFF">
+        <textarea id="watchlist-comment-input" class="knowledge-modal-textarea" placeholder="${allowFanToFan || !isInvestorView ? '写下你对这只股票的阶段判断、验证节点或追踪问题…' : '仍可留下你的个人评论，大V会看到。'}" style="min-height:88px;margin:0;background:#FFFFFF"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px">
+          <div style="font-size:11px;color:var(--gray-400)">当前显示 ${commentItems.length} 条可见评论</div>
+          <button class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="submitWatchlistComment('${data.code}')">发表评论</button>
+        </div>
+      </div>
+      <div class="watch-research-grid" style="margin-top:12px">${commentCards}</div>
+    </div>
+  `;
+  const showKlineAnalysis = String(data.asset_type || '').toLowerCase() === 'stock';
+  const analysisSection = showKlineAnalysis ? renderWatchlistKlineAnalysis(data.kline_analysis || {}) : '';
+  const sectionMap = {
+    overview: overviewSection,
+    intraday: intradaySection,
+    comments: commentsSection,
+    ...(showKlineAnalysis ? {analysis: analysisSection} : {}),
+  };
+  // K-line analysis is limited to individual stock details. ETF and indicator
+  // pages retain their applicable history/quote views without this tab.
+  const showIntradayTab = data.intraday_supported === true;
+  const visibleSection = showKlineAnalysis ? activeSection : (activeSection === 'analysis' ? 'overview' : activeSection);
+  host.innerHTML = `
+    <div style="padding-bottom:8px">
+      <div style="display:flex;justify-content:flex-start;margin-bottom:10px">
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="closeWatchlistDetailPage()">← 返回自选股</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text-main)">${data.name}</div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:4px">${data.code} · ${data.market} · ${data.industry}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:20px;font-weight:700;color:var(--text-main)">${hasRealMarketPrice ? Number(data.price).toFixed(2) : '--'}</div>
+          <div style="font-size:12px;color:${hasRealMarketPrice ? (Number(data.change || 0) >= 0 ? 'var(--red)' : 'var(--green)') : 'var(--gray-400)'}">${hasRealMarketPrice && Number.isFinite(Number(data.change)) && Number.isFinite(Number(data.change_pct)) ? `${Number(data.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change)).toFixed(2)} (${Number(data.change_pct).toFixed(2)}%)` : '暂无真实行情'}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;gap:8px;margin-bottom:14px">
+        <button class="${isStockInWatchlist(data.code) ? 'btn-outline' : 'btn-gold'}" style="padding:10px;font-size:12px;${isStockInWatchlist(data.code) ? 'color:#B42318;border-color:rgba(180,35,24,0.28)' : ''}" onclick="${isStockInWatchlist(data.code) ? 'requestWatchlistRemoval(currentWatchlistDetail.code)' : 'addCurrentStockToWatchlist()'}">${isStockInWatchlist(data.code) ? '移出自选股' : '添加自选股'}</button>
+      </div>
+      ${pendingWatchlistRemovalCode === normalizeStockLookupValue(data.code) ? `
+        <div style="margin:-4px 0 14px;padding:12px;border:1px solid rgba(180,35,24,0.20);border-radius:10px;background:rgba(180,35,24,0.04)">
+          <div style="font-size:12px;font-weight:700;color:var(--text-main)">从自选股移除“${escapeHtml(data.name || data.code)}”？</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:4px">不会删除评论、K线标注或历史研究记录。</div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="cancelWatchlistRemoval()">保留</button><button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.28)" onclick="removeCurrentStockFromWatchlist()">确认移出</button></div>
+        </div>
+      ` : ''}
+      <div class="watch-detail-tabs">
+        <div class="watch-detail-tab ${visibleSection === 'overview' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'overview')">总览</div>
+        ${showIntradayTab ? `<div class="watch-detail-tab ${visibleSection === 'intraday' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'intraday')">分时</div>` : ''}
+        <div class="watch-detail-tab ${activeSection === 'comments' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'comments')">评论</div>
+        ${showKlineAnalysis ? `<div class="watch-detail-tab ${visibleSection === 'analysis' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'analysis')">K线分析</div>` : ''}
+      </div>
+      ${sectionMap[visibleSection] || overviewSection}
+    </div>
+  `;
+  if (window.GangtiseEcharts) window.GangtiseEcharts.flush(host);
+}
+
+function submitWatchlistComment(stockCode) {
+  const detail = currentWatchlistDetail;
+  const input = document.getElementById('watchlist-comment-input');
+  const content = input && typeof input.value === 'string' ? input.value.trim() : '';
+  if (!detail || !content) {
+    showToast('请先输入评论内容');
+    return;
+  }
+  const payload = getActiveWatchlistUserPayload();
+  const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const pendingItem = {
+    id: tempId,
+    tenant_slug: payload.tenant_slug || '',
+    stock_code: stockCode,
+    stock_name: detail.name || stockCode,
+    comment_text: content,
+    created_by_user_id: payload.user_profile_id || '',
+    created_by_name: payload.user_name || payload.user_profile_id || '租户用户',
+    created_by_role: payload.user_role || 'investor',
+    created_by_role_label: payload.user_role === 'dav' ? '大V投顾' : '粉丝用户',
+    source_client: 'h5',
+    created_at: '刚刚',
+    updated_at: '刚刚',
+    pending: true,
+    can_delete: false,
+  };
+  const previousComments = Array.isArray(currentWatchlistDetail.comments) ? currentWatchlistDetail.comments.slice() : [];
+  currentWatchlistDetail.comments = [pendingItem, ...previousComments];
+  if (input) input.value = '';
+  renderWatchlistDetail(currentWatchlistDetail, 'comments');
+  fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/comments`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      ...payload,
+      stock_name: detail.name || stockCode,
+      comment_text: content,
+      source_client: 'h5',
+    }),
+  }).then(async (resp) => {
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_comment_save_failed');
+    currentWatchlistDetail.comments = (Array.isArray(currentWatchlistDetail.comments) ? currentWatchlistDetail.comments : [])
+      .filter((item) => String(item.id || '') !== String(tempId));
+    currentWatchlistDetail.comments = [data.item, ...currentWatchlistDetail.comments];
+    renderWatchlistDetail(currentWatchlistDetail, 'comments');
+    showToast('评论已发布');
+  }).catch((error) => {
+    currentWatchlistDetail.comments = previousComments;
+    if (input) input.value = content;
+    renderWatchlistDetail(currentWatchlistDetail, 'comments');
+    showToast(error.message || '评论发布失败');
+  });
+}
+
+function deleteWatchlistComment(stockCode, commentId) {
+  const payload = getActiveWatchlistUserPayload();
+  fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/comments/${encodeURIComponent(commentId)}` + `?tenant_slug=${encodeURIComponent(payload.tenant_slug)}&user_role=${encodeURIComponent(payload.user_role)}&user_profile_id=${encodeURIComponent(payload.user_profile_id)}`, {
+    method: 'DELETE',
+  }).then(async (resp) => {
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_comment_delete_failed');
+    currentWatchlistDetail.comments = (Array.isArray(currentWatchlistDetail.comments) ? currentWatchlistDetail.comments : []).filter((item) => String(item.id || '') !== String(commentId || ''));
+    renderWatchlistDetail(currentWatchlistDetail, 'comments');
+    showToast('评论已删除');
+  }).catch((error) => {
+    showToast(error.message || '评论删除失败');
+  });
+}
+
+function openWatchlistAuthorDm(name) {
+  if (!canAccessAdvisor(name)) {
+    showToast('当前身份仅可与所属租户投顾互动');
+    return;
+  }
+  const mapping = {
+    '财经老王': { id: 1, avatar: '👑', tier: '种子投顾' },
+    '投资女神Lisa': { id: 2, avatar: '💎', tier: '种子投顾' },
+    '量化老师陈明': { id: 3, avatar: '📊', tier: '成长投顾' },
+    '全球宏观James': { id: 4, avatar: '🌐', tier: '成长投顾' },
+    '新能源猎手阿强': { id: 5, avatar: '⚡', tier: '观察投顾' },
+    '港股研究员': { id: 2, avatar: '🏙️', tier: '观察投顾' },
+  };
+  const author = mapping[name];
+  closeWatchlistDetailPage();
+  if (author) {
+    openDmChat(author.id, name, author.avatar, author.tier);
+  } else {
+    showToast('暂未配置该投顾对话');
+  }
+}
+
+function openWatchlistAnnotationModal(candleIndex) {
+  const user = getActiveDemoUser();
+  if (!currentWatchlistDetail || !Array.isArray(currentWatchlistDetail.kline)) return;
+  const candle = currentWatchlistDetail.kline[candleIndex];
+  if (!candle) return;
+  const annotationKey = currentWatchlistDetail.annotation_key || currentWatchlistDetail.indicator_code || currentWatchlistDetail.code;
+  const profileId = String(user.username || user.id || '').trim();
+  const existing = getWatchlistAnnotations(user.tenant.id, annotationKey).find(item => Number(item.candleIndex) === Number(candleIndex) && String(item.created_by_user_id || '') === profileId);
+  currentWatchlistAnnotationTarget = {
+    tenantId: user.tenant.id,
+    stockCode: annotationKey,
+    stockName: currentWatchlistDetail.name,
+    candleIndex,
+    candle,
+    existing: existing || null,
+  };
+  const host = document.getElementById('watchlist-annotation-modal-content');
+  const modal = document.getElementById('watchlist-annotation-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${existing ? '编辑 K线标注' : '新增 K线标注'} · ${escapeHtml(currentWatchlistDetail.name)}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
+      你正在${existing ? '编辑' : '标注'} ${escapeHtml(candle.date || '--')} 这根 K 线。保存后，这条标注会显示在图上，并自动参与后续洞见。
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">K线节点</label>
+      <div class="review-watchlist-row">
+        <span class="review-watchlist-chip">${escapeHtml(candle.date || '--')}</span>
+        <span class="review-watchlist-chip">开 ${Number(candle.open || 0).toFixed(2)}</span>
+        <span class="review-watchlist-chip">收 ${Number(candle.close || 0).toFixed(2)}</span>
+        <span class="review-watchlist-chip">高 ${Number(candle.high || 0).toFixed(2)}</span>
+        <span class="review-watchlist-chip">低 ${Number(candle.low || 0).toFixed(2)}</span>
+      </div>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">洞见内容</label>
+      <textarea id="watchlist-annotation-content" class="knowledge-modal-textarea" placeholder="写下你对这根 K 线的判断、观察点和后续洞见。">${escapeHtml(existing && (existing.content || [existing.title, existing.note, existing.trigger].filter(Boolean).join('；')) || '')}</textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeWatchlistAnnotationModal()">取消</button>
+      ${existing ? '<button class="btn-outline" style="color:#E74C3C;border-color:rgba(231,76,60,0.22)" onclick="deleteWatchlistAnnotation()">删除标注</button>' : ''}
+      <button class="btn-gold" onclick="saveWatchlistAnnotation()">${existing ? '保存修改' : '保存标注'}</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function closeWatchlistAnnotationModal() {
+  const modal = document.getElementById('watchlist-annotation-modal');
+  if (modal) modal.classList.remove('show');
+  currentWatchlistAnnotationTarget = null;
+}
+
+function syncCurrentWatchlistAnnotationState(target, items) {
+  if (!target || !currentWatchlistDetail) return;
+  const activeUser = getActiveDemoUser() || {};
+  const tenantId = ((activeUser || {}).tenant || {}).id || target.tenantId;
+  const annotationKey = currentWatchlistDetail.annotation_key
+    || currentWatchlistDetail.indicator_code
+    || currentWatchlistDetail.code
+    || target.stockCode;
+  const normalizedItems = Array.isArray(items) ? items : [];
+
+  // Store under both values during the transition from exchange-suffixed
+  // client codes to canonical database codes. The chart always reads the
+  // current detail key, while subsequent views can use the API return value.
+  [annotationKey, target.stockCode].forEach((key) => {
+    if (key) replaceWatchlistAnnotations(tenantId, key, normalizedItems);
+  });
+  currentWatchlistDetail.annotations = getWatchlistAnnotations(tenantId, annotationKey);
+}
+
+function redrawCurrentWatchlistDetail() {
+  if (!currentWatchlistDetail) return;
+  renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+  const chartHost = document.getElementById('watchlist-detail-content');
+  if (chartHost && window.GangtiseEcharts && typeof window.GangtiseEcharts.flush === 'function') {
+    window.GangtiseEcharts.flush(chartHost);
+  }
+}
+
+function saveWatchlistAnnotation() {
+  const target = currentWatchlistAnnotationTarget;
+  if (!target) return;
+  const content = (document.getElementById('watchlist-annotation-content') || {}).value?.trim() || '';
+  if (!content) {
+    showToast('请填写洞见内容');
+    return;
+  }
+  const bucket = getWatchlistAnnotationBucket(target.tenantId, target.stockCode);
+  const userPayload = getActiveWatchlistUserPayload();
+  const nextEntry = {
+    id: `${buildAnnotationId(target.tenantId, target.stockCode, target.candleIndex)}__${userPayload.user_profile_id}`,
+    candleIndex: target.candleIndex,
+    dateLabel: target.candle.date || '',
+    content,
+    title: '',
+    note: content,
+    trigger: '',
+    updatedAt: '刚刚',
+    created_by_user_id: userPayload.user_profile_id,
+    created_by_role: userPayload.user_role,
+  };
+  const previousItems = bucket.slice();
+  const existingIndex = bucket.findIndex(item => Number(item.candleIndex) === Number(target.candleIndex) && String(item.created_by_user_id || '') === String(userPayload.user_profile_id || ''));
+  if (existingIndex >= 0) bucket[existingIndex] = nextEntry;
+  else bucket.push(nextEntry);
+  fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      ...userPayload,
+      stock_name: target.stockName,
+      candle_index: target.candleIndex,
+      candle_date: target.candle.date || '',
+      open: target.candle.open,
+      high: target.candle.high,
+      low: target.candle.low,
+      close: target.candle.close,
+      content,
+      source_client: 'h5',
+    }),
+  }).then(async (resp) => {
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_save_failed');
+    const currentUser = getActiveDemoUser() || {};
+    const tenantId = ((currentUser || {}).tenant || {}).id || target.tenantId;
+    const nextItems = [
+      ...getWatchlistAnnotations(tenantId, target.stockCode).filter((item) => Number(item.candleIndex) !== Number(target.candleIndex) || String(item.created_by_user_id || '') !== String(userPayload.user_profile_id || '')),
+      data.item,
+    ];
+    syncCurrentWatchlistAnnotationState(target, nextItems);
+    closeWatchlistAnnotationModal();
+    redrawCurrentWatchlistDetail();
+    renderReviewExperience();
+    showToast('K线标注已保存，洞见会自动引用');
+  }).catch((error) => {
+    watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
+    closeWatchlistAnnotationModal();
+    redrawCurrentWatchlistDetail();
+    renderReviewExperience();
+    showToast(error.message || '标注保存失败');
+  });
+}
+
+function deleteWatchlistAnnotation() {
+  const target = currentWatchlistAnnotationTarget;
+  if (!target) return;
+  if (!target.existing || !target.existing.id) {
+    showToast('只能删除你自己创建的标注');
+    return;
+  }
+  const previousItems = getWatchlistAnnotationBucket(target.tenantId, target.stockCode).slice();
+  watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] =
+    getWatchlistAnnotationBucket(target.tenantId, target.stockCode).filter(item => String(item.id || '') !== String(target.existing.id));
+  const userPayload = getActiveWatchlistUserPayload();
+  const existingId = target.existing.id;
+  fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations/${encodeURIComponent(existingId)}` + `?tenant_slug=${encodeURIComponent(userPayload.tenant_slug)}&user_role=${encodeURIComponent(userPayload.user_role)}&user_profile_id=${encodeURIComponent(userPayload.user_profile_id)}`, {
+    method: 'DELETE',
+  }).then(async (resp) => {
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_delete_failed');
+    syncCurrentWatchlistAnnotationState(target, previousItems.filter(item => String(item.id || '') !== String(existingId)));
+    closeWatchlistAnnotationModal();
+    redrawCurrentWatchlistDetail();
+    renderReviewExperience();
+    showToast('已删除该处 K 线标注');
+  }).catch((error) => {
+    watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
+    closeWatchlistAnnotationModal();
+    redrawCurrentWatchlistDetail();
+    renderReviewExperience();
+    showToast(error.message || '删除标注失败');
+  });
+}
+
+function runWatchlistHermes(stockCode, mode) {
+  if (mode === 'forecast' && !isStockForecastEnabled()) {
+    showToast('预测功能当前未开放');
+    return;
+  }
+  const detail = currentWatchlistDetail && normalizeStockLookupValue(currentWatchlistDetail.code) === normalizeStockLookupValue(stockCode)
+    ? currentWatchlistDetail
+    : null;
+  const skillKey = mode === 'forecast' ? 'judgement' : 'basic';
+  const stockLabel = detail ? `${detail.name}（${detail.code}）` : stockCode;
+  closeWatchlistDetailPage();
+  switchTab('hermes');
+  fillHermesStockCode(stockCode);
+  selectHermesSkill(skillKey);
+  setTimeout(() => {
+    const input = document.getElementById('hermes-question-input');
+    if (input) {
+      fillHermesQuestionInput(mode === 'forecast'
+        ? `请判断 ${stockLabel} 当前更适合继续跟踪、重点研究还是暂缓处理，并说明原因。`
+        : `请围绕 ${stockLabel} 的盈利、估值、行业位置和关键争议点，给我一个简洁但完整的基本面分析。`);
+      runHermesAnalysis({ fromWatchlist: true });
+    }
+  }, 80);
+}
+
+// ===== COMMUNITY =====
+let communitySubTab = 'square';
+
+function switchCommunityTab(tab) {
+  communitySubTab = tab;
+  // Update sub-tab buttons
+  document.querySelectorAll('.community-subtab').forEach(el => el.classList.remove('active'));
+  const tabs = ['square', 'dav', 'events'];
+  const idx = tabs.indexOf(tab);
+  if (idx !== -1) {
+    document.querySelectorAll('.community-subtab')[idx].classList.add('active');
+  }
+  // Show/hide sub-panels
+  document.getElementById('community-square').style.display = (tab === 'square') ? 'block' : 'none';
+  document.getElementById('community-dav').style.display = (tab === 'dav') ? 'block' : 'none';
+  document.getElementById('community-events').style.display = (tab === 'events') ? 'block' : 'none';
+  if (tab === 'dav') syncTenantScopedAdvisorViews();
+}
+
+async function loadCommunityPosts() {
+  try {
+    const resp = await fetch('/api/community/posts');
+    const data = await resp.json();
+    // API returns array directly
+    const posts = Array.isArray(data) ? data : (data.posts || []);
+    // Merge API posts with sample posts for richer feed
+    const merged = [...posts.map(p => ({
+      id: p.id, avatar: p.avatar, name: p.author,
+      tier: (p.tier === '试点作者' || p.tier === '大V投顾') ? 'dav' : (p.tier === '认证用户' ? 'verified' : 'normal'),
+      platform: p.platform, time: p.time, content: p.content,
+      tags: p.tags, likes: p.likes, comments: p.comments, points: '+' + (p.points_reward||10) + '积分'
+    })), ...getSamplePosts().slice(posts.length > 3 ? 3 : 0)];
+    renderPosts(merged);
+  } catch (e) {
+    renderPosts(getSamplePosts());
+  }
+}
+
+function getSamplePosts() {
+  return [
+    {
+      id: 1, avatar: '👑', name: '财经老王', tier: 'dav', platform: '微信社群',
+      time: '10分钟前',
+      content: '今天先用 Hermes 把全天资料压成了复盘提纲，再挑出两只自选股深挖。这样做的好处是先节省整理时间，再把精力放在真正需要判断的地方。',
+      tags: ['复盘', '方法论', '自选股'],
+      likes: 234, comments: 56, points: '+10积分'
+    },
+    {
+      id: 2, avatar: '🌐', name: '全球宏观James', tier: 'dav', platform: '内容合作',
+      time: '32分钟前',
+      content: '宏观内容最怕一句话结论。我更需要的是“结论来自哪几条证据、置信度多高、哪些地方还没验证完”，这样普通用户也更容易理解边界。',
+      tags: ['宏观', '证据链', '置信度'],
+      likes: 189, comments: 43, points: '+10积分'
+    },
+    {
+      id: 3, avatar: '⚡', name: '新能源猎手阿强', tier: 'verified', platform: '转介绍',
+      time: '1小时前',
+      content: '产业线索能不能转成有效内容，关键不是“消息早不早”，而是有没有验证节点。我现在更关注平台能不能把会议纪要、研报和市场数据自动串起来。',
+      tags: ['产业线索', '验证节点', '纪要'],
+      likes: 312, comments: 78, points: '+10积分'
+    },
+    {
+      id: 4, avatar: '📊', name: '量化老师陈明', tier: 'verified', platform: '公众号',
+      time: '2小时前',
+      content: '我最关心的不是功能多少，而是研究动作能不能被标准化。复盘、自选股诊断和证据链输出只要打磨扎实，团队协同和内容复用都会更顺。',
+      tags: ['量化', '标准化', '工作流'],
+      likes: 145, comments: 29, points: '+10积分'
+    },
+    {
+      id: 5, avatar: '💡', name: '价值猎人小林', tier: 'normal', platform: '洞见智研',
+      time: '3小时前',
+      content: '刚用 Hermes 跑了一次“证据链归因”，明显比直接看长纪要省时间。现在最有感的不是结果多激进，而是来源和理由终于能看明白了。',
+      tags: ['Hermes', '证据链', '纪要'],
+      likes: 67, comments: 18, points: '+10积分'
+    }
+  ];
+}
+
+function renderPosts(posts) {
+  const container = document.getElementById('posts-container');
+  if (!posts || posts.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无帖子</div>';
+    return;
+  }
+  container.innerHTML = posts.map(p => {
+    const avatarClass = p.tier === 'dav' ? 'dav' : (p.tier === 'verified' ? 'verified' : 'normal');
+    const badge = p.tier === 'dav'
+      ? '<span class="post-badge-dav">投顾</span>'
+      : (p.tier === 'verified' ? '<span class="post-badge-verified">认证</span>' : '');
+    const tags = (p.tags || []).map(t =>
+      `<span class="tag tag-gold" style="font-size:11px">#${t}</span>`
+    ).join('');
+    return `
+    <div class="post-card" id="post-${p.id}">
+      <div class="post-author-row">
+        <div class="post-avatar ${avatarClass}">${p.avatar}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="post-name">${p.name}</span>${badge}
+            <span style="font-size:11px;color:var(--gray-400);background:rgba(154,149,144,0.1);padding:1px 6px;border-radius:4px">${p.platform}</span>
+          </div>
+        </div>
+        <div class="post-time">${p.time}</div>
+      </div>
+      <div class="post-content" id="post-content-${p.id}">${p.content}</div>
+      <div style="margin-bottom:8px">
+        <span onclick="toggleExpand(${p.id})" style="font-size:12px;color:var(--gold);cursor:pointer" id="expand-${p.id}">展开</span>
+      </div>
+      <div class="post-tags">${tags}</div>
+      <div class="post-footer">
+        <div class="post-action" onclick="likePost(${p.id}, this)">
+          <span>👍</span><span id="likes-${p.id}">${p.likes}</span>
+        </div>
+        <div class="post-action">
+          <span>💬</span><span>${p.comments}</span>
+        </div>
+        <div class="post-action">
+          <span>🔗</span><span>分享</span>
+        </div>
+        <div class="post-points-badge">${p.points}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleExpand(postId) {
+  const content = document.getElementById('post-content-' + postId);
+  const btn = document.getElementById('expand-' + postId);
+  if (content.classList.contains('expanded')) {
+    content.classList.remove('expanded');
+    btn.textContent = '展开';
+  } else {
+    content.classList.add('expanded');
+    btn.textContent = '收起';
+  }
+}
+
+async function loadCommunityEvents() {
+  try {
+    const resp = await fetch('/api/community/events');
+    const data = await resp.json();
+    const events = Array.isArray(data) ? data : (data.events || []);
+    const mapped = events.map(e => ({
+      id: e.id,
+      type: e.type,
+      typeClass: e.type === '直播' ? 'event-live' : e.type === '会议' ? 'event-meeting' : 'event-activity',
+      title: e.title,
+      date: e.date,
+      host: e.host,
+      participants: e.participants,
+      points: e.points,
+      statusText: e.status,
+      open: e.status !== '已结束',
+      desc: e.desc || ''
+    }));
+    renderEvents([...mapped, ...getSampleEvents().slice(mapped.length > 2 ? 2 : 0)]);
+  } catch (e) {
+    renderEvents(getSampleEvents());
+  }
+}
+
+function getSampleEvents() {
+  return [
+    {
+      id: 1, type: '直播', typeClass: 'event-live',
+      title: '【投顾直播】财经老王：降息预期下的 A 股跟踪框架',
+      date: '2026-05-22 20:00', host: '财经老王 · 全球宏观James',
+      participants: 128, points: 100, statusText: '报名中', open: true,
+      desc: '两位大V投顾联合直播，围绕降息预期、资金风格与行业节奏做研究框架分享，重点验证用户留存与互动质量。',
+      tags: ['宏观', 'A股', '配置策略'], reward: '参与+100积分，提问被采纳+50积分'
+    },
+    {
+      id: 2, type: '活动', typeClass: 'event-activity',
+      title: '【挑战赛】洞见智研投研大赛第三季 · 最佳分析师评选',
+      date: '2026-05-25 ~ 2026-06-15', host: '洞见智研官方',
+      participants: 214, points: 500, statusText: '进行中', open: true,
+      desc: '发布原创投研帖子，平台重点观察内容质量、互动留存和转介绍效率。优质样本将进入共创反馈池。',
+      tags: ['原创', '竞赛', '奖励'], reward: '一等奖¥2000，参与即得+50积分'
+    },
+    {
+      id: 3, type: '会议', typeClass: 'event-meeting',
+      title: '【专家会议】新能源产业链Q2展望 · 固态电池专题',
+      date: '2026-05-24 14:00', host: '新能源猎手阿强 + 行业专家',
+      participants: 68, points: 200, statusText: '名额有限', open: true,
+      desc: '邀请产业链专家做闭门分享，重点验证高价值纪要内容是否能带来更强付费和留存。',
+      tags: ['新能源', '固态电池', '专家'], reward: '参与+200积分，仅限深度交流用户'
+    },
+    {
+      id: 4, type: '活动', typeClass: 'event-activity',
+      title: '【积分翻倍】本周发帖积分×2 · 限时活动',
+      date: '2026-05-20 ~ 2026-05-26', host: '洞见智研官方',
+      participants: 186, points: 0, statusText: '进行中', open: true,
+      desc: '本周内发布投研帖子，积分翻倍奖励。平台同步观察哪些内容方向更能形成高频讨论与次日回访。',
+      tags: ['积分', '限时', '福利'], reward: '发帖积分×2，优质帖额外+50算力'
+    },
+    {
+      id: 5, type: '直播', typeClass: 'event-live',
+      title: '【直播回放】量化老师陈明：多因子模型实战讲解',
+      date: '2026-05-18 19:30', host: '量化老师陈明',
+      participants: 96, points: 30, statusText: '可回放', open: true,
+      desc: '回放内容围绕价值、动量、质量三因子展开，主要验证深度交流用户对量化研究模板的接受度。',
+      tags: ['量化', '因子', '回放'], reward: '观看回放+30积分'
+    },
+    {
+      id: 6, type: '会议', typeClass: 'event-meeting',
+      title: '【闭门会】港股互联网板块验证交流',
+      date: '2026-05-28 15:00', host: '投资女神Lisa + 港股研究员',
+      participants: 24, points: 300, statusText: '即将开放', open: false,
+      desc: '仅限机构试点与深度交流代表参与，重点讨论港股互联网的估值修复逻辑和产品需求访谈。',
+      tags: ['港股', '互联网', '闭门交流'], reward: '参与+300积分，仅限机构试点'
+    },
+  ];
+}
+
+function renderEvents(events) {
+  _allEvents = events; // store for detail view
+  const container = document.getElementById('events-container');
+  if (!events || events.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无活动</div>';
+    return;
+  }
+  const ongoing = events.filter(e => ['进行中','报名中','名额有限','可回放'].includes(e.statusText));
+  const other = events.filter(e => !['进行中','报名中','名额有限','可回放'].includes(e.statusText));
+
+  let html = '';
+  if (ongoing.length) {
+    html += `<div style="font-size:12px;color:var(--gold);font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span>进行中 / 即将开始</div>`;
+    html += ongoing.map(ev => renderEventCard(ev)).join('');
+  }
+  if (other.length) {
+    html += `<div style="font-size:12px;color:var(--gray-400);font-weight:600;margin:16px 0 10px;display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--gray-400);display:inline-block"></span>往期 / 即将开放</div>`;
+    html += other.map(ev => renderEventCard(ev)).join('');
+  }
+  container.innerHTML = html;
+}
+
+function renderEventCard(ev) {
+  const tags = (ev.tags || []).map(t => `<span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:1px 7px;border-radius:8px">${t}</span>`).join('');
+  const statusColor = ev.statusText === '进行中' ? 'var(--green)' : ev.statusText === '报名中' ? '#3498DB' : ev.statusText === '名额有限' ? '#E67E22' : 'var(--gray-400)';
+  const btnHtml = ev.open && ev.statusText !== '即将开放'
+    ? `<button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="joinEvent(${ev.id}, ${ev.points}, '${ev.statusText}')">
+        ${ev.statusText === '可回放' ? '▶ 观看' : ev.statusText === '进行中' ? '参与' : '报名'}
+       </button>`
+    : `<button class="btn-outline" style="padding:6px 14px;font-size:12px;opacity:0.5;cursor:default">${ev.statusText}</button>`;
+
+  return `
+  <div class="event-card" style="position:relative;overflow:hidden;cursor:pointer" onclick="showEventDetail(${ev.id})">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+      <span class="event-type-badge ${ev.typeClass}">${ev.type}</span>
+      <span style="font-size:11px;color:${statusColor};font-weight:600">● ${ev.statusText}</span>
+    </div>
+    <div class="event-title">${ev.title}</div>
+    ${ev.desc ? `<div style="font-size:12px;color:var(--gray-400);line-height:1.6;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${ev.desc}</div>` : ''}
+    <div class="event-meta">📅 ${ev.date} &nbsp;·&nbsp; 🎙️ ${ev.host}</div>
+    ${tags ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${tags}</div>` : ''}
+    ${ev.reward ? `<div style="font-size:11px;color:var(--gold);background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:6px;padding:5px 10px;margin-bottom:10px">🎁 ${ev.reward}</div>` : ''}
+    <div class="event-footer" onclick="event.stopPropagation()">
+      <div class="event-info">👥 ${ev.participants.toLocaleString()}人 ${ev.points > 0 ? `&nbsp;·&nbsp; <span style="color:var(--gold)">+${ev.points}积分</span>` : ''}</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;color:var(--gray-400)">详情 ›</span>
+        ${btnHtml}
+      </div>
+    </div>
+  </div>`;
+}
+
+function joinEvent(id, points, status) {
+  if (status === '可回放') {
+    showToast('正在加载回放... +' + points + '积分');
+  } else {
+    showToast('报名成功！+' + points + '积分已到账');
+  }
+}
+
+// Store events for detail view
+let _allEvents = [];
+
+function showEventDetail(id) {
+  const ev = _allEvents.find(e => e.id === id);
+  if (!ev) return;
+  const tags = (ev.tags || []).map(t => `<span style="font-size:11px;background:rgba(200,169,110,0.1);color:var(--gold);padding:2px 10px;border-radius:10px">${t}</span>`).join('');
+  const statusColor = ev.statusText === '进行中' ? 'var(--green)' : ev.statusText === '报名中' ? '#3498DB' : ev.statusText === '名额有限' ? '#E67E22' : 'var(--gray-400)';
+
+  // Agenda / schedule mock
+  const agendas = {
+    1: [
+      { time: '20:00', item: '开场介绍 · 财经老王 & 全球宏观James' },
+      { time: '20:10', item: '美联储降息路径分析 · 全球宏观James' },
+      { time: '20:35', item: 'A股各板块配置策略 · 财经老王' },
+      { time: '21:00', item: '互动问答 · 观众提问环节' },
+      { time: '21:20', item: '总结与投资建议' },
+    ],
+    2: [
+      { time: '第1周', item: '报名参赛，发布第一篇原创投研帖子' },
+      { time: '第2周', item: '社区互动，为优质帖子点赞投票' },
+      { time: '第3周', item: '专家评审，筛选Top20帖子' },
+      { time: '第4周', item: '公众投票，决出最终排名' },
+      { time: '颁奖', item: '直播颁奖典礼，公布获奖名单' },
+    ],
+    3: [
+      { time: '14:00', item: '开场 · 新能源猎手阿强主持' },
+      { time: '14:10', item: '固态电池产业化进展 · 行业专家A' },
+      { time: '14:40', item: '碳酸锂价格走势与投资机会 · 行业专家B' },
+      { time: '15:10', item: '海外市场拓展与竞争格局 · 行业专家C' },
+      { time: '15:40', item: '圆桌讨论 · 投资机会与风险' },
+    ],
+    4: [
+      { time: '19:30', item: '开场 · 量化老师陈明' },
+      { time: '19:40', item: '多因子模型基础讲解' },
+      { time: '20:10', item: '价值、动量、质量因子实战' },
+      { time: '20:40', item: '代码演示与回测结果' },
+      { time: '21:00', item: '问答环节' },
+    ],
+    5: [
+      { time: '19:30', item: '开场 · 量化老师陈明' },
+      { time: '19:40', item: '港股互联网估值框架' },
+      { time: '20:10', item: '南向资金行为分析' },
+      { time: '20:40', item: '个股精选与配置建议' },
+      { time: '21:00', item: '问答环节' },
+    ],
+    6: [
+      { time: '15:00', item: '开场 · 投资女神Lisa' },
+      { time: '15:10', item: '港股互联网深度研讨' },
+      { time: '15:50', item: '港股研究员：个股分析' },
+      { time: '16:20', item: '圆桌讨论' },
+    ],
+  };
+  const agenda = agendas[id] || [];
+  const agendaHtml = agenda.length ? `
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px">📅 活动议程</div>
+      ${agenda.map(a => `
+        <div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(200,169,110,0.06)">
+          <div style="font-size:11px;color:var(--gold);min-width:44px;font-weight:600">${a.time}</div>
+          <div style="font-size:13px;color:var(--white)">${a.item}</div>
+        </div>`).join('')}
+    </div>` : '';
+
+  const btnHtml = ev.open && ev.statusText !== '即将开放'
+    ? `<button class="btn-gold" style="width:100%;padding:12px" onclick="joinEvent(${ev.id},${ev.points},'${ev.statusText}');document.getElementById('event-detail-modal').classList.remove('show')">
+        ${ev.statusText === '可回放' ? '▶ 立即观看' : '立即报名 · +' + ev.points + '积分'}
+       </button>`
+    : `<button class="btn-outline" style="width:100%;padding:12px;opacity:0.5">${ev.statusText}</button>`;
+
+  document.getElementById('event-detail-content').innerHTML = `
+    <div style="padding:0 4px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span class="event-type-badge ${ev.typeClass}">${ev.type}</span>
+        <span style="font-size:11px;color:${statusColor};font-weight:600">● ${ev.statusText}</span>
+      </div>
+      <div style="font-size:17px;font-weight:700;color:var(--white);line-height:1.4;margin-bottom:10px">${ev.title}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${tags}</div>
+
+      <div style="background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="font-size:12px;color:var(--gray-400);margin-bottom:4px">活动简介</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.7">${ev.desc || '暂无简介'}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">时间</div>
+          <div style="font-size:12px;color:var(--white);margin-top:3px">📅 ${ev.date}</div>
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">主持/主办</div>
+          <div style="font-size:12px;color:var(--white);margin-top:3px">🎙️ ${ev.host}</div>
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">参与人数</div>
+          <div style="font-size:13px;color:var(--gold);font-weight:600;margin-top:3px">👥 ${ev.participants.toLocaleString()}人</div>
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">积分奖励</div>
+          <div style="font-size:13px;color:var(--gold);font-weight:600;margin-top:3px">🎁 +${ev.points}积分</div>
+        </div>
+      </div>
+
+      ${ev.reward ? `<div style="font-size:12px;color:var(--gold);background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:8px;padding:10px;margin-bottom:14px">🎁 ${ev.reward}</div>` : ''}
+
+      ${agendaHtml}
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px">🤖 Hermes 活动解读</div>
+        <div style="font-size:12px;color:var(--gray-400);background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.1);border-radius:8px;padding:10px;line-height:1.7">
+          本次活动由平台大V投顾或研究协同方主持，内容基于洞见智研证据链样本，支持研究分享、观点回看和会后持续跟踪。
+        </div>
+      </div>
+
+      ${btnHtml}
+    </div>`;
+  document.getElementById('event-detail-modal').classList.add('show');
+}
+
+function showFundNewsDetail(item) {
+  const news = item && typeof item === 'object' ? item : {};
+  const title = String(news.title || '综合归纳要闻').trim() || '综合归纳要闻';
+  const sourceGroup = String(news.source_group || news.tag || '综合要闻').trim() || '综合要闻';
+  const tag = String(news.tag || sourceGroup).trim() || sourceGroup;
+  const industry = String(news.industry || '综合/未分类').trim() || '综合/未分类';
+  const time = String(news.time || '刚刚').trim() || '刚刚';
+  const content = String(news.content || news.summary || '').trim();
+  const sourceName = String(news.source_name || news.source || '').trim();
+  const sourceUrl = String(news.url || news.link || '').trim();
+  const why = String(news.why || '当前没有补充说明。').trim() || '当前没有补充说明。';
+  const detailSummary = sourceGroup === '自选股'
+    ? '这条内容与当前自选股样本直接相关，适合结合预警和个股判断一起看。'
+    : sourceGroup === '大V趋势'
+      ? '这条内容会被当前租户大V的研究框架优先引用，适合放到近期判断里联动理解。'
+      : '这条内容会影响当前市场框架、估值锚或主线判断，属于需要优先看的背景变量。';
+  document.getElementById('event-detail-content').innerHTML = `
+    <div style="padding:0 4px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <span class="event-type-badge event-activity">${escapeHtml(sourceGroup)}</span>
+        <span class="tag tag-gold">${escapeHtml(tag)}</span>
+        <span style="font-size:11px;color:var(--gray-400)">${escapeHtml(time)}</span>
+      </div>
+      <div style="font-size:17px;font-weight:700;color:var(--white);line-height:1.5;margin-bottom:14px">${escapeHtml(title)}</div>
+      <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">新闻内容</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.9;white-space:pre-wrap">${escapeHtml(content || '当前暂无可展示的新闻正文。')}</div>
+      </div>
+      <div style="background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">为什么是要闻</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.8">${escapeHtml(why)}</div>
+      </div>
+      <div style="display:grid;gap:10px;margin-bottom:16px">
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">信息来源</div>
+          <div style="font-size:12px;color:var(--white);margin-top:4px">${escapeHtml(sourceName || '公开信息源')}</div>
+          ${sourceUrl ? `<a href="${escapeAttr(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="display:block;margin-top:5px;font-size:11px;color:var(--gold);word-break:break-all">查看原文</a>` : ''}
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">内容归类</div>
+          <div style="font-size:12px;color:var(--white);margin-top:4px">${escapeHtml(sourceGroup)} · ${escapeHtml(tag)}</div>
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">阅读建议</div>
+          <div style="font-size:12px;color:var(--white);margin-top:4px;line-height:1.8">${escapeHtml(detailSummary)}</div>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('event-detail-modal').classList.add('show');
+}
+
+function getFundNewsTabs() {
+  const tabs = Array.isArray(FUND_NEWS_TABS) && FUND_NEWS_TABS.length ? FUND_NEWS_TABS : [{ key: 'all', label: '全部新闻', count: 0, items: [] }];
+  return tabs.map((tab) => ({
+    key: String(tab.key || 'all').trim() || 'all',
+    label: String(tab.label || '全部').trim() || '全部',
+    count: Number(tab.count || 0),
+    items: Array.isArray(tab.items) ? tab.items : [],
+  }));
+}
+
+function getFundNewsListTabs() {
+  const tabs = Array.isArray(FUND_NEWS_LIST_TABS) && FUND_NEWS_LIST_TABS.length ? FUND_NEWS_LIST_TABS : getFundNewsTabs();
+  return tabs.map((tab) => ({
+    key: String(tab.key || 'all').trim() || 'all',
+    label: String(tab.label || '全部').trim() || '全部',
+    count: Number(tab.count || 0),
+    items: Array.isArray(tab.items) ? tab.items : [],
+  }));
+}
+
+function renderFundNewsHome() {
+  const tabs = getFundNewsTabs();
+  const activeKey = window.fundNewsHomeTabKey && tabs.some((tab) => tab.key === window.fundNewsHomeTabKey)
+    ? window.fundNewsHomeTabKey
+    : (tabs[0]?.key || 'all');
+  window.fundNewsHomeTabKey = activeKey;
+  const activeTab = tabs.find((tab) => tab.key === activeKey) || tabs[0] || { items: [] };
+  const tabsHost = document.getElementById('fund-news-home-tabs');
+  const resultsHost = document.getElementById('fund-news-home-results');
+  if (!tabsHost || !resultsHost) return;
+  tabsHost.innerHTML = tabs.map((tab) => (
+    `<button type="button" class="watch-detail-tab fund-news-list-tab ${tab.key === activeKey ? 'active' : ''}" onclick="selectFundNewsHomeTab('${escapeAttr(tab.key)}')">${escapeHtml(tab.label)} (${tab.count})</button>`
+  )).join('');
+  const rows = Array.isArray(activeTab.items) ? activeTab.items : [];
+  window.FUND_NEWS_HOME_ITEMS = rows;
+  resultsHost.innerHTML = rows.length ? `<div style="display:grid;gap:10px">${rows.map((item, index) => `
+    <div class="news-item fund-news-item" style="cursor:pointer" onclick="showFundNewsDetail(window.FUND_NEWS_HOME_ITEMS[${index}])">
+      <div class="news-item-header"><div class="news-title">${escapeHtml(item.title || '综合归纳要闻')}</div><span class="fund-news-source">${escapeHtml(item.source_name || item.source_group || '新闻源')}</span></div>
+      <div class="news-meta"><span class="tag tag-gold">${escapeHtml(item.source_group || item.tag || '综合要闻')}</span><span class="news-time">${escapeHtml(item.time || '来源未提供发布时间')}</span></div>
+    </div>`).join('')}</div>` : '<div class="fund-board-empty">最近 3 天暂无新闻。</div>';
+}
+
+function selectFundNewsHomeTab(tabKey) {
+  window.fundNewsHomeTabKey = String(tabKey || 'all');
+  renderFundNewsHome();
+}
+
+function renderFundNewsRelevance(item) {
+  if (String(item?.aggregation_bucket || '') !== 'watchlist_sector') return '';
+  const topics = Array.isArray(item?.matched_topics)
+    ? item.matched_topics.map((topic) => String(topic || '').trim()).filter(Boolean).slice(0, 2)
+    : [];
+  const label = topics.length ? `关联${topics.join('、')}` : '关联自选板块';
+  return `<span class="fund-news-relevance">${escapeHtml(label)}</span>`;
+}
+
+function renderFundNewsImpact(item) {
+  const impact = ['positive', 'negative', 'neutral', 'mixed'].includes(String(item?.impact || '')) ? String(item.impact) : 'neutral';
+  const label = String(item?.impact_label || (impact === 'positive' ? '利好' : impact === 'negative' ? '利空' : impact === 'mixed' ? '影响分化' : '中性/待确认'));
+  return `<span class="fund-news-impact-tag fund-news-impact-${impact}">${escapeHtml(label)}</span>`;
+}
+
+function buildFundNewsListRouteUrl(activeTabKey) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('news_view', 'list');
+  if (activeTabKey && activeTabKey !== 'summary') url.searchParams.set('news_tab', activeTabKey);
+  else url.searchParams.delete('news_tab');
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function renderFundNewsList() {
+  const tabs = getFundNewsListTabs();
+  const nextKey = tabs.some((tab) => tab.key === fundNewsListState.activeTabKey) ? fundNewsListState.activeTabKey : 'all';
+  fundNewsListState.activeTabKey = nextKey;
+  const currentTab = tabs.find((tab) => tab.key === nextKey) || tabs[0];
+  const query = String(fundNewsListState.query || '').trim().toLowerCase();
+  const analysisHost = document.getElementById('fund-news-analysis');
+  let analysis = {};
+  try { analysis = JSON.parse(analysisHost?.dataset.analysis || '{}'); } catch (error) { analysis = {}; }
+  const analysisDate = String(analysis.date || new Date().toISOString().slice(0, 10));
+  const allNewsItems = (tabs.find((tab) => tab.key === 'all')?.items || tabs.flatMap((tab) => tab.items || []));
+  const availableDates = [...new Set(allNewsItems.map((item) => String(item.published_at || item.fetched_at || '').slice(0, 10)).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= analysisDate))].sort().reverse();
+  const timeWindowDates = {
+    today: new Set([analysisDate]),
+    recent_3d: new Set(availableDates.slice(0, 3)),
+    recent_10d: new Set(availableDates.slice(0, 10)),
+  };
+  const selectedTimeDates = timeWindowDates[fundNewsListState.activeTimeWindow];
+  const rows = (currentTab?.items || []).filter((item) => {
+    if (fundNewsListState.activeImpact !== 'all' && String(item.impact || 'neutral') !== fundNewsListState.activeImpact) return false;
+    if (selectedTimeDates && !selectedTimeDates.has(String(item.published_at || item.fetched_at || '').slice(0, 10))) return false;
+    if (!query) return true;
+    return [item.title, item.content, item.summary, item.why, item.tag, item.source_group, ...(item.matched_topics || [])]
+      .join(' ')
+      .toLowerCase()
+      .includes(query);
+  });
+  window.FUND_NEWS_LIST_ITEMS = rows;
+  const tabsHost = document.getElementById('fund-news-list-tabs');
+  const resultsHost = document.getElementById('fund-news-list-results');
+  if (tabsHost) {
+    tabsHost.innerHTML = tabs.map((tab) => (
+      `<button type="button" class="watch-detail-tab fund-news-list-tab ${fundNewsListState.activeTabKey === tab.key ? 'active' : ''}" onclick="selectFundNewsListTab('${escapeAttr(tab.key)}')">${escapeHtml(tab.label)} (${tab.count})</button>`
+    )).join('');
+  }
+  if (!resultsHost) return;
+  resultsHost.innerHTML = rows.length ? `
+    <div style="display:grid;gap:10px">
+      ${rows.map((newsItem, index) => `
+        <div class="news-item fund-news-item ${String(newsItem.aggregation_bucket || '') === 'watchlist_sector' ? 'is-watchlist-sector' : ''}" style="cursor:pointer" onclick="showFundNewsDetail(window.FUND_NEWS_LIST_ITEMS[${index}])">
+          <div class="news-item-header">
+            <div class="news-title">${escapeHtml(newsItem.title || '综合归纳要闻')}</div>
+            <span class="fund-news-source">${escapeHtml(newsItem.source_group || newsItem.tag || '综合要闻')}</span>
+          </div>
+          <div class="news-meta"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tag tag-gold">${escapeHtml(newsItem.source_group || newsItem.tag || '综合要闻')}</span><span class="news-time">${escapeHtml(newsItem.time || '来源未提供发布时间')}</span></div></div>
+        </div>
+      `).join('')}
+    </div>
+  ` : `<div class="fund-board-empty">当前筛选条件下没有可展示的新闻。</div>`;
+}
+
+function openFundNewsList(options = {}) {
+  const listPage = document.getElementById('page-fund-news-list');
+  if (!listPage) return;
+  const tabs = getFundNewsListTabs();
+  const requestedTab = String(options.activeTabKey || 'all').trim();
+  fundNewsListState.activeTabKey = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : 'all';
+  if (options.activeImpact) fundNewsListState.activeImpact = String(options.activeImpact || 'all');
+  if (!options.keepQuery) fundNewsListState.query = '';
+  ALL_TABS.forEach((tab) => document.getElementById('page-' + tab)?.classList.remove('active'));
+  document.querySelectorAll('.page').forEach((page) => page.classList.remove('active'));
+  listPage.classList.add('active');
+  listPage.setAttribute('aria-hidden', 'false');
+  document.querySelectorAll('.h5-nav-item').forEach((item) => item.classList.remove('active'));
+  document.getElementById('nav-feed')?.classList.add('active');
+  if (!options.skipHistory) window.history.pushState({}, '', buildFundNewsListRouteUrl(fundNewsListState.activeTabKey));
+  renderFundNewsList();
+  window.scrollTo({ top: 0, behavior: options.skipScroll ? 'auto' : 'smooth' });
+}
+
+function closeFundNewsList(options = {}) {
+  const listPage = document.getElementById('page-fund-news-list');
+  listPage?.classList.remove('active');
+  listPage?.setAttribute('aria-hidden', 'true');
+  ALL_TABS.forEach((tab) => document.getElementById('page-' + tab)?.classList.remove('active'));
+  document.getElementById('page-feed')?.classList.add('active');
+  document.querySelectorAll('.h5-nav-item').forEach((item) => item.classList.remove('active'));
+  document.getElementById('nav-feed')?.classList.add('active');
+  if (!options.skipHistory) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('news_view');
+    url.searchParams.delete('news_tab');
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+  window.scrollTo({ top: 0, behavior: options.skipScroll ? 'auto' : 'smooth' });
+}
+
+function selectFundNewsListTab(tabKey) {
+  fundNewsListState.activeTabKey = String(tabKey || 'summary').trim() || 'summary';
+  fundNewsListState.query = '';
+  window.history.replaceState({}, '', buildFundNewsListRouteUrl(fundNewsListState.activeTabKey));
+  renderFundNewsList();
+}
+
+function selectFundNewsImpact(value) {
+  fundNewsListState.activeImpact = String(value || 'all');
+  renderFundNewsList();
+}
+
+function selectFundNewsTimeWindow(value) {
+  fundNewsListState.activeTimeWindow = ['all', 'today', 'recent_3d', 'recent_10d'].includes(String(value || '')) ? String(value) : 'all';
+  renderFundNewsList();
+}
+
+function updateFundNewsListQuery(value) {
+  fundNewsListState.query = String(value || '');
+  renderFundNewsList();
+  const input = document.getElementById('fund-news-query-input');
+  if (input) {
+    input.value = fundNewsListState.query;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+}
+
+function likePost(postId, btn) {
+  fetch('/api/community/like', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ post_id: postId })
+  }).catch(() => {});
+  const likesEl = document.getElementById('likes-' + postId);
+  if (likesEl) {
+    likesEl.textContent = parseInt(likesEl.textContent) + 1;
+  }
+  btn.style.color = 'var(--gold)';
+  showToast('+2积分');
+}
+
+function appendTag(tag) {
+  const ta = document.getElementById('compose-text');
+  ta.value += (ta.value && !ta.value.endsWith(' ') ? ' ' : '') + tag;
+  ta.focus();
+}
+
+function submitPost() {
+  const text = document.getElementById('compose-text').value.trim();
+  if (!text) { showToast('请输入内容'); return; }
+  document.getElementById('compose-modal').classList.remove('show');
+  document.getElementById('compose-text').value = '';
+  showToast('发布成功！+10积分');
+  // Reload posts
+  loadCommunityPosts();
+}
+
+// ===== HERMES =====
+const HERMES_CUSTOM_SKILL_STORAGE_KEY = 'gangtise_demo_hermes_custom_skills';
+let hermesSelectedSkill = 'basic';
+let hermesAssistantMode = 'consultation';
+let hermesConversation = [];
+let hermesCredits = 0;
+let hermesUsageSnapshot = null;
+let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
+let hermesScopedKnowledgeId = '';
+let hermesUploadedFiles = [];
+let hermesLoadingTicker = null;
+let hermesActiveSessionId = '';
+let hermesSessionList = [];
+let hermesSessionSearchKeyword = '';
+let hermesSessionActorKey = '';
+let hermesSessionListLoadedKey = '';
+let hermesSessionListLoading = false;
+const fundNewsListState = { activeTabKey: 'all', query: '', activeImpact: 'all', activeTimeWindow: 'all' };
+
+let fundNewsAnalysisCharts = [];
+let fundNewsAnalysisResizeHandler = null;
+let fundNewsAnalysisWindow = 'today';
+const fundNewsAnalysisWindowLabels = { today: '今日', recent_3d: '近3个交易日', recent_10d: '近10个交易日' };
+function selectFundNewsAnalysisWindow(windowKey) {
+  const nextKey = Object.prototype.hasOwnProperty.call(fundNewsAnalysisWindowLabels, String(windowKey)) ? String(windowKey) : 'today';
+  fundNewsAnalysisWindow = nextKey;
+  document.querySelectorAll('[data-news-window]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.newsWindow === nextKey);
+  });
+  renderFundNewsAnalysisCharts();
+}
+function renderFundNewsAnalysisCharts() {
+  const host = document.getElementById('fund-news-analysis');
+  if (!host || !window.echarts) return;
+  let analysis = {};
+  try { analysis = JSON.parse(host.dataset.analysis || '{}'); } catch (error) { analysis = {}; }
+  const selected = (analysis.windows && analysis.windows[fundNewsAnalysisWindow]) || analysis;
+  const counts = selected.counts || {};
+  const total = Number(selected.total || 0);
+  const windowLabel = fundNewsAnalysisWindowLabels[fundNewsAnalysisWindow] || '今日';
+  const dates = Array.isArray(selected.dates) ? selected.dates : [];
+  const pieHost = document.getElementById('fund-news-impact-pie');
+  const barHost = document.getElementById('fund-news-industry-bar');
+  const dateHost = document.getElementById('fund-news-analysis-date');
+  const pieCaption = document.getElementById('fund-news-impact-caption');
+  const industryCaption = document.getElementById('fund-news-industry-caption');
+  if (dateHost) dateHost.textContent = dates.length ? `${dates[0]}${dates.length > 1 ? ` 至 ${dates[dates.length - 1]}` : ''}` : windowLabel;
+  if (pieCaption) pieCaption.textContent = `${windowLabel}新闻利好 / 利空比例`;
+  if (industryCaption) industryCaption.textContent = `${windowLabel}行业利好 / 利空分类占比`;
+  if (!selected.available || !total) {
+    [pieHost, barHost].forEach((target) => { if (target) target.innerHTML = `<div class="fund-news-analysis-empty">${windowLabel}暂无带有效发布时间的新闻标注<br>暂不计算利好/利空比例</div>`; });
+    return;
+  }
+  const positive = Number(counts.positive || 0);
+  const negative = Number(counts.negative || 0);
+  fundNewsAnalysisCharts.forEach((chart) => chart?.dispose?.());
+  const pie = window.echarts.init(pieHost);
+  pie.setOption({ animation: false, tooltip: { trigger: 'item', formatter: '{b}: {c} 条 ({d}%)' }, legend: { bottom: 5, left: 'center', textStyle: { fontSize: 10 } }, series: [{ type: 'pie', radius: ['42%', '70%'], center: ['50%', '45%'], avoidLabelOverlap: true, label: { fontSize: 10, formatter: '{b} {d}%' }, data: [{ name: '利好', value: positive, itemStyle: { color: '#D64545' } }, { name: '利空', value: negative, itemStyle: { color: '#2E9B65' } }, { name: '中性/待确认', value: Number(counts.neutral || 0), itemStyle: { color: '#AAB4C0' } }, { name: '影响分化', value: Number(counts.mixed || 0), itemStyle: { color: '#D69E2E' } }] }]
+  });
+  const industries = Array.isArray(selected.industries) ? selected.industries.slice(0, 8) : [];
+  const bar = window.echarts.init(barHost);
+  bar.setOption({ animation: false, grid: { left: 72, right: 12, top: 32, bottom: 24 }, tooltip: { trigger: 'axis', valueFormatter: value => `${value}%` }, legend: { top: 8, right: 8, textStyle: { fontSize: 9 } }, xAxis: { type: 'value', max: 100, axisLabel: { fontSize: 9, formatter: '{value}%' }, splitLine: { lineStyle: { color: '#EEF2F6' } } }, yAxis: { type: 'category', inverse: true, data: industries.map(item => item.industry), axisLabel: { fontSize: 9, width: 62, overflow: 'truncate' } }, series: [{ name: '利好', type: 'bar', stack: 'impact', data: industries.map(item => item.positive_pct), itemStyle: { color: '#D64545' }, barMaxWidth: 16 }, { name: '利空', type: 'bar', stack: 'impact', data: industries.map(item => item.negative_pct), itemStyle: { color: '#2E9B65' }, barMaxWidth: 16 }, { name: '中性/待确认', type: 'bar', stack: 'impact', data: industries.map(item => item.neutral_pct), itemStyle: { color: '#AAB4C0' }, barMaxWidth: 16 }, { name: '影响分化', type: 'bar', stack: 'impact', data: industries.map(item => item.mixed_pct), itemStyle: { color: '#D69E2E' }, barMaxWidth: 16 }] });
+  fundNewsAnalysisCharts = [pie, bar];
+  if (fundNewsAnalysisResizeHandler) window.removeEventListener('resize', fundNewsAnalysisResizeHandler);
+  fundNewsAnalysisResizeHandler = () => fundNewsAnalysisCharts.forEach((chart) => chart.resize());
+  window.addEventListener('resize', fundNewsAnalysisResizeHandler);
+}
+
+function getHermesSettings() {
+  return (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
+}
+
+function getHermesEnabledChartTypes() {
+  const types = getHermesSettings().chart_types_enabled;
+  if (!Array.isArray(types) || !types.length) {
+    return ['kline_chart', 'line_chart', 'distribution_chart'];
+  }
+  return types.map(item => String(item || '').trim()).filter(Boolean);
+}
+
+function isHermesThinkingEnabled() {
+  return getHermesSettings().thinking_process_enabled !== false;
+}
+
+function getHermesSessionStorageKey() {
+  const activeUser = getActiveDemoUser() || {};
+  const tenantSlug = String((((activeUser || {}).tenant || {}).slug) || 'default').trim().toLowerCase() || 'default';
+  const profileId = String(activeUser.username || activeUser.name || activeUser.role || 'guest').trim().toLowerCase() || 'guest';
+  return `gangtise_demo_hermes_session:${tenantSlug}:${profileId}`;
+}
+
+function getHermesSessionIndexStorageKey() {
+  return `${getHermesSessionStorageKey()}:index`;
+}
+
+function getHermesSessionCacheStorageKey(sessionId) {
+  return `${getHermesSessionStorageKey()}:cache:${String(sessionId || '').trim()}`;
+}
+
+function getHermesSessionActorKey() {
+  const activeUser = getActiveDemoUser() || {};
+  const tenantSlug = String((((activeUser || {}).tenant || {}).slug) || 'default').trim().toLowerCase() || 'default';
+  const profileId = String(activeUser.username || activeUser.name || activeUser.role || 'guest').trim().toLowerCase() || 'guest';
+  return `${tenantSlug}:${profileId}`;
+}
+
+function createHermesSessionId() {
+  return `hermes_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function readHermesSessionIndex() {
+  return [];
+}
+
+function writeHermesSessionIndex(records) {
+  // Session index is returned by /api/hermes/sessions and is never a browser
+  // database.
+}
+
+function readHermesSessionCache(sessionId) {
+  return null;
+}
+
+function writeHermesSessionCache(sessionId, payload) {
+  // The database-backed Hermes session API is the source of truth.
+}
+
+function formatHermesSessionTime(value) {
+  const text = String(value || '').trim();
+  if (!text) return '刚刚';
+  if (/^\d{4}-\d{2}-\d{2} /.test(text)) return text.slice(5, 16);
+  return text.slice(0, 16);
+}
+
+function summarizeHermesSessionTitle(conversation) {
+  const firstUser = (Array.isArray(conversation) ? conversation : []).find((item) => item && item.type === 'user' && String(item.text || '').trim());
+  return firstUser ? String(firstUser.text || '').trim().slice(0, 36) : '新会话';
+}
+
+function summarizeHermesSessionPreview(conversation) {
+  const list = Array.isArray(conversation) ? conversation.slice().reverse() : [];
+  for (const item of list) {
+    if (!item || item.type !== 'ai') continue;
+    const artifact = normalizeHermesArtifact(item.artifact || item.result, item.question);
+    const text = String(artifact.summary || artifact.body || artifact.headline || '').trim();
+    if (text) return text.slice(0, 72);
+  }
+  for (const item of list) {
+    if (item && item.type === 'user' && String(item.text || '').trim()) {
+      return String(item.text || '').trim().slice(0, 72);
+    }
+  }
+  return '';
+}
+
+function summarizeHermesSessionIntent(conversation) {
+  const list = Array.isArray(conversation) ? conversation.slice().reverse() : [];
+  const latestAi = list.find((item) => item && item.type === 'ai');
+  return latestAi ? String(latestAi.intentLabel || latestAi.capabilityLabel || '').trim() : '';
+}
+
+function buildHermesLocalSessionRecord(sessionId, conversation) {
+  const normalizedId = String(sessionId || '').trim();
+  const list = Array.isArray(conversation) ? conversation : [];
+  const turnCount = list.filter((item) => item && item.type === 'user').length;
+  return {
+    session_id: normalizedId,
+    title: summarizeHermesSessionTitle(list),
+    preview: summarizeHermesSessionPreview(list),
+    turn_count: turnCount,
+    last_intent_label: summarizeHermesSessionIntent(list),
+    last_seen_at: nowTsForHermesSession(),
+    source: 'local',
+  };
+}
+
+function nowTsForHermesSession() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+}
+
+function syncHermesSessionCache(options = {}) {
+  const sessionId = String(hermesActiveSessionId || '').trim();
+  if (!sessionId) return;
+  const record = buildHermesLocalSessionRecord(sessionId, hermesConversation);
+  const payload = {
+    ...record,
+    conversation: Array.isArray(hermesConversation) ? hermesConversation.slice(0) : [],
+    saved_at: record.last_seen_at,
+  };
+  writeHermesSessionCache(sessionId, payload);
+  let index = readHermesSessionIndex().filter((item) => String((item || {}).session_id || '').trim() !== sessionId);
+  if (!options.skipEmpty || record.turn_count > 0 || record.preview) {
+    index.unshift(record);
+  }
+  index = index
+    .filter((item) => item && String(item.session_id || '').trim())
+    .sort((a, b) => String(b.last_seen_at || '').localeCompare(String(a.last_seen_at || '')))
+    .slice(0, 40);
+  writeHermesSessionIndex(index);
+}
+
+function closeH5ModalById(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.classList.remove('show');
+}
+
+function ensureHermesSessionId() {
+  if (String(hermesActiveSessionId || '').trim()) return hermesActiveSessionId;
+  hermesActiveSessionId = createHermesSessionId();
+  return hermesActiveSessionId;
+}
+
+function getHermesCurrentSessionRecord() {
+  const sessionId = ensureHermesSessionId();
+  return buildHermesLocalSessionRecord(sessionId, hermesConversation);
+}
+
+function mergeHermesSessionRecords(remoteSessions, localSessions) {
+  const merged = new Map();
+  (Array.isArray(remoteSessions) ? remoteSessions : []).forEach((item) => {
+    if (!item || !item.session_id) return;
+    merged.set(String(item.session_id), { ...item, source: item.source || 'remote' });
+  });
+  (Array.isArray(localSessions) ? localSessions : []).forEach((item) => {
+    if (!item || !item.session_id) return;
+    const key = String(item.session_id);
+    const current = merged.get(key) || {};
+    merged.set(key, {
+      ...current,
+      ...item,
+      title: item.title || current.title || '新会话',
+      preview: item.preview || current.preview || '',
+      last_seen_at: item.last_seen_at || current.last_seen_at || '',
+      source: current.source === 'remote' ? 'hybrid' : 'local',
+    });
+  });
+  return Array.from(merged.values()).sort((a, b) => String(b.last_seen_at || '').localeCompare(String(a.last_seen_at || '')));
+}
+
+function loadHermesLocalSessionRecords() {
+  return readHermesSessionIndex().map((item) => {
+    const cache = readHermesSessionCache(item.session_id) || {};
+    return {
+      ...item,
+      title: item.title || cache.title || '新会话',
+      preview: item.preview || cache.preview || '',
+      turn_count: Number(item.turn_count || cache.turn_count || 0),
+      last_intent_label: item.last_intent_label || cache.last_intent_label || '',
+      last_seen_at: item.last_seen_at || cache.last_seen_at || cache.saved_at || '',
+      source: 'local',
+    };
+  });
+}
+
+async function loadHermesSessionList(options = {}) {
+  const actorKey = getHermesSessionActorKey();
+  const force = !!options.force;
+  if (hermesSessionListLoading && !force) return hermesSessionList;
+  if (!force && hermesSessionListLoadedKey === actorKey && hermesSessionList.length) return hermesSessionList;
+  hermesSessionListLoading = true;
+  const activeUser = getActiveDemoUser() || {};
+  const params = new URLSearchParams({
+    tenant_slug: (((activeUser || {}).tenant || {}).slug || '').toLowerCase(),
+    user_role: String(activeUser.role || '').trim(),
+    user_profile_id: String(activeUser.username || '').trim(),
+    limit: '36',
+  });
+  try {
+    const resp = await fetch(`/api/hermes/sessions?${params.toString()}`, { cache: 'no-store' });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'hermes_sessions_failed');
+    hermesSessionList = mergeHermesSessionRecords(data.sessions || [], loadHermesLocalSessionRecords());
+    hermesSessionListLoadedKey = actorKey;
+  } catch (error) {
+    hermesSessionList = mergeHermesSessionRecords([], loadHermesLocalSessionRecords());
+    if (!options.silent) showToast('历史会话加载失败，已先展示本机缓存');
+  } finally {
+    hermesSessionListLoading = false;
+    renderHermesSessionBar();
+    if (document.getElementById('hermes-session-modal')?.classList.contains('show')) {
+      renderHermesSessionModal();
+    }
+  }
+  return hermesSessionList;
+}
+
+function getVisibleHermesSessionList() {
+  const keyword = String(hermesSessionSearchKeyword || '').trim().toLowerCase();
+  const current = getHermesCurrentSessionRecord();
+  const list = mergeHermesSessionRecords(hermesSessionList, current.turn_count || current.preview ? [current] : []);
+  if (!keyword) return list;
+  return list.filter((item) => {
+    const corpus = `${item.title || ''} ${item.preview || ''} ${item.last_intent_label || ''}`.toLowerCase();
+    return corpus.includes(keyword);
+  });
+}
+
+function renderHermesSessionBar() {
+  const titleEl = document.getElementById('hermes-session-current-title');
+  const metaEl = document.getElementById('hermes-session-current-meta');
+  if (!titleEl || !metaEl) return;
+  const record = getHermesCurrentSessionRecord();
+  titleEl.textContent = record.title || '新会话';
+  if (record.turn_count > 0) {
+    metaEl.textContent = `${record.turn_count} 轮对话 · ${record.last_seen_at ? formatHermesSessionTime(record.last_seen_at) : '刚刚'}`;
+  } else {
+    metaEl.textContent = '点击切换历史会话';
+  }
+}
+
+function closeHermesSessionModal() {
+  closeH5ModalById('hermes-session-modal');
+}
+
+function renderHermesSessionModal() {
+  const host = document.getElementById('hermes-session-modal-content');
+  if (!host) return;
+  const list = getVisibleHermesSessionList();
+  host.innerHTML = `
+    <div class="hermes-modal-head">
+      <div>
+        <div class="modal-title" style="margin-bottom:0">会话</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:4px">新会话单独开始，历史会话可继续追问。</div>
+      </div>
+      <button class="hermes-modal-close" type="button" onclick="startHermesNewSession({ closeModal: true })">新会话</button>
+    </div>
+    <input class="hermes-session-search" placeholder="搜索会话标题、摘要或能力标签" value="${escapeAttr(hermesSessionSearchKeyword)}" oninput="handleHermesSessionSearch(this.value)">
+    <div class="hermes-session-list">
+      ${list.length ? list.map((item) => `
+        <button type="button" class="hermes-session-card ${String(item.session_id || '') === String(hermesActiveSessionId || '') ? 'active' : ''}" onclick="switchHermesSession('${escapeAttr(item.session_id || '')}', { closeModal: true })">
+          <div class="hermes-session-card-head">
+            <div class="hermes-session-card-title">${escapeHtml(item.title || '新会话')}</div>
+            <div class="hermes-session-card-time">${escapeHtml(formatHermesSessionTime(item.last_seen_at || ''))}</div>
+          </div>
+          <div class="hermes-session-card-preview">${escapeHtml(item.preview || '进入后可继续提问')}</div>
+          <div class="hermes-session-card-meta">
+            <span class="hermes-session-chip">${escapeHtml(`${Number(item.turn_count || 0)} 轮`)}</span>
+            ${item.last_intent_label ? `<span class="hermes-session-chip">${escapeHtml(item.last_intent_label)}</span>` : ''}
+            ${String(item.session_id || '') === String(hermesActiveSessionId || '') ? '<span class="hermes-session-chip">当前会话</span>' : ''}
+          </div>
+        </button>
+      `).join('') : '<div class="hermes-session-empty">当前还没有可继续的历史会话。<br>从右上角新建一轮对话即可开始。</div>'}
+    </div>
+  `;
+}
+
+function handleHermesSessionSearch(value) {
+  hermesSessionSearchKeyword = String(value || '').trim();
+  renderHermesSessionModal();
+}
+
+async function openHermesSessionModal() {
+  hermesSessionSearchKeyword = '';
+  renderHermesSessionModal();
+  const modal = document.getElementById('hermes-session-modal');
+  if (modal) modal.classList.add('show');
+  await loadHermesSessionList({ silent: true });
+}
+
+function buildHermesMessagesPayload() {
+  return hermesConversation
+    .filter((item) => item && (item.type === 'user' || item.type === 'ai'))
+    .map((item) => {
+      if (item.type === 'user') {
+        return { role: 'user', content: String(item.text || '').trim() };
+      }
+      const artifact = normalizeHermesArtifact(item.artifact || item.result, item.question);
+      return {
+        role: 'assistant',
+        content: String(artifact.body || artifact.summary || artifact.headline || '').trim(),
+      };
+    })
+    .filter((item) => item.content);
+}
+
+function buildHermesConversationFromSessionTurns(turns) {
+  const conversation = [];
+  (Array.isArray(turns) ? turns : []).forEach((turn) => {
+    const questionText = String((turn || {}).question_text || '').trim();
+    const answerText = String((turn || {}).answer_text || '').trim();
+    const answerSummary = String((turn || {}).answer_summary || '').trim();
+    if (questionText) {
+      conversation.push({
+        id: createHermesEntryId('user'),
+        type: 'user',
+        text: questionText,
+        stockCode: inferHermesStockCodeFromQuestion(questionText),
+        skillLabel: (turn || {}).intent_label || 'Hermes 对话',
+        displayMode: 'text',
+      });
+    }
+    if (answerText || answerSummary) {
+      conversation.push({
+        id: createHermesEntryId('ai'),
+        type: 'ai',
+        question: questionText,
+        result: normalizeHermesArtifact({
+          type: 'text_response',
+          question: questionText,
+          title: 'Hermes 对话',
+          headline: answerSummary || answerText.slice(0, 36) || '已完成回答',
+          summary: answerSummary || '',
+          body: answerText || answerSummary || '',
+          bullets: [],
+          followups: [],
+          citations: Array.isArray((turn || {}).citations) ? turn.citations : [],
+          knowledge: [],
+          footer: (turn || {}).intent_label ? `本次按：${turn.intent_label}` : '',
+        }, questionText),
+        artifact: normalizeHermesArtifact({
+          type: 'text_response',
+          question: questionText,
+          title: 'Hermes 对话',
+          headline: answerSummary || answerText.slice(0, 36) || '已完成回答',
+          summary: answerSummary || '',
+          body: answerText || answerSummary || '',
+          bullets: [],
+          followups: [],
+          citations: Array.isArray((turn || {}).citations) ? turn.citations : [],
+          knowledge: [],
+          footer: (turn || {}).intent_label ? `本次按：${turn.intent_label}` : '',
+        }, questionText),
+        displayMode: 'text',
+        capabilityLabel: (turn || {}).intent_label || '',
+        intentLabel: (turn || {}).intent_label || '',
+        // Keep the machine-readable intent: the localized label is not stable enough
+        // to restore task-specific actions after a session reload.
+        intent: (turn || {}).intent || '',
+      });
+    }
+  });
+  return conversation;
+}
+
+async function switchHermesSession(sessionId, options = {}) {
+  const normalizedId = String(sessionId || '').trim();
+  if (!normalizedId) return;
+  const cache = readHermesSessionCache(normalizedId);
+  hermesActiveSessionId = normalizedId;
+  if (cache && Array.isArray(cache.conversation) && cache.conversation.length) {
+    hermesConversation = cache.conversation.slice(0);
+    clearHermesQuestionInputs();
+    renderHermesWorkspace();
+    scrollHermesThreadToBottom();
+    if (options.closeModal) closeHermesSessionModal();
+    return;
+  }
+  try {
+    const activeUser = getActiveDemoUser() || {};
+    const params = new URLSearchParams({
+      tenant_slug: (((activeUser || {}).tenant || {}).slug || '').toLowerCase(),
+      user_role: String(activeUser.role || '').trim(),
+      user_profile_id: String(activeUser.username || '').trim(),
+    });
+    const resp = await fetch(`/api/hermes/sessions/${encodeURIComponent(normalizedId)}?${params.toString()}`, { cache: 'no-store' });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'hermes_session_detail_failed');
+    hermesConversation = buildHermesConversationFromSessionTurns(data.turns || []);
+    syncHermesSessionCache();
+    clearHermesQuestionInputs();
+    renderHermesWorkspace();
+    scrollHermesThreadToBottom();
+    if (options.closeModal) closeHermesSessionModal();
+  } catch (error) {
+    showToast('历史会话加载失败');
+  }
+}
+
+function startHermesNewSession(options = {}) {
+  hermesActiveSessionId = createHermesSessionId();
+  hermesConversation = [];
+  hermesUploadedFiles = [];
+  hermesScopedKnowledgeId = '';
+  clearHermesQuestionInputs({ focus: options.focus !== false });
+  renderHermesWorkspace();
+  resetHermesScrollPosition();
+  if (options.closeModal) closeHermesSessionModal();
+  if (!options.silent) showToast('已开始新会话');
+}
+
+function ensureHermesSessionBootstrap() {
+  const actorKey = getHermesSessionActorKey();
+  if (hermesSessionActorKey !== actorKey) {
+    hermesSessionActorKey = actorKey;
+    hermesConversation = [];
+    hermesSessionList = [];
+    hermesSessionSearchKeyword = '';
+    hermesSessionListLoadedKey = '';
+    hermesUploadedFiles = [];
+    hermesScopedKnowledgeId = '';
+    hermesActiveSessionId = '';
+  }
+  const sessionId = ensureHermesSessionId();
+  const cache = readHermesSessionCache(sessionId);
+  if (!hermesConversation.length && cache && Array.isArray(cache.conversation) && cache.conversation.length) {
+    hermesConversation = cache.conversation.slice(0);
+  }
+  if (!hermesSessionListLoadedKey && !hermesSessionListLoading) {
+    loadHermesSessionList({ silent: true }).catch(() => {});
+  }
+}
+
+const DEFAULT_HERMES_SKILLS = {
+  basic: {
+    id: 'basic',
+    icon: '🧭',
+    label: '基本面分析',
+    desc: '先看盈利、估值、行业位置和争议点，适合第一次快速判断。',
+    promptTemplate: '围绕盈利、估值、行业位置和争议点做一轮结构化基本面分析。',
+    suggestions: [
+      '请概括这只股票当前的基本面强弱。',
+      '请把盈利、估值、行业位置拆开讲清楚。',
+      '请说明最值得继续跟踪的两个变量。'
+    ],
+    knowledgeKeywords: ['基本面', '估值', '盈利', '框架']
+  },
+  judgement: {
+    id: 'judgement',
+    icon: '📌',
+    label: '基本面判断',
+    desc: '直接输出继续跟踪、重点研究或暂缓处理，并解释原因。',
+    promptTemplate: '直接给出继续跟踪、重点研究或暂缓处理的阶段性结论，并解释原因。',
+    suggestions: [
+      '请判断当前更适合继续跟踪还是重点研究。',
+      '请给出阶段性结论和置信度。',
+      '请说明短期和中期分别该看什么。'
+    ],
+    knowledgeKeywords: ['判断', '洞见', '跟踪', '结论']
+  },
+  evidence: {
+    id: 'evidence',
+    icon: '🔗',
+    label: '证据链归因',
+    desc: '把结论拆成来源、依据和未验证项，方便给粉丝或团队复用。',
+    promptTemplate: '把当前结论拆成来源、依据、未验证项和可复用的证据链表达。',
+    suggestions: [
+      '请把当前结论拆成证据链。',
+      '请区分已验证和未验证部分。',
+      '请输出适合洞见引用的依据卡片。'
+    ],
+    knowledgeKeywords: ['纪要', '证据', '来源', '方法']
+  },
+  report_interpretation: {
+    id: 'report_interpretation',
+    icon: '📄',
+    label: '报告解读',
+    desc: '适合上传研报、纪要或文件后，让 Hermes 先读材料，再给出结构化解读。',
+    promptTemplate: '先解析当前上传文件，再输出结构化解读、重点结论和待验证项。',
+    suggestions: [
+      '请解读我刚上传的这份研报，先说核心结论。',
+      '请把这份纪要拆成结论、依据和风险提示。',
+      '请把上传文件做成一版适合继续追问的结构化摘要。'
+    ],
+    knowledgeKeywords: ['研报', '纪要', '报告', '知识']
+  },
+  content_generation: {
+    id: 'content_generation',
+    icon: '✍️',
+    label: '内容生成',
+    desc: '把已有知识、附件或研究结果整理成摘要、提纲、草稿或发布文案。',
+    promptTemplate: '结合当前上下文，输出一版可直接修改的结构化内容草稿。',
+    suggestions: [
+      '请基于当前内容生成一版结构化摘要。',
+      '请帮我起草一段研究结论，语气专业一点。',
+      '请整理成提纲，方便我后续继续修改。'
+    ],
+    knowledgeKeywords: ['摘要', '提纲', '草稿', '方法']
+  },
+  line_chart: {
+    id: 'line_chart',
+    icon: '📈',
+    label: '线性图',
+    desc: '优先把指标、股指或智能指标按线性趋势方式展示，适合看方向和斜率变化。',
+    promptTemplate: '优先输出线性趋势图，并围绕趋势方向、阶段拐点和最近变化做解释。',
+    suggestions: [
+      '请用线性图展示这个指标最近3个月的趋势。',
+      '请把这条指数的趋势线画出来并解释最近变化。',
+      '请用线性图展示近一段时间的方向和拐点。'
+    ],
+    knowledgeKeywords: ['趋势', '线性图', '走势图']
+  },
+  kline_chart: {
+    id: 'kline_chart',
+    icon: '🕯️',
+    label: 'K线图',
+    desc: '优先用 K 线方式展示指数或指标，适合看波动区间、均线和异动位置。',
+    promptTemplate: '优先输出 K 线图，并解释区间波动、均线关系和异常点。',
+    suggestions: [
+      '请给我这个指数最近3个月的K线图。',
+      '请用K线展示这条指标最近的波动情况。',
+      '请结合K线解释最近区间高低点。'
+    ],
+    knowledgeKeywords: ['K线', '蜡烛图', '均线']
+  },
+  distribution_chart: {
+    id: 'distribution_chart',
+    icon: '📊',
+    label: '分布图',
+    desc: '优先把指标按分布统计方式展示，适合看区间集中度、离散程度和分位位置。',
+    promptTemplate: '优先输出分布统计图，并解释当前值落在哪个区间、分布是否集中。',
+    suggestions: [
+      '请用分布图看这个指标最近3个月的分布。',
+      '请展示这条指数近阶段的区间分布统计。',
+      '请用分布图判断当前值处于什么区间。'
+    ],
+    knowledgeKeywords: ['分布', '直方图', '区间统计']
+  },
+  small_talk: {
+    id: 'small_talk',
+    icon: '💬',
+    label: '轻度闲聊',
+    desc: '用于轻量追问、上下文承接和研究方向确认，不替代研究型任务。',
+    promptTemplate: '简短承接上下文，必要时把问题收口到平台支持的研究能力。',
+    suggestions: [
+      '先帮我确认一下我刚才的问题更适合怎么问。',
+      '你先告诉我接下来应该补什么信息。',
+      '如果要继续研究，这一步最适合先看什么？'
+    ],
+    knowledgeKeywords: ['帮助', '确认', '方向']
+  }
+};
+
+let currentWatchlistSection = 'overview';
+
+function openWatchlistDetailFromCard(stockCode, section) {
+  switchTab('market');
+  window.setTimeout(() => openWatchlistDetail(stockCode, section || 'overview'), 0);
+}
+
+async function selectHermesMode(mode) {
+  const mapping = {
+    '基本面分析': 'basic',
+    '自选股诊断': 'judgement',
+    '证据链归因': 'evidence',
+    '线性图': 'line_chart',
+    'K线图': 'kline_chart',
+    '分布图': 'distribution_chart',
+    '报告解读': 'report_interpretation',
+    '内容生成': 'content_generation',
+    '轻度闲聊': 'small_talk',
+    '线索追踪': 'evidence',
+    '洞见速写': 'basic',
+    '研报精读': 'evidence',
+    '专家纪要速读': 'evidence',
+    '方法模板': 'judgement'
+  };
+  selectHermesSkill(mapping[mode] || 'basic');
+}
+
+async function selectHermesOption(option) {
+  applyHermesSuggestion(option);
+}
+
+function fillHermesStockCode(stockCode) {
+  const normalized = findWatchlistCodeFromInput(stockCode);
+  const inputA = document.getElementById('hermes-stock-code-input');
+  if (inputA) inputA.value = normalized;
+}
+
+function getHermesActiveStockCode() {
+  const input = document.getElementById('hermes-stock-code-input');
+  return (input && input.value) || '';
+}
+
+function inferHermesStockCodeFromQuestion(question) {
+  const text = String(question || '').trim();
+  if (!text) return '';
+  const codeMatch = text.match(/\b\d{5,6}\b/);
+  if (codeMatch) return findWatchlistCodeFromInput(codeMatch[0]);
+  const cards = Array.from(document.querySelectorAll('[data-watchlist-card="true"]'));
+  const matchedCard = cards.find(node => {
+    const code = String(node.dataset.stockCode || '').trim();
+    const name = String(node.dataset.stockName || '').trim();
+    return (code && text.includes(code)) || (name && text.includes(name));
+  });
+  return matchedCard ? findWatchlistCodeFromInput(matchedCard.dataset.stockCode || '') : '';
+}
+
+function getHermesActiveQuestion() {
+  const input = document.getElementById('hermes-question-input');
+  return (input && input.value) || '';
+}
+
+function resizeHermesQuestionInput(input) {
+  const node = input || document.getElementById('hermes-question-input');
+  if (!node) return;
+  node.style.height = 'auto';
+  node.style.height = `${Math.max(88, Math.min(node.scrollHeight, 160))}px`;
+}
+
+function renderHermesComposerSubmit() {
+  const button = document.getElementById('hermes-composer-submit');
+  const hasText = !!String(getHermesActiveQuestion() || '').trim();
+  if (!button) {
+    syncHermesComposerClearance();
+    return;
+  }
+  button.textContent = hermesAssistantMode === 'task' && !hasText ? '执行任务' : '发送';
+  button.removeAttribute('aria-label');
+  button.title = '发送';
+  button.disabled = !hasText && hermesAssistantMode !== 'task';
+  syncHermesComposerClearance();
+}
+
+function getHermesScrollContainer() {
+  const thread = document.getElementById('hermes-chat-thread');
+  if (!thread) return document.scrollingElement || document.documentElement;
+  let node = thread.parentElement;
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
+      && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+
+function scrollHermesThreadToBottom(options = {}) {
+  if (!hermesConversation.length) return;
+  const behavior = options.behavior || 'smooth';
+  const scroll = () => {
+    const container = getHermesScrollContainer();
+    const targetTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    if (typeof container.scrollTo === 'function') {
+      container.scrollTo({ top: targetTop, behavior });
+    } else {
+      container.scrollTop = targetTop;
+    }
+  };
+  window.requestAnimationFrame(() => window.requestAnimationFrame(scroll));
+}
+
+function resetHermesScrollPosition() {
+  const container = getHermesScrollContainer();
+  if (typeof container.scrollTo === 'function') {
+    container.scrollTo({ top: 0, behavior: 'auto' });
+  } else {
+    container.scrollTop = 0;
+  }
+}
+
+function syncHermesComposerClearance() {
+  const thread = document.getElementById('hermes-chat-thread');
+  const composer = document.querySelector('#page-hermes .hermes-composer-shell');
+  if (!thread || !composer) return;
+  const rect = composer.getBoundingClientRect();
+  const bottomOffset = Math.max(0, window.innerHeight - rect.bottom);
+  const clearance = Math.ceil(rect.height + bottomOffset + 14);
+  thread.style.paddingBottom = `${clearance}px`;
+}
+
+window.addEventListener('resize', syncHermesComposerClearance);
+
+function handleHermesQuestionInput(input) {
+  resizeHermesQuestionInput(input);
+  renderHermesComposerSubmit();
+}
+
+function fillHermesQuestionInput(text, options = {}) {
+  const input = document.getElementById('hermes-question-input');
+  if (!input) return;
+  const normalizedText = String(text || '').trim();
+  if (options.append) {
+    input.value = appendTranscribedText(input.value, normalizedText);
+  } else {
+    input.value = normalizedText;
+  }
+  resizeHermesQuestionInput(input);
+  renderHermesComposerSubmit();
+  if (options.focus !== false) input.focus();
+}
+
+function focusHermesQuestionComposer() {
+  const input = document.getElementById('hermes-question-input');
+  if (input) input.focus();
+}
+
+function getHermesActiveKnowledgeScopeText() {
+  if (!hermesScopedKnowledgeId) return '默认知识';
+  const entry = getKnowledgeEntryById(hermesScopedKnowledgeId);
+  return entry ? `知识：${entry.title}` : '知识范围';
+}
+
+function getHermesUploadedFileNames() {
+  return hermesUploadedFiles.map(item => item.filename || item.name || '文件');
+}
+
+function createHermesEntryId(prefix = 'entry') {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function renderHermesComposerContext() {
+  const hosts = [
+    document.getElementById('hermes-composer-context'),
+  ].filter(Boolean);
+  if (!hosts.length) return;
+  const chips = [];
+  const taskNote = hermesAssistantMode === 'task'
+    ? '<div class="hermes-task-mode-note">当前任务模式支持归纳当前租户的用户评论与个股 K 线标注。可直接输入今日、昨日、本周、本月、今年或所有。</div>'
+    : '<div class="hermes-task-mode-note">咨询模式用于研究型问答：支持今日个股观察、今日大盘与指数分析、个股看点摘要、个股深度研究、自选股组合分析、智能指标与看板解读。</div>';
+  if (hermesSelectedSkill && hermesSelectedSkill !== 'basic') {
+    const skill = getHermesSkillById(hermesSelectedSkill);
+    if (skill) {
+      chips.push(`
+        <div class="hermes-composer-chip">
+          <span>方式：${escapeHtml(skill.label)}</span>
+          <button onclick="selectHermesSkill('basic')" aria-label="恢复默认分析方式">×</button>
+        </div>
+      `);
+    }
+  }
+  if (hermesScopedKnowledgeId) {
+    chips.push(`
+      <div class="hermes-composer-chip">
+        <span>${escapeHtml(getHermesActiveKnowledgeScopeText())}</span>
+        <button onclick="clearHermesKnowledgeScope()" aria-label="清除知识范围">×</button>
+      </div>
+    `);
+  }
+  getHermesUploadedFileNames().forEach((name, index) => {
+    chips.push(`
+      <div class="hermes-composer-chip">
+        <span>文件：${escapeHtml(name)}</span>
+        <button onclick="removeHermesUploadedFile(${index})" aria-label="移除文件">×</button>
+      </div>
+    `);
+  });
+  const html = chips.join('');
+  hosts.forEach(host => { host.innerHTML = taskNote + html; });
+  const input = document.getElementById('hermes-question-input');
+  if (input) input.placeholder = hermesAssistantMode === 'task'
+    ? '例如：总结本周用户评论和 K 线标注...'
+    : '问小金智能体...';
+}
+
+function handleHermesComposerSubmit() {
+  if (!String(getHermesActiveQuestion() || '').trim() && hermesAssistantMode !== 'task') return;
+  runHermesAnalysis();
+}
+
+function clearHermesKnowledgeScope() {
+  hermesScopedKnowledgeId = '';
+  renderHermesWorkspace();
+}
+
+function removeHermesUploadedFile(index) {
+  hermesUploadedFiles.splice(index, 1);
+  renderHermesWorkspace();
+}
+
+function closeHermesPlusMenu() {
+  const modal = document.getElementById('hermes-plus-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function openHermesUrlAttachPrompt() {
+  const target = window.prompt('输入要解析的 URL');
+  const normalized = String(target || '').trim();
+  if (!normalized) return;
+  try {
+    const resp = await fetch('/api/kol/knowledge/url-preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url: normalized }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'url_preview_failed');
+    const preview = data.preview || {};
+    hermesUploadedFiles = [{
+      filename: preview.title || normalized,
+      summary: preview.summary || '',
+      body: preview.body || '',
+      url: normalized,
+    }];
+    closeHermesPlusMenu();
+    renderHermesWorkspace();
+    showToast('已加入 URL 解析结果');
+  } catch (error) {
+    showToast(error.message || 'URL 解析失败');
+  }
+}
+
+function selectHermesKnowledgeScope(entryId) {
+  hermesScopedKnowledgeId = entryId || '';
+  closeHermesPlusMenu();
+  renderHermesWorkspace();
+  showToast(entryId ? '已切换知识范围' : '已恢复默认知识范围');
+}
+
+async function openHermesFilePicker() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv,.html,.htm';
+  input.multiple = true;
+  input.onchange = async () => {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    const parsedFiles = [];
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      const resp = await fetch('/api/kol/knowledge/file-preview', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        showToast((data && data.error) || `文件解析失败：${file.name}`);
+        continue;
+      }
+      const preview = data.preview || {};
+      parsedFiles.push({
+        filename: preview.filename || file.name,
+        summary: preview.summary || '',
+        body: preview.body || '',
+      });
+    }
+    if (!parsedFiles.length) return;
+    hermesUploadedFiles = parsedFiles;
+    closeHermesPlusMenu();
+    renderHermesWorkspace();
+    showToast(`已接入 ${parsedFiles.length} 个文件`);
+  };
+  input.click();
+}
+
+function openHermesPlusMenu() {
+  const host = document.getElementById('hermes-plus-modal-content');
+  if (!host) return;
+  host.innerHTML = `
+    <div class="hermes-modal-head">
+      <div class="modal-title" style="margin-bottom:0">添加上下文</div>
+      <button class="hermes-modal-close" type="button" onclick="closeHermesPlusMenu()">关闭</button>
+    </div>
+    <div class="hermes-plus-action-row">
+      <button class="hermes-plus-action" onclick="openHermesFilePicker()">
+        <div class="hermes-plus-action-title">上传文件解析</div>
+        <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给小金智能体。</div>
+      </button>
+      <button class="hermes-plus-action" onclick="openHermesUrlAttachPrompt()">
+        <div class="hermes-plus-action-title">解析网页 URL</div>
+        <div class="hermes-plus-action-desc">输入网页地址后，先提炼正文和摘要，再作为本轮问题的知识材料。</div>
+      </button>
+    </div>
+  `;
+  const modal = document.getElementById('hermes-plus-modal');
+  if (modal) modal.classList.add('show');
+}
+
+function clearHermesQuestionInputs(options) {
+  options = options || {};
+  const inputA = document.getElementById('hermes-question-input');
+  if (inputA) {
+    inputA.value = '';
+    inputA.scrollTop = 0;
+    resizeHermesQuestionInput(inputA);
+    if (options.focus) inputA.focus();
+  }
+  renderHermesComposerSubmit();
+}
+
+function getHermesSkillStorageByTenant() {
+  try {
+    const raw = window.localStorage ? window.localStorage.getItem(HERMES_CUSTOM_SKILL_STORAGE_KEY) : '';
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveHermesSkillStorageByTenant(storage) {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(HERMES_CUSTOM_SKILL_STORAGE_KEY, JSON.stringify(storage));
+    }
+  } catch (e) {}
+}
+
+function getTenantHermesCustomSkills() {
+  const activeUser = getActiveDemoUser();
+  const storage = getHermesSkillStorageByTenant();
+  const list = storage[activeUser.tenant.id];
+  return Array.isArray(list) ? list : [];
+}
+
+function persistTenantHermesCustomSkills(skills) {
+  const activeUser = getActiveDemoUser();
+  const storage = getHermesSkillStorageByTenant();
+  storage[activeUser.tenant.id] = skills;
+  saveHermesSkillStorageByTenant(storage);
+}
+
+function inferHermesKnowledgeForSkill(skill) {
+  const entries = getTenantKnowledgeEntries().filter(entry => entry.status === 'ready');
+  if (!entries.length) return [];
+  if (hermesScopedKnowledgeId) {
+    const scopedEntry = entries.find(entry => entry.id === hermesScopedKnowledgeId) || getKnowledgeEntryById(hermesScopedKnowledgeId);
+    return scopedEntry ? [scopedEntry] : [];
+  }
+  if (Array.isArray(skill.linkedKnowledgeIds) && skill.linkedKnowledgeIds.length) {
+    const resolved = skill.linkedKnowledgeIds
+      .map(id => entries.find(entry => entry.id === id) || getTenantKnowledgeEntries().find(entry => entry.id === id))
+      .filter(Boolean);
+    return resolved;
+  }
+  const keywords = Array.isArray(skill.knowledgeKeywords) ? skill.knowledgeKeywords : [];
+  const matched = entries.filter(entry => {
+    const corpus = `${entry.title} ${entry.summary} ${(entry.tags || []).join(' ')}`.toLowerCase();
+    return keywords.some(keyword => corpus.includes(String(keyword).toLowerCase()));
+  });
+  return (matched.length ? matched : entries).slice(0, 3);
+}
+
+function getHermesSkillCatalog() {
+  const enabledChartTypes = new Set(getHermesEnabledChartTypes());
+  const builtins = Object.values(DEFAULT_HERMES_SKILLS)
+    .filter(skill => isStockForecastEnabled() || skill.id !== 'judgement')
+    .filter(skill => {
+      if (!['line_chart', 'kline_chart', 'distribution_chart'].includes(skill.id)) return true;
+      return enabledChartTypes.has(skill.id);
+    })
+    .map(skill => ({
+    ...skill,
+    source: 'system',
+  }));
+  const custom = getTenantHermesCustomSkills().map(skill => ({
+    ...skill,
+    source: 'custom',
+    icon: skill.icon || '🧠',
+  }));
+  return [...builtins, ...custom];
+}
+
+function getHermesSkillById(skillId) {
+  return getHermesSkillCatalog().find(skill => skill.id === skillId) || getHermesSkillCatalog()[0];
+}
+
+function renderHermesCredits() {
+  const el = document.getElementById('hermes-credits-display');
+  if (!el) return;
+  const usedCount = Number((hermesUsageSnapshot || {}).used_count || 0);
+  const quotaTotal = Number((hermesUsageSnapshot || {}).quota_total || 0);
+  el.textContent = '⚡ ' + formatInt(hermesCredits) + '次';
+  el.title = quotaTotal
+    ? `真实剩余 ${formatInt(hermesCredits)} 次，累计已用 ${formatInt(usedCount)} 次 / 总额度 ${formatInt(quotaTotal)} 次`
+    : `当前累计已用 ${formatInt(usedCount)} 次`;
+}
+
+function syncHermesCreditsToActiveUser() {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || !hermesUsageSnapshot) return;
+  const remainingCount = Math.max(0, Number(hermesUsageSnapshot.remaining_count || 0));
+  activeUser.computeCredits = remainingCount;
+  if (currentDemoUser && currentDemoUser.username === activeUser.username) {
+    currentDemoUser.computeCredits = remainingCount;
+  }
+  DEMO_PROFILE_USERS = (Array.isArray(DEMO_PROFILE_USERS) ? DEMO_PROFILE_USERS : []).map((user) => (
+    user && user.username === activeUser.username
+      ? { ...user, computeCredits: remainingCount }
+      : user
+  ));
+  if (window.CURRENT_DEMO_PROFILE && window.CURRENT_DEMO_PROFILE.username === activeUser.username) {
+    window.CURRENT_DEMO_PROFILE.computeCredits = remainingCount;
+  }
+  if (el('profile-compute')) {
+    el('profile-compute').textContent = `⚡ ${formatInt(remainingCount)} 次可用`;
+  }
+}
+
+async function refreshHermesCredits(options = {}) {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || !activeUser.username) {
+    hermesUsageSnapshot = null;
+    hermesCredits = 0;
+    renderHermesCredits();
+    return null;
+  }
+  const params = new URLSearchParams({
+    tenant_slug: (((activeUser || {}).tenant || {}).slug || activeUser.tenant_slug || '').toLowerCase(),
+    user_profile_id: String(activeUser.username || '').trim(),
+  });
+  try {
+    const resp = await fetch(`/api/hermes/usage/current?${params.toString()}`, { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) {
+      throw new Error((data && data.error) || 'hermes_usage_load_failed');
+    }
+    hermesUsageSnapshot = data.usage || {};
+    hermesCredits = Math.max(0, Number((hermesUsageSnapshot || {}).remaining_count || 0));
+    syncHermesCreditsToActiveUser();
+    renderHermesCredits();
+    return hermesUsageSnapshot;
+  } catch (error) {
+    if (!options.silent) {
+      showToast('Hermes 次数加载失败，已保留当前展示');
+    }
+    return null;
+  }
+}
+
+function renderHermesSkillSelector() {
+  const hosts = [
+    document.getElementById('hermes-skill-grid'),
+  ].filter(Boolean);
+  if (!hosts.length) return;
+  const skills = getHermesSkillCatalog();
+  if (!skills.some(skill => skill.id === hermesSelectedSkill) && skills.length) {
+    hermesSelectedSkill = skills[0].id;
+  }
+  const html = skills.map(skill => {
+    const linkedKnowledge = inferHermesKnowledgeForSkill(skill);
+    return `
+    <div class="hermes-skill-chip ${skill.id === hermesSelectedSkill ? 'active' : ''}" onclick="selectHermesSkill('${skill.id}')">
+      <div class="hermes-skill-icon">${skill.icon}</div>
+      <div class="hermes-skill-name">${skill.label}</div>
+      <div class="hermes-skill-meta">
+        <span class="hermes-skill-meta-chip">${skill.source === 'custom' ? '自定义' : '系统'}</span>
+        <span class="hermes-skill-meta-chip">知识 ${linkedKnowledge.length} 条</span>
+      </div>
+    </div>
+  `;
+  }).join('');
+  hosts.forEach(host => { host.innerHTML = html; });
+}
+
+function renderHermesSkillContext() {
+  const skill = getHermesSkillById(hermesSelectedSkill);
+  const hosts = [
+    document.getElementById('hermes-skill-context'),
+  ].filter(Boolean);
+  if (!hosts.length || !skill) return;
+  const linkedKnowledge = inferHermesKnowledgeForSkill(skill);
+  const html = `
+    <div class="hermes-context-title">${escapeHtml(skill.label)} · 知识库上下文</div>
+    <div class="hermes-context-desc">${escapeHtml(skill.source === 'custom'
+      ? `这是一个自定义 skill。Hermes 会优先按你的个性化提示词执行，并引入关联知识库条目。`
+      : skill.desc)}</div>
+    <div class="hermes-context-chip-row">
+      ${linkedKnowledge.length
+        ? linkedKnowledge.map(entry => `<span class="hermes-context-chip">${escapeHtml(entry.title)}</span>`).join('')
+        : '<span class="hermes-context-chip">暂未关联知识条目</span>'}
+    </div>
+  `;
+  hosts.forEach(host => { host.innerHTML = html; });
+}
+
+function renderHermesSuggestionChips() {
+  // 推荐问题已移除，保留函数以兼容已有的技能切换调用。
+}
+
+function renderHermesCapabilityChips() {
+  const host = document.getElementById('hermes-capability-row');
+  if (!host) return;
+  const items = [
+    { skill: 'basic', label: '研究问答' },
+    { skill: 'line_chart', label: '数据展示' },
+    { skill: 'kline_chart', label: 'K线走势' },
+    { skill: 'distribution_chart', label: '分布统计' },
+    { skill: 'report_interpretation', label: '报告解读' },
+    { skill: 'content_generation', label: '内容生成' },
+    { skill: 'small_talk', label: '轻度闲聊' },
+  ].filter((item) => getHermesSkillById(item.skill));
+  host.innerHTML = items.map((item) => `
+    <button type="button" class="hermes-capability-chip ${hermesSelectedSkill === item.skill ? 'active' : ''}" onclick="selectHermesSkill('${item.skill}')">${escapeHtml(item.label)}</button>
+  `).join('');
+}
+
+function selectHermesSkill(skillKey) {
+  hermesSelectedSkill = getHermesSkillById(skillKey) ? skillKey : 'basic';
+  renderHermesSkillSelector();
+  renderHermesSkillContext();
+  renderHermesSuggestionChips();
+}
+
+function applyHermesSuggestion(text) {
+  fillHermesQuestionInput(text);
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildHermesMetaLine(parts) {
+  return parts.filter(Boolean).join(' · ');
+}
+
+function buildHermesWatchlistKlineSvg(points) {
+  const rows = Array.isArray(points) ? points.filter(item => item && typeof item === 'object') : [];
+  if (!rows.length) return '';
+  const shell = buildInlineChartShell('hermes-watchlist-kline', '210px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildKlineOption({
+      candles: rows,
+      ma5: buildMovingAverageSeries(rows, 5),
+      ma10: buildMovingAverageSeries(rows, 10),
+      ma20: buildMovingAverageSeries(rows, 20),
+      anomalies: [],
+    }, {
+      candleLabel: 'Hermes K线',
+    }));
+  });
+  return `
+    <div class="hermes-chart-shell">
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function buildHermesWatchlistTrendSvg(series) {
+  const rows = Array.isArray(series) ? series.filter(item => item && typeof item === 'object') : [];
+  if (!rows.length) return '';
+  const shell = buildInlineChartShell('hermes-watchlist-trend', '200px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildLineOption(rows, {
+      seriesName: '个股趋势',
+      valueLabel: '收盘值',
+      lineColor: '#2F74C0',
+    }));
+  });
+  return `
+    <div class="hermes-chart-shell">
+      <div class="hermes-chart-head">
+        <div class="hermes-chart-title">线性趋势</div>
+      </div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function buildHermesWatchlistDistributionSvg(values) {
+  const items = Array.isArray(values) ? values.map(item => Number(item)).filter(value => Number.isFinite(value)) : [];
+  if (!items.length) return '';
+  const shell = buildInlineChartShell('hermes-watchlist-distribution', '200px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildDistributionOption(items, {
+      seriesName: '价格分布',
+      barColor: '#2F74C0',
+    }));
+  });
+  return `
+    <div class="hermes-chart-shell">
+      <div class="hermes-chart-head">
+        <div class="hermes-chart-title">分布统计</div>
+      </div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function buildHermesIndicatorKlineSvg(klinePayload) {
+  const candles = Array.isArray(klinePayload?.candles) ? klinePayload.candles : [];
+  if (!candles.length) return '';
+  const shell = buildInlineChartShell('hermes-indicator-kline', '220px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildKlineOption({
+      candles,
+      ma5: Array.isArray(klinePayload?.ma5) ? klinePayload.ma5 : buildMovingAverageSeries(candles, 5),
+      ma10: Array.isArray(klinePayload?.ma10) ? klinePayload.ma10 : buildMovingAverageSeries(candles, 10),
+      ma20: Array.isArray(klinePayload?.ma20) ? klinePayload.ma20 : buildMovingAverageSeries(candles, 20),
+      anomalies: normalizeCandleAnomalies(candles, klinePayload?.anomalies),
+    }, {
+      candleLabel: '指标K线',
+    }));
+  });
+  return `
+    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--white)">K线走势</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">当前按最近时间窗口输出 K 线走势，并保留均线和异动点标记。</div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function buildHermesIndicatorTrendSvg(series) {
+  const rows = Array.isArray(series) ? series.filter(item => item && typeof item === 'object') : [];
+  if (!rows.length) return '';
+  const shell = buildInlineChartShell('hermes-indicator-trend', '200px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildLineOption(rows, {
+      seriesName: '趋势线',
+      valueLabel: '指标值',
+      lineColor: '#2F74C0',
+    }));
+  });
+  return `
+    <div class="hermes-chart-shell">
+      <div class="hermes-chart-head">
+        <div class="hermes-chart-title">趋势线</div>
+      </div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function buildHermesIndicatorDistributionSvg(values) {
+  const items = Array.isArray(values) ? values.map(item => Number(item)).filter(value => Number.isFinite(value)) : [];
+  if (!items.length) return '';
+  const shell = buildInlineChartShell('hermes-indicator-distribution', '200px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildDistributionOption(items, {
+      seriesName: '分布统计',
+      barColor: '#2F74C0',
+    }));
+  });
+  return `
+    <div class="hermes-chart-shell">
+      <div class="hermes-chart-head">
+        <div class="hermes-chart-title">分布统计</div>
+      </div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function normalizeHermesArtifact(artifact, fallbackQuestion) {
+  const payload = artifact && typeof artifact === 'object' ? artifact : {};
+  const text = (value, fallback = '') => String(value == null ? fallback : value).trim();
+  const listText = (value) => (Array.isArray(value) ? value : [])
+    .map((item) => text(item))
+    .filter(Boolean);
+  const normalizeSymbol = (value, defaults = {}) => {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      name: text(source.name, defaults.name || ''),
+      code: text(source.code, defaults.code || ''),
+      market: text(source.market, defaults.market || ''),
+      industry: text(source.industry, defaults.industry || ''),
+    };
+  };
+  const normalizeMetrics = (value) => (Array.isArray(value) ? value : []).map((item) => {
+    const metric = item && typeof item === 'object' ? item : {};
+    return {
+      label: text(metric.label),
+      value: text(metric.value),
+      note: text(metric.note),
+    };
+  });
+  const normalizeSections = (value) => (Array.isArray(value) ? value : []).map((item) => {
+    const section = item && typeof item === 'object' ? item : {};
+    return { title: text(section.title), body: text(section.body) };
+  }).filter((item) => item.title || item.body);
+  const normalizeKnowledge = (value) => (Array.isArray(value) ? value : []).map((item) => {
+    const knowledge = item && typeof item === 'object' ? item : {};
+    return { title: text(knowledge.title), summary: text(knowledge.summary) };
+  }).filter((item) => item.title || item.summary);
+  const type = text(payload.type, 'text_response') || 'text_response';
+  if (type === 'watchlist_analysis') {
+    const symbol = payload.symbol && typeof payload.symbol === 'object' ? payload.symbol : {};
+    const rawChart = payload.chart && typeof payload.chart === 'object' ? payload.chart : {};
+    let rawChartHtml = text(payload.chartHtml || payload.chart_html);
+    if (!rawChartHtml) {
+      if (rawChart.kind === 'kline') {
+        rawChartHtml = buildHermesWatchlistKlineSvg(rawChart.points || []);
+      } else if (rawChart.kind === 'trend') {
+        rawChartHtml = buildHermesWatchlistTrendSvg(rawChart.series || []);
+      } else if (rawChart.kind === 'distribution') {
+        rawChartHtml = buildHermesWatchlistDistributionSvg(rawChart.distribution || []);
+      }
+    }
+    return {
+      type,
+      question: text(payload.question, fallbackQuestion),
+      title: text(payload.title, '结构化分析') || '结构化分析',
+      headline: text(payload.headline, '已生成结构化结果') || '已生成结构化结果',
+      summary: text(payload.summary),
+      body: text(payload.body),
+      symbol: normalizeSymbol(symbol, { name: '对话主题', code: 'Chat' }),
+      confidence: text(payload.confidence, '中') || '中',
+      metrics: normalizeMetrics(payload.metrics),
+      judgement: listText(payload.judgement),
+      nextSteps: listText(payload.next_steps),
+      leadConclusion: text(payload.lead_conclusion),
+      analysisSections: normalizeSections(payload.analysis_sections),
+      citations: listText(payload.citations),
+      knowledge: normalizeKnowledge(payload.knowledge),
+      chart: rawChart,
+      chart_html: rawChartHtml,
+      chartHtml: rawChartHtml,
+      footer: text(payload.footer),
+    };
+  }
+  if (type === 'indicator_analysis') {
+    const symbol = payload.symbol && typeof payload.symbol === 'object' ? payload.symbol : {};
+    const chart = payload.chart && typeof payload.chart === 'object' ? payload.chart : {};
+    let chartHtml = '';
+    if (chart.kind === 'kline') {
+      chartHtml = buildHermesIndicatorKlineSvg(chart.kline || {});
+    } else if (chart.kind === 'distribution') {
+      chartHtml = buildHermesIndicatorDistributionSvg(chart.distribution || []);
+    } else {
+      chartHtml = buildHermesIndicatorTrendSvg(chart.series || []);
+    }
+    return {
+      type,
+      question: text(payload.question, fallbackQuestion),
+      title: text(payload.title, '指标趋势分析') || '指标趋势分析',
+      headline: text(payload.headline, '已生成指标分析') || '已生成指标分析',
+      summary: text(payload.summary),
+      body: text(payload.body),
+      symbol: normalizeSymbol(symbol, { name: '指标' }),
+      confidence: text(payload.confidence, '中') || '中',
+      metrics: normalizeMetrics(payload.metrics),
+      judgement: listText(payload.judgement),
+      nextSteps: listText(payload.next_steps),
+      citations: listText(payload.citations),
+      knowledge: normalizeKnowledge(payload.knowledge),
+      chart,
+      chart_html: chartHtml,
+      chartHtml,
+      footer: text(payload.footer),
+    };
+  }
+  return {
+    type: 'text_response',
+    question: text(payload.question, fallbackQuestion),
+    title: text(payload.title, 'Hermes 对话') || 'Hermes 对话',
+    headline: text(payload.headline),
+    summary: text(payload.summary),
+    body: text(payload.body),
+    bullets: listText(payload.bullets),
+    followups: listText(payload.followups),
+    citations: listText(payload.citations),
+    knowledge: normalizeKnowledge(payload.knowledge),
+    footer: text(payload.footer),
+  };
+}
+
+function normalizeHermesDisplayText(value) {
+  return String(value == null ? '' : value).trim();
+}
+
+function describeHermesPresentationError(error) {
+  const message = normalizeHermesDisplayText(error && error.message);
+  if (message.includes("reading 'trim'")) return '页面展示模块读取样式配置异常';
+  return '页面展示模块异常';
+}
+
+function renderHermesRawAnswerFallback(answer, title, presentationError) {
+  const host = document.getElementById('hermes-chat-thread');
+  if (!host) return;
+  const text = normalizeHermesDisplayText(answer);
+  const diagnostic = normalizeHermesDisplayText(presentationError);
+  const entries = host.querySelectorAll('.hermes-transcript-entry');
+  const lastEntry = entries.length ? entries[entries.length - 1] : null;
+  if (lastEntry && lastEntry.classList.contains('assistant') && lastEntry.querySelector('.hermes-thinking-disclosure')) {
+    lastEntry.remove();
+  }
+  const fallback = document.createElement('div');
+  fallback.className = 'hermes-transcript-entry assistant';
+  fallback.innerHTML = `
+    <div class="hermes-transcript-kicker">Hermes</div>
+    <div class="hermes-transcript-text">${escapeHtml(title || '研究结果')}</div>
+    <div class="hermes-text-article"><div class="hermes-text-paragraph" style="white-space:pre-wrap">${escapeHtml(text || '本轮已获得结果，但页面未能完成格式化展示。')}</div></div>
+    ${diagnostic ? `<div class="hermes-transcript-meta">${escapeHtml(diagnostic)}，已保留上游原始结果。</div>` : ''}
+  `;
+  host.appendChild(fallback);
+  host.classList.remove('is-empty');
+  scrollHermesThreadToBottom();
+}
+
+function buildHermesTraceThoughts(agentTrace) {
+  const trace = agentTrace && typeof agentTrace === 'object' ? agentTrace : {};
+  const steps = Array.isArray(trace.steps) ? trace.steps : [];
+  const thoughts = [];
+  steps.forEach((step) => {
+    const detail = String(step && step.detail || '').trim();
+    if (detail) thoughts.push(detail);
+    if (Array.isArray(step && step.items)) {
+      step.items.forEach((item) => {
+        const line = String(item && item.detail || item && item.title || '').trim();
+        if (line) thoughts.push(line);
+      });
+    }
+  });
+  return thoughts.slice(0, 6);
+}
+
+function renderHermesThinkingStream(lines, options = {}) {
+  const items = Array.isArray(lines) ? lines.filter(Boolean) : [];
+  if (!items.length) return '';
+  const activeIndex = Number.isInteger(options.activeIndex) ? options.activeIndex : -1;
+  const visible = activeIndex >= 0 ? items.slice(0, activeIndex + 1) : items;
+  return `
+    <div class="hermes-thinking-stream" aria-label="小金智能体深度思考">
+      ${visible.map((line, index) => `
+        <div class="hermes-thinking-row ${index === activeIndex ? 'active' : ''}">
+          <span class="hermes-thinking-dot"></span>
+          <span class="hermes-thinking-text">${escapeHtml(line)}</span>
+          ${index === activeIndex ? `<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderHermesThinkingDisclosure(lines, options = {}) {
+  const items = Array.isArray(lines) ? lines.filter(Boolean) : [];
+  if (!items.length) return '';
+  if (!isHermesThinkingEnabled()) return '';
+  const label = String(options.label || '深度思考').trim() || '深度思考';
+  const entryId = String(options.entryId || '').trim();
+  const entry = entryId ? hermesConversation.find((item) => item && item.id === entryId) : null;
+  // Closed by default. The per-entry state protects a user choice during loading re-renders.
+  const openAttr = entry && entry.thinkingExpanded === true ? ' open' : '';
+  const loadingDots = options.loading
+    ? `<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>`
+    : '';
+  return `
+    <details class="hermes-thinking-disclosure" data-hermes-thinking-entry-id="${escapeAttr(entryId)}"${openAttr} ontoggle="handleHermesThinkingDisclosureToggle(this)">
+      <summary class="hermes-thinking-summary">
+        <span class="hermes-thinking-summary-main">
+          <span>${escapeHtml(label)}</span>
+          ${loadingDots}
+        </span>
+        <span class="hermes-thinking-toggle" aria-hidden="true"></span>
+      </summary>
+      ${renderHermesThinkingStream(items, options)}
+    </details>
+  `;
+}
+
+function handleHermesThinkingDisclosureToggle(disclosure) {
+  const entryId = String(disclosure && disclosure.dataset ? disclosure.dataset.hermesThinkingEntryId : '').trim();
+  if (!entryId) return;
+  const entry = hermesConversation.find((item) => item && item.id === entryId);
+  if (!entry) return;
+  const isExpanded = !!disclosure.open;
+  if (entry.thinkingExpanded === isExpanded) return;
+  entry.thinkingExpanded = isExpanded;
+  syncHermesSessionCache({ skipEmpty: false });
+}
+
+function dedupeHermesTextItems(items) {
+  const seen = new Set();
+  return (Array.isArray(items) ? items : []).map(item => String(item || '').trim()).filter(item => {
+    if (!item || seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
+function renderHermesInlineMarkup(text) {
+  const escaped = escapeHtml(String(text || '').trim());
+  if (!escaped) return '';
+  return escaped
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code>$1</code>');
+}
+
+function renderHermesReadableText(text) {
+  const raw = String(text || '').replace(/\r\n/g, '\n').trim();
+  if (!raw) return '';
+  const normalized = raw
+    .replace(/([^\n])\s+(#{1,6}\s+)/g, '$1\n$2')
+    .replace(/([^\n])\s+(-\s+)/g, '$1\n$2')
+    .replace(/([^\n])\s+(\d+[\.、]\s+)/g, '$1\n$2');
+  const lines = normalized.split('\n').map(line => String(line == null ? '' : line).trim());
+  const blocks = [];
+  let paragraph = [];
+  let listType = '';
+  let listItems = [];
+  let tableRows = [];
+  const flushParagraph = () => {
+    const content = paragraph.join(' ').replace(/\s+/g, ' ').trim();
+    if (content) blocks.push({ type: 'paragraph', content });
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (listItems.length) blocks.push({ type: listType || 'bullet', items: listItems.slice() });
+    listType = '';
+    listItems = [];
+  };
+  const flushTable = () => {
+    if (tableRows.length) blocks.push({ type: 'table', rows: tableRows.slice() });
+    tableRows = [];
+  };
+  lines.forEach((line) => {
+    const current = String(line || '').trim();
+    if (!current) {
+      flushParagraph();
+      flushList();
+      flushTable();
+      return;
+    }
+    const tableCells = current.startsWith('|') && current.endsWith('|')
+      ? current.slice(1, -1).split('|').map(cell => String(cell == null ? '' : cell).trim())
+      : [];
+    const isTableDivider = tableCells.length && tableCells.every(cell => /^:?-{3,}:?$/.test(cell));
+    if (tableCells.length) {
+      flushParagraph();
+      flushList();
+      if (!isTableDivider) tableRows.push(tableCells);
+      return;
+    }
+    if (tableRows.length) flushTable();
+    const headingMatch = current.match(/^(#{1,6})\s*(.+)$/);
+    const orderedMatch = current.match(/^(\d+[\.、])\s*(.+)$/);
+    const bulletMatch = current.match(/^[-•·]\s*(.+)$/);
+    if (headingMatch) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: 'heading', content: String(headingMatch[2] == null ? '' : headingMatch[2]).trim() });
+      return;
+    }
+    if (orderedMatch || bulletMatch) {
+      flushParagraph();
+      const isOrdered = !!orderedMatch;
+      if (listType && listType !== (isOrdered ? 'ordered' : 'bullet')) flushList();
+      listType = isOrdered ? 'ordered' : 'bullet';
+      listItems.push(String((orderedMatch || bulletMatch)[2] == null ? '' : (orderedMatch || bulletMatch)[2]).trim());
+      return;
+    }
+    if (listItems.length) flushList();
+    paragraph.push(current);
+  });
+  flushParagraph();
+  flushList();
+  flushTable();
+  if (!blocks.length) return '';
+  return `
+    <div class="hermes-text-article">
+      ${blocks.map((block) => {
+        if (block.type === 'heading') {
+          return `<div class="hermes-text-section-heading">${renderHermesInlineMarkup(block.content)}</div>`;
+        }
+        if (block.type === 'paragraph') {
+          return `<div class="hermes-text-paragraph">${renderHermesInlineMarkup(block.content)}</div>`;
+        }
+        if (block.type === 'table') {
+          const rows = Array.isArray(block.rows) ? block.rows : [];
+          if (!rows.length) return '';
+          const header = rows[0];
+          const body = rows.slice(1);
+          return `<div class="hermes-text-table-wrap"><table class="hermes-text-table"><thead><tr>${header.map(cell => `<th>${renderHermesInlineMarkup(cell)}</th>`).join('')}</tr></thead><tbody>${body.map(row => `<tr>${header.map((_, index) => `<td>${renderHermesInlineMarkup(row[index] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+        }
+        const tag = block.type === 'ordered' ? 'ol' : 'ul';
+        const cls = block.type === 'ordered' ? 'hermes-text-ordered' : 'hermes-text-bullet';
+        return `<${tag} class="hermes-text-list ${cls}">${block.items.map(item => `<li>${renderHermesInlineMarkup(item)}</li>`).join('')}</${tag}>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderHermesClickableBullets(items, options = {}) {
+  const list = dedupeHermesTextItems(items);
+  if (!list.length) return '';
+  const clickable = !!options.clickable;
+  return `<div class="hermes-bullet-list" style="margin-top:8px">${
+    list.map((item) => clickable
+      ? `<button type="button" class="hermes-bullet-item is-clickable" onclick="applyHermesSuggestion('${escapeAttr(item)}')">${escapeHtml(item)}</button>`
+      : `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`
+    ).join('')
+  }</div>`;
+}
+
+function buildHermesLoadingThoughts(entry) {
+  const payload = entry && typeof entry === 'object' ? entry : {};
+  const elapsedMs = Math.max(0, Date.now() - Number(payload.startedAt || Date.now()));
+  const lines = Array.isArray(payload.thoughts) ? payload.thoughts : [];
+  const activeIndex = lines.length ? Math.min(Math.floor(elapsedMs / 1200), lines.length - 1) : 0;
+  return {
+    lines,
+    activeIndex,
+  };
+}
+
+function buildHermesLoadingThoughtTemplates(question, skill, stockCode) {
+  const hasStock = !!String(stockCode || '').trim();
+  const hasAttachments = Array.isArray(hermesUploadedFiles) && hermesUploadedFiles.length > 0;
+  const suffix = String(question || '').trim().slice(0, 22);
+  return [
+    suffix ? `先理解你问的重点：${suffix}${String(question || '').trim().length > 22 ? '…' : ''}` : '先判断你到底在追问哪一层信息',
+    `由模型识别问题意图，再按 ${String((skill || {}).label || '默认对话')} 的方式组织回答`,
+    hasAttachments
+      ? `正在读你刚上传的文件${hasStock ? '，并对照租户知识与个股资料' : '，并对照租户知识'}`
+      : (hasStock ? '正在调取个股资料并整理判断依据' : '正在整理回答所需的上下文和表达重点'),
+    hasStock ? '把个股信息压缩成可直接判断的要点' : '先把结论压短，再把依据补齐',
+    '最后再整理成一版更适合直接阅读的回答',
+  ];
+}
+
+function syncHermesLoadingTicker() {
+  const hasLoading = hermesConversation.some((entry) => entry && entry.type === 'loading');
+  if (hasLoading && !hermesLoadingTicker) {
+    hermesLoadingTicker = setInterval(() => {
+      renderHermesThread();
+    }, 900);
+    return;
+  }
+  if (!hasLoading && hermesLoadingTicker) {
+    clearInterval(hermesLoadingTicker);
+    hermesLoadingTicker = null;
+  }
+}
+
+function renderHermesTextArtifact(artifact, agentTrace) {
+  const entry = arguments[2] && typeof arguments[2] === 'object' ? arguments[2] : {};
+  const entryId = String(entry.id || '').trim();
+  const isSmallTalk = isHermesSmallTalkEntry(entry, artifact);
+  const uniqueBullets = dedupeHermesTextItems(artifact.bullets);
+  const uniqueFollowups = dedupeHermesTextItems(
+    (artifact.followups || []).filter(item => !uniqueBullets.includes(String(item || '').trim()))
+  );
+  const evidenceHtml = artifact.citations.length
+    ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.citations.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item)}</span>`).join('')}</div>`
+    : '';
+  const knowledgeHtml = artifact.knowledge.length
+    ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.knowledge.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item.title)}</span>`).join('')}</div>`
+    : '';
+  const bodyHtml = artifact.body ? renderHermesReadableText(artifact.body) : '';
+  const bulletHtml = renderHermesClickableBullets(uniqueBullets);
+  const followupHtml = renderHermesClickableBullets(uniqueFollowups, { clickable: true });
+  const thoughtLines = buildHermesTraceThoughts(agentTrace);
+  const routeLabel = isSmallTalk ? '' : String(entry.capabilityLabel || entry.intentLabel || entry.intent || '').trim();
+  const routeMeta = routeLabel
+    ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(routeLabel)}</div>`
+    : '';
+  return `
+    <div class="hermes-transcript-entry assistant">
+      <div class="hermes-transcript-kicker">Hermes</div>
+      ${!isSmallTalk && artifact.headline ? `<div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>` : ''}
+      ${routeMeta}
+      ${!isSmallTalk && artifact.summary ? renderHermesReadableText(artifact.summary) : ''}
+      ${renderHermesThinkingDisclosure(thoughtLines, { entryId })}
+      ${bodyHtml}
+      ${bulletHtml}
+      ${followupHtml}
+      ${knowledgeHtml}
+      ${evidenceHtml}
+      ${artifact.footer ? `<div class="hermes-transcript-meta">${escapeHtml(artifact.footer)}</div>` : ''}
+      ${renderHermesInsightDraftAction(entry)}
+    </div>
+  `;
+}
+
+function renderHermesInsightDraftAction(entry) {
+  const user = getActiveDemoUser();
+  const entryId = String((entry || {}).id || '').trim();
+  if (!entryId || !isDavCapableUser(user)) return '';
+  const isInteractionSummary = isHermesInteractionSummaryEntry(entry);
+  return `
+    <button class="btn-gold" type="button" style="width:100%;margin-top:14px;padding:11px 12px;font-size:12px;box-shadow:0 8px 18px rgba(200,169,110,0.22)" onclick="openInsightDraftFromHermes('${escapeAttr(entryId)}')">
+      ${isInteractionSummary ? '将互动归纳加入洞见草稿' : '加入洞见笔记草稿'}
+    </button>
+  `;
+}
+
+function isHermesInteractionSummaryEntry(entry) {
+  const payload = entry && typeof entry === 'object' ? entry : {};
+  const intent = String(payload.intent || payload.intentLabel || '').trim().toLowerCase();
+  const capability = String(payload.capabilityLabel || '').trim();
+  return intent === 'today_user_interaction_task' || capability === '用户互动归纳';
+}
+
+function isHermesSmallTalkEntry(entry, artifact) {
+  const payload = entry && typeof entry === 'object' ? entry : {};
+  const intent = String(payload.intentLabel || payload.intent || '').trim().toLowerCase();
+  const capability = String(payload.capabilityLabel || '').trim().toLowerCase();
+  return intent === 'small_talk'
+    || intent.includes('闲聊')
+    || capability === 'small_talk'
+    || capability.includes('闲聊');
+}
+
+function renderHermesThread() {
+  const hosts = [
+    document.getElementById('hermes-chat-thread'),
+  ].filter(Boolean);
+  if (!hosts.length) return;
+  if (!hermesConversation.length) {
+    const emptyHtml = `
+      <div class="hermes-chat-empty">
+        <div class="hermes-prompt-guide">从个股、洞见、指标或功能开始</div>
+      </div>
+    `;
+    hosts.forEach(host => {
+      host.innerHTML = emptyHtml;
+      host.classList.add('is-empty');
+    });
+    syncHermesLoadingTicker();
+    return;
+  }
+  const html = hermesConversation.map((entry, index) => {
+    try {
+      return renderHermesThreadEntry(entry);
+    } catch (error) {
+      console.error('Hermes entry render failed', { index, entry, error });
+      return renderHermesEntryFallback(entry, error, index);
+    }
+  }).join('');
+  hosts.forEach(host => {
+    host.innerHTML = html;
+    host.classList.remove('is-empty');
+    if (window.GangtiseEcharts) window.GangtiseEcharts.flush(host);
+  });
+  syncHermesLoadingTicker();
+}
+
+function renderHermesThreadEntry(entry) {
+    entry = entry && typeof entry === 'object' ? entry : {};
+    if (entry.type === 'user') {
+      const meta = buildHermesMetaLine([
+        entry.stockCode || '',
+        entry.skillLabel || '',
+        entry.displayMode === 'structured' ? '结构化问题' : '纯聊天'
+      ]);
+      return `
+        <div class="hermes-transcript-entry user">
+          <div class="hermes-transcript-kicker">你</div>
+          <div class="hermes-transcript-text">${escapeHtml(entry.text)}</div>
+          <div class="hermes-transcript-meta">${escapeHtml(meta)}</div>
+        </div>
+      `;
+    }
+    if (entry.type === 'loading') {
+      const loadingThoughts = buildHermesLoadingThoughts(entry);
+      return `
+        <div class="hermes-transcript-entry assistant">
+          <div class="hermes-transcript-kicker">Hermes</div>
+          ${renderHermesThinkingDisclosure(loadingThoughts.lines, {
+            entryId: entry.id,
+            activeIndex: loadingThoughts.activeIndex,
+            label: '深度思考中',
+            loading: true,
+          })}
+        </div>
+      `;
+    }
+    const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
+    if ((entry.displayMode || 'text') !== 'structured' || !['watchlist_analysis', 'indicator_analysis'].includes(artifact.type)) {
+      return renderHermesTextArtifact(artifact, entry.agentTrace, entry);
+    }
+    return `
+      <div class="hermes-transcript-entry assistant">
+        <div class="hermes-transcript-kicker">Hermes</div>
+        ${entry.capabilityLabel ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(entry.capabilityLabel)}</div>` : ''}
+        <div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>
+        <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace, entry)}</div>
+        ${renderHermesInsightDraftAction(entry)}
+      </div>
+    `;
+}
+
+function renderHermesEntryFallback(entry, error, index) {
+  const payload = entry && typeof entry === 'object' ? entry : {};
+  const question = normalizeHermesDisplayText(payload.question || payload.text);
+  const artifact = payload.artifact || payload.result;
+  const rawAnswer = artifact && typeof artifact === 'object'
+    ? (artifact.body || artifact.summary || artifact.headline)
+    : artifact;
+  const answer = normalizeHermesDisplayText(rawAnswer);
+  return `
+    <div class="hermes-transcript-entry assistant">
+      <div class="hermes-transcript-kicker">Hermes</div>
+      <div class="hermes-transcript-text">页面展示异常，已保留原始结果</div>
+      ${question ? `<div class="hermes-transcript-meta">问题：${escapeHtml(question)}</div>` : ''}
+      <div class="hermes-text-article"><div class="hermes-text-paragraph" style="white-space:pre-wrap">${escapeHtml(answer || '该条历史结果无法格式化展示。')}</div></div>
+      <div class="hermes-transcript-meta">第 ${Number(index || 0) + 1} 条内容展示失败，未影响其他会话内容。</div>
+      ${renderHermesInsightDraftAction(payload)}
+    </div>
+  `;
+}
+
+function renderHermesAnalysisCards(artifact, agentTrace) {
+  const entry = arguments[2] && typeof arguments[2] === 'object' ? arguments[2] : {};
+  const symbol = artifact.symbol || {};
+  const metricsHtml = (artifact.metrics || []).map(metric => `
+    <div class="hermes-metric-card">
+      <div class="hermes-metric-label">${escapeHtml(metric.label)}</div>
+      <div class="hermes-metric-value">${escapeHtml(metric.value)}</div>
+      <div class="hermes-metric-note">${escapeHtml(metric.note)}</div>
+    </div>
+  `).join('');
+  const bulletsHtml = renderHermesClickableBullets(artifact.judgement || []);
+  const actionsHtml = renderHermesClickableBullets(artifact.nextSteps || [], { clickable: true });
+  const evidenceHtml = (artifact.citations || []).map(item => `<span class="hermes-evidence-chip">${escapeHtml(item)}</span>`).join('');
+  const knowledgeHtml = (artifact.knowledge || []).length
+    ? artifact.knowledge.map(entry => `<span class="hermes-evidence-chip">${escapeHtml(entry.title)}</span>`).join('')
+    : '<span class="hermes-evidence-chip">暂未命中知识库条目</span>';
+  const thoughtLines = buildHermesTraceThoughts(agentTrace);
+  const summaryHtml = artifact.summary ? renderHermesReadableText(artifact.summary) : '';
+  const bodyHtml = artifact.body ? renderHermesReadableText(artifact.body) : '';
+  const insightBlock = bulletsHtml
+    ? `
+      <div style="margin-top:10px">
+        <div class="hermes-section-label">结论</div>
+        ${bulletsHtml}
+      </div>
+    `
+    : '';
+  const actionBlock = actionsHtml
+    ? `
+      <div style="margin-top:10px">
+        <div class="hermes-section-label">下一步</div>
+        ${actionsHtml}
+      </div>
+    `
+    : '';
+  const resultTitle = artifact.type === 'indicator_analysis'
+    ? `${escapeHtml(symbol.name || '指标')}${symbol.code ? ` · ${escapeHtml(symbol.code)}` : ''}`
+    : `${escapeHtml(symbol.name || '对话主题')} · ${escapeHtml(symbol.code || 'Chat')}`;
+  const isIndicatorKline = artifact.type === 'indicator_analysis' && String(artifact.chartHtml || '').includes('K线走势');
+  const primaryChartHtml = isIndicatorKline ? `<div style="margin-top:10px">${artifact.chartHtml || ''}</div>` : (artifact.chartHtml || '');
+  const watchlistSectionsHtml = artifact.type === 'watchlist_analysis' && Array.isArray(artifact.analysisSections) && artifact.analysisSections.length
+    ? `
+      <div class="hermes-result-card">
+        <div class="hermes-section-label">证据链分析</div>
+        <div style="display:grid;gap:10px;margin-top:10px">
+          ${artifact.analysisSections.map((section) => `
+            <div style="padding:12px;border:1px solid rgba(47,116,192,0.10);border-radius:12px;background:#F7FBFF">
+              <div style="font-size:12px;font-weight:700;color:#2F74C0">${escapeHtml(section.title || '')}</div>
+              <div style="font-size:12px;color:var(--text-main);line-height:1.8;margin-top:6px">${escapeHtml(section.body || '')}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `
+    : '';
+  const metricBlock = metricsHtml && isFeatureEnabled('core_indicators')
+    ? `
+      <div style="margin-top:10px">
+        <div class="hermes-section-label">核心指标</div>
+        <div class="hermes-metric-grid" style="margin-top:8px">${metricsHtml}</div>
+      </div>
+    `
+    : '';
+  const primaryCardHtml = artifact.type === 'indicator_analysis'
+    ? `
+      <div class="hermes-result-card">
+        <div class="hermes-result-top">
+          <div>
+            <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
+            <div class="hermes-result-title">${resultTitle}</div>
+            ${summaryHtml ? `<div class="hermes-result-subtitle">${summaryHtml}</div>` : ''}
+            ${entry.capabilityLabel ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(entry.capabilityLabel)}</div>` : ''}
+          </div>
+          <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
+        </div>
+        ${primaryChartHtml}
+        ${metricBlock}
+        ${bodyHtml ? `<div style="margin-top:10px">${bodyHtml}</div>` : ''}
+        ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
+      </div>
+    `
+    : `
+      <div class="hermes-result-card">
+        <div class="hermes-result-top">
+          <div>
+            <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
+            <div class="hermes-result-title">${resultTitle}</div>
+            ${summaryHtml ? `<div class="hermes-result-subtitle">${summaryHtml}</div>` : ''}
+            ${entry.capabilityLabel ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(entry.capabilityLabel)}</div>` : ''}
+          </div>
+          <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
+        </div>
+        ${primaryChartHtml}
+        ${bodyHtml ? `<div style="margin-top:10px">${bodyHtml}</div>` : ''}
+        ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
+      </div>
+      <div class="hermes-result-card">
+        <div class="hermes-section-label">核心指标</div>
+        <div class="hermes-metric-grid">${metricsHtml}</div>
+      </div>
+    `;
+  const leadConclusionBlock = artifact.type === 'watchlist_analysis' && artifact.leadConclusion
+    ? `
+      <div class="hermes-result-card">
+        <div class="hermes-section-label">结论先行</div>
+        <div class="hermes-result-subtitle" style="margin-top:10px;line-height:1.8">${escapeHtml(artifact.leadConclusion)}</div>
+      </div>
+    `
+    : '';
+  return `
+    ${primaryCardHtml}
+    ${leadConclusionBlock}
+    ${watchlistSectionsHtml}
+    <div class="hermes-result-card">
+      ${insightBlock}
+      ${actionBlock}
+      <div style="${(insightBlock || actionBlock) ? 'margin-top:10px' : ''}">
+        <div class="hermes-section-label">参考</div>
+      </div>
+      <div class="hermes-evidence-row">${knowledgeHtml}</div>
+      <div class="hermes-evidence-row" style="margin-top:8px">${evidenceHtml}</div>
+      <div class="hermes-result-subtitle" style="margin-top:10px">${escapeHtml(artifact.footer || '')}</div>
+    </div>
+    ${renderHermesThinkingDisclosure(thoughtLines, { entryId: entry.id })}
+  `;
+}
+
+async function runHermesAnalysis(options) {
+  options = options || {};
+  if (!isFeatureEnabled('hermes')) {
+    showToast('当前账号还未开放 Hermes');
+    return;
+  }
+  ensureHermesSessionBootstrap();
+  const question = String(getHermesActiveQuestion() || '').trim()
+    || (hermesAssistantMode === 'task' ? '请归纳今日用户评论与个股K线标注，给我一份运营简报。' : '');
+  const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
+  if (!question) {
+    showToast('请先输入你想让 Hermes 回答的问题');
+    return;
+  }
+  let responseApplied = false;
+  let completedAnswer = '';
+  let completedTitle = '研究结果';
+  const rawCode = getHermesActiveStockCode();
+  let stockCode = findWatchlistCodeFromInput(rawCode);
+  if (!stockCode) {
+    stockCode = inferHermesStockCodeFromQuestion(question);
+  }
+  if (stockCode) fillHermesStockCode(stockCode);
+  const sessionId = ensureHermesSessionId();
+  // Freeze the request before clearing the composer. The UI state is cleared
+  // immediately for responsiveness, but the API must receive this turn.
+  const messagesSnapshot = buildHermesMessagesPayload();
+  if (!messagesSnapshot.some((item) => item.role === 'user' && item.content === question)) {
+    messagesSnapshot.push({ role: 'user', content: question });
+  }
+  hermesConversation.push({
+    id: createHermesEntryId('user'),
+    type: 'user',
+    text: question,
+    stockCode,
+    skillLabel: hermesAssistantMode === 'task' ? '用户互动归纳任务' : skill.label,
+    displayMode: 'text',
+  });
+  hermesConversation.push({
+    id: createHermesEntryId('loading'),
+    type: 'loading',
+    startedAt: Date.now(),
+    thoughts: hermesAssistantMode === 'task'
+      ? ['理解任务要求与时间范围', '读取指定范围的用户互动', '归纳关注点与后续建议']
+      : buildHermesLoadingThoughtTemplates(question, skill, stockCode),
+  });
+  syncHermesSessionCache({ skipEmpty: false });
+  clearHermesQuestionInputs({ focus: true });
+  renderHermesThread();
+  scrollHermesThreadToBottom();
+  try {
+    const activeUser = getActiveDemoUser();
+    const resp = await fetch('/api/hermes/query', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        tenant_slug: ((activeUser || {}).tenant || {}).slug || '',
+        user_role: (activeUser || {}).role || '',
+        user_profile_id: activeUser && activeUser.username ? activeUser.username : '',
+        user_name: activeUser && (activeUser.name || activeUser.username) ? (activeUser.name || activeUser.username) : '',
+        user_membership: activeUser && activeUser.membership ? activeUser.membership : '',
+        entry_point: options.fromWatchlist ? 'watchlist_detail' : (hermesAssistantMode === 'task' ? 'hermes_task' : 'hermes_chat'),
+        assistant_mode: hermesAssistantMode,
+        session_id: sessionId,
+        question,
+        messages: messagesSnapshot,
+        selected_knowledge_ids: hermesScopedKnowledgeId ? [hermesScopedKnowledgeId] : [],
+        attachments: hermesUploadedFiles.slice(0),
+        preferred_mode: hermesAssistantMode === 'task' ? 'today_user_interaction_task' : (hermesSelectedSkill || 'basic'),
+        web_answer: false,
+      }),
+    });
+    const responseText = await resp.text();
+    let data = {};
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (parseError) {
+      throw new Error(`hermes_http_${resp.status}_invalid_json`);
+    }
+    if (!resp.ok || data.ok === false) {
+      throw new Error((data && data.error) || 'hermes_query_failed');
+    }
+    // HTTP 200 with ok=true means the upstream answer is already obtained.
+    // Mark it before any optional client-side normalization or rendering so a
+    // UI-only exception cannot turn a successful research call into a model error.
+    responseApplied = true;
+    completedAnswer = normalizeHermesDisplayText(data.answer || '');
+    completedTitle = normalizeHermesDisplayText(data.capability_label || '研究结果');
+    const artifact = Array.isArray(data.artifacts) && data.artifacts.length
+      ? data.artifacts[0]
+      : {
+          type: 'text_response',
+          question,
+          title: `${skill.icon} ${skill.label}`,
+          headline: data.answer || '已完成本轮对话处理。',
+          summary: data.summary || '',
+          body: data.answer || '',
+          bullets: Array.isArray(data.bullets) ? data.bullets : [],
+          followups: [],
+          citations: Array.isArray(data.citations) ? data.citations : [],
+          knowledge: [],
+          footer: (data.router && data.router.reason) ? `路由：${data.router.reason}` : '',
+        };
+    const normalizedArtifact = normalizeHermesArtifact(artifact, question);
+    completedAnswer = normalizeHermesDisplayText(normalizedArtifact.body || data.answer || '');
+    completedTitle = normalizeHermesDisplayText(normalizedArtifact.headline || normalizedArtifact.title || data.capability_label || '研究结果');
+    const displayMode = data.display_mode === 'structured' && ['watchlist_analysis', 'indicator_analysis'].includes(normalizedArtifact.type)
+      ? 'structured'
+      : 'text';
+    hermesConversation.pop();
+    hermesConversation.push({
+      id: createHermesEntryId('ai'),
+      type: 'ai',
+      question,
+      result: normalizedArtifact,
+      artifact: normalizedArtifact,
+      displayMode,
+      agentTrace: data.agent_trace || null,
+      capabilityLabel: data.capability_label || data.intent || (hermesAssistantMode === 'task' ? '用户互动归纳任务' : skill.label),
+      intentLabel: data.intent || '',
+      intent: data.intent || '',
+    });
+    try {
+      syncHermesSessionCache({ skipEmpty: false });
+      loadHermesSessionList({ force: true, silent: true }).catch((error) => {
+        console.error('Hermes session refresh failed after a successful answer', error);
+      });
+      await refreshHermesCredits({ silent: true });
+      renderHermesWorkspace();
+      scrollHermesThreadToBottom();
+    } catch (renderError) {
+      // A presentation error must never discard a successfully returned
+      // Gangtise/LLM answer or incorrectly report it as a model failure.
+      console.error('Hermes answer presentation failed after a successful API response', renderError);
+      const presentationError = describeHermesPresentationError(renderError);
+      try {
+        renderHermesRawAnswerFallback(completedAnswer, completedTitle, presentationError);
+      } catch (fallbackError) {
+        console.error('Hermes raw answer fallback failed', fallbackError);
+      }
+      showToast(`${presentationError}，研究结果已生成并保留原始内容。`);
+      return;
+    }
+    if (options.fromWatchlist && getActiveDemoUser().role === 'investor') {
+      showToast(`已按 ${getActiveDemoUser().tenant.advisor} 视角生成个股分析`);
+    }
+  } catch (e) {
+    if (responseApplied) {
+      console.error('Hermes completed response encountered a post-processing error', e);
+      const presentationError = describeHermesPresentationError(e);
+      if (hermesConversation.length && hermesConversation[hermesConversation.length - 1].type === 'loading') {
+        hermesConversation.pop();
+        hermesConversation.push({
+          id: createHermesEntryId('ai'),
+          type: 'ai',
+          question,
+          result: {
+            type: 'text_response',
+            question,
+            title: completedTitle || '研究结果',
+            headline: completedTitle || '研究结果',
+            summary: '',
+            body: completedAnswer,
+            bullets: [],
+            followups: [],
+            citations: [],
+            knowledge: [],
+            footer: '已保留上游返回的原始研究内容。',
+          },
+          displayMode: 'text',
+          capabilityLabel: '研究结果',
+          intentLabel: '',
+        });
+        try {
+          syncHermesSessionCache({ skipEmpty: false });
+        } catch (cacheError) {
+          console.error('Hermes session cache failed after a successful answer', cacheError);
+        }
+      }
+      renderHermesRawAnswerFallback(completedAnswer, completedTitle, presentationError);
+      showToast(`${presentationError}，研究结果已生成并保留原始内容。`);
+      return;
+    }
+    if (hermesConversation.length && hermesConversation[hermesConversation.length - 1].type === 'loading') {
+      hermesConversation.pop();
+    }
+    const rawError = (e && e.message) || 'hermes_query_failed';
+    const friendlyError = rawError === 'hermes_investor_access_disabled'
+      ? '当前租户尚未向普通用户开放 Hermes'
+      : (rawError === 'hermes_disabled'
+        ? 'Hermes 当前已在后台关闭'
+        : (rawError.includes('gangtise_one_pager_no_report')
+          ? 'Gangtise 公司一页通未返回该证券的最近一期研究报告。本轮已严格中止，未使用本地模型或模板生成替代内容。'
+          : (rawError.includes('gangtise_one_pager_response_unrecognized')
+            ? 'Gangtise 公司一页通返回了内容，但当前返回结构无法识别。本轮已严格中止，未使用本地模型或模板生成替代内容。'
+            : `模型调用失败：${rawError}`)));
+    hermesConversation.push({
+      id: createHermesEntryId('ai'),
+      type: 'ai',
+      question,
+      result: normalizeHermesArtifact({
+        type: 'text_response',
+        title: `${skill.icon} ${skill.label}`,
+        headline: 'Hermes 调用失败',
+        summary: `本轮未生成答案，统一编排入口已严格中止：${friendlyError}`,
+        body: '',
+        bullets: [friendlyError],
+        followups: ['你可以直接重试，或换一个更具体的问题。'],
+        citations: ['统一查询入口失败'],
+        knowledge: inferHermesKnowledgeForSkill(skill),
+        footer: 'Hermes 保留了当前对话上下文，你可以继续追问。',
+      }, question),
+      displayMode: 'text',
+      agentTrace: {
+        headline: 'Hermes Agent 本轮未完成',
+        summary: '已完成问题接收，但在编排或工具执行阶段中断。你可以直接重试，或把问题收窄后再问。',
+        steps: [
+          { title: '问题拆解', detail: '问题已进入 Agent 流程。', status: 'ok' },
+          { title: '执行规划', detail: '本轮在编排阶段或结果汇总阶段中断。', status: 'error' },
+        ],
+      },
+    });
+    syncHermesSessionCache({ skipEmpty: false });
+    loadHermesSessionList({ force: true, silent: true }).catch(() => {});
+    renderHermesThread();
+    renderHermesComposerSubmit();
+    scrollHermesThreadToBottom();
+    showToast(friendlyError);
+  }
+}
+
+function sendHermesChat() {
+  runHermesAnalysis();
+}
+
+function renderHermesHistory() {
+  renderHermesWorkspace();
+}
+
+function openHermesSkillModal() {
+  const entries = getTenantKnowledgeEntries();
+  hermesCustomSkillDraft = {
+    title: '',
+    prompt: '',
+    knowledgeIds: entries.slice(0, 2).map(entry => entry.id),
+  };
+  renderHermesSkillModal();
+  const modal = document.getElementById('hermes-skill-modal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeHermesSkillModal() {
+  const modal = document.getElementById('hermes-skill-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function toggleHermesSkillKnowledge(entryId) {
+  const next = new Set(hermesCustomSkillDraft.knowledgeIds || []);
+  if (next.has(entryId)) {
+    next.delete(entryId);
+  } else {
+    next.add(entryId);
+  }
+  hermesCustomSkillDraft.knowledgeIds = Array.from(next);
+  renderHermesSkillModal();
+}
+
+function renderHermesSkillModal() {
+  const host = document.getElementById('hermes-skill-modal-content');
+  if (!host) return;
+  const entries = getTenantKnowledgeEntries();
+  host.innerHTML = `
+    <div class="hermes-modal-head">
+      <div class="modal-title" style="margin-bottom:0">新增自定义 skill</div>
+      <button class="hermes-modal-close" type="button" onclick="closeHermesSkillModal()">关闭</button>
+    </div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">你可以把自己的研究动作沉淀成 skill，并且直接绑定租户知识库，让 Hermes 后续按这套方法持续对话。</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">Skill 名称</label>
+      <input id="hermes-skill-title-input" class="knowledge-modal-input" placeholder="例如：龙头股估值框架" value="${escapeHtml(hermesCustomSkillDraft.title)}" />
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">个性化提示词</label>
+      <textarea id="hermes-skill-prompt-input" class="knowledge-modal-textarea" placeholder="例如：优先按照龙头公司估值带、盈利兑现和行业竞争格局做判断，再给出跟踪结论。">${escapeHtml(hermesCustomSkillDraft.prompt)}</textarea>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">关联知识库</label>
+      <div class="knowledge-chip-row">
+        ${entries.length
+          ? entries.map(entry => `
+            <button class="${hermesCustomSkillDraft.knowledgeIds.includes(entry.id) ? 'btn-gold' : 'btn-outline'}" style="padding:7px 10px;font-size:11px" onclick="toggleHermesSkillKnowledge('${entry.id}')">${escapeHtml(entry.title)}</button>
+          `).join('')
+          : '<span class="knowledge-chip">当前租户还没有知识条目</span>'}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeHermesSkillModal()">取消</button>
+      <button class="btn-gold" onclick="saveHermesCustomSkill()">保存 skill</button>
+    </div>
+  `;
+}
+
+function saveHermesCustomSkill() {
+  const titleInput = document.getElementById('hermes-skill-title-input');
+  const promptInput = document.getElementById('hermes-skill-prompt-input');
+  const title = titleInput ? String(titleInput.value || '').trim() : '';
+  const prompt = promptInput ? String(promptInput.value || '').trim() : '';
+  if (!title) {
+    showToast('请先输入 skill 名称');
+    return;
+  }
+  if (!prompt) {
+    showToast('请先输入个性化提示词');
+    return;
+  }
+  const customSkills = getTenantHermesCustomSkills();
+  const skill = {
+    id: `custom_${Date.now()}`,
+    icon: '🧠',
+    label: title,
+    desc: prompt.length > 34 ? `${prompt.slice(0, 34)}...` : prompt,
+    promptTemplate: prompt,
+    suggestions: [
+      prompt,
+      `请按「${title}」这套方法继续展开。`,
+      '请把这个自定义 skill 的结论再拆细一点。'
+    ],
+    linkedKnowledgeIds: (hermesCustomSkillDraft.knowledgeIds || []).slice(0),
+  };
+  customSkills.unshift(skill);
+  persistTenantHermesCustomSkills(customSkills);
+  hermesSelectedSkill = skill.id;
+  closeHermesSkillModal();
+  renderHermesWorkspace();
+  showToast('已新增自定义 skill');
+}
+
+// ===== DM (私信) =====
+let currentDmKol = null;
+let dmConversationsCache = null;
+let dmCurrentHistory = []; // 当前对话上下文 (多轮)
+let dmCenterState = null;
+const DAV_DM_CONVERSATIONS = [
+  { id: 101, user_name: '投研达人_小陈', user_avatar: '👨', tier: '核心用户', last_msg: '老王好！AI算力还能追吗？', time: '5分钟前', unread: 2, vip_only: false },
+  { id: 102, user_name: '价值猎人小林', user_avatar: '🧑', tier: '观察用户', last_msg: '请问港股互联网怎么看？', time: '23分钟前', unread: 1, vip_only: false },
+  { id: 103, user_name: '量化新手_阿明', user_avatar: '😊', tier: '新用户', last_msg: '想学习多因子模型，有推荐吗？', time: '1小时前', unread: 0, vip_only: false },
+];
+const DAV_DM_MESSAGES = {
+  101: [
+    { id: 1, sender: 'user', content: '老王好！AI算力还能追吗？', time: '2026-06-07 09:10', type: 'text' },
+    { id: 2, sender: 'kol', content: '短期先别追高，更适合等回调后再看订单兑现和估值承接。', time: '2026-06-07 09:16', type: 'text' },
+    { id: 3, sender: 'user', content: '那我先继续跟踪，后面想结合 Hermes 再看一次。', time: '2026-06-07 09:18', type: 'text' },
+  ],
+  102: [
+    { id: 1, sender: 'user', content: '请问港股互联网怎么看？', time: '2026-06-07 08:42', type: 'text' },
+    { id: 2, sender: 'kol', content: '我更关注回购强度、南向资金和财报兑现，短期不建议只看情绪。', time: '2026-06-07 08:47', type: 'text' },
+  ],
+  103: [
+    { id: 1, sender: 'user', content: '想学习多因子模型，有推荐吗？', time: '2026-06-07 07:36', type: 'text' },
+    { id: 2, sender: 'kol', content: '可以先从价值、动量、质量三因子的基础框架入手，再结合 Hermes 看示例。', time: '2026-06-07 07:45', type: 'text' },
+  ],
+};
+
+function isDavDmMode() {
+  const activeUser = getSafeActiveDemoUser();
+  return isDavCapableUser(activeUser);
+}
+
+function getInvestorDmConversation() {
+  const activeUser = getSafeActiveDemoUser();
+  return {
+    id: buildInvestorFallbackThreadId(activeUser),
+    kol_name: activeUser.tenant.advisor,
+    kol_avatar: activeUser.avatar || '👑',
+    tier: '所属大V',
+    last_msg: '欢迎交流',
+    time: '刚刚',
+    unread: 0,
+    vip_only: false,
+  };
+}
+
+function getDmThreadUnreadCount(thread) {
+  if (!thread || typeof thread !== 'object') return 0;
+  return isDavDmMode()
+    ? Number(thread.kol_unread || thread.unread || 0)
+    : Number(thread.user_unread || thread.unread || 0);
+}
+
+function updateDmNavBadge() {
+  const badge = document.getElementById('dm-nav-badge');
+  if (!badge) return;
+  const stats = (dmCenterState && dmCenterState.stats) || {};
+  const unread = isDavDmMode()
+    ? Number(stats.unread_messages || 0)
+    : Number(stats.investor_unread_threads || 0);
+  badge.style.display = unread > 0 ? 'block' : 'none';
+}
+
+function renderDmBroadcastHistory(list) {
+  const host = document.getElementById('wb-broadcast-history');
+  if (!host) return;
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) {
+    host.innerHTML = '<div style="padding:12px 16px;color:var(--gray-400);font-size:12px">当前暂无群发记录</div>';
+    return;
+  }
+  host.innerHTML = items.slice(0, 6).map((item) => `
+    <div class="wb-broadcast-item">
+      <div class="wb-broadcast-content">${escapeHtml(item.content || '')}</div>
+      <div class="wb-broadcast-meta"><span>${escapeHtml(item.time || '--')}</span><span>触达 ${escapeHtml(String(item.reach || 0))}人</span><span style="color:var(--gold)">打开率 ${escapeHtml(String(item.open_rate || 0))}%</span></div>
+    </div>
+  `).join('');
+}
+
+function applyDmCenterPayload(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  dmCenterState = payload;
+  dmConversationsCache = Array.isArray(payload.threads) ? payload.threads : dmConversationsCache;
+  updateDmNavBadge();
+  renderDmBroadcastHistory(payload.broadcasts || []);
+}
+
+function buildInvestorFallbackThreadId(user) {
+  const tenantSlug = user && user.tenant ? user.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || 'tenant');
+  const username = user && user.username ? user.username : 'investor';
+  return `${tenantSlug}-thread-fallback-${username}`;
+}
+
+function getDmQuickAskOptions() {
+  if (isDavDmMode()) {
+    return [
+      { label: '跟进粉丝', text: '先别急着下结论，我建议你先继续跟踪盈利、估值和验证节点。' },
+      { label: '引导 Hermes', text: '你可以先用 Hermes 跑一轮基本面分析，我再帮你看结论是否站得住。' },
+      { label: '补充风险', text: '这个方向先别只看情绪，最好把风险边界和反证条件一起列出来。' },
+      { label: '安排直播', text: '这个问题我会放到本周直播里展开讲，你也可以先把关注点发给我。' },
+    ];
+  }
+  return [
+    { label: 'A股科技', text: 'A股科技板块现在能追吗?' },
+    { label: '港股互联网', text: '港股互联网值得配置吗?' },
+    { label: '新能源', text: '新能源板块还有机会吗?' },
+    { label: '宏观', text: '美联储降息怎么布局?' },
+  ];
+}
+
+function getInvestorDmMessages() {
+  const activeUser = getSafeActiveDemoUser();
+  return [
+    { id: 1, sender: 'kol', content: `欢迎来到 ${activeUser.tenant.advisor} 的专属消息区，有问题可以直接提问。`, time: '2026-06-07 09:00', type: 'text' },
+    { id: 2, sender: 'user', content: '最近想继续跟踪科技主线，也想看看你这边最新的复盘。', time: '2026-06-07 09:08', type: 'text' },
+    { id: 3, sender: 'kol', content: '可以，新的复盘和后续重点样本我会第一时间同步到消息里。', time: '2026-06-07 09:12', type: 'text' },
+  ];
+}
+
+function renderDmQuickAsks() {
+  const host = document.getElementById('dm-quick-asks');
+  if (!host) return;
+  if (!isFeatureEnabled('fan_interaction') || isCurrentDmSystemThread()) {
+    host.innerHTML = '';
+    host.style.display = 'none';
+    return;
+  }
+  host.style.display = 'flex';
+  const prefix = isDavDmMode() ? '快捷回复:' : '快捷提问:';
+  host.innerHTML = `
+    <span style="font-size:10px;color:var(--gray-400);padding:5px 8px">${prefix}</span>
+    ${getDmQuickAskOptions().map(item => `
+      <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('${escapeHtml(item.text)}')">${item.label}</span>
+    `).join('')}
+  `;
+}
+
+function isCurrentDmSystemThread() {
+  if (isDavDmMode()) return false;
+  const thread = currentDmKol && currentDmKol.thread && typeof currentDmKol.thread === 'object' ? currentDmKol.thread : null;
+  const recordType = thread ? String(thread.type || '').trim() : '';
+  return !!(recordType && recordType !== 'fan_interaction');
+}
+
+function syncDmComposerState() {
+  const inputBar = document.getElementById('dm-input-bar');
+  const input = document.getElementById('dm-input');
+  const sendButton = document.getElementById('dm-send-btn');
+  const isSystemThread = isCurrentDmSystemThread();
+  const interactionEnabled = isFeatureEnabled('fan_interaction');
+  if (inputBar) inputBar.style.display = interactionEnabled && !isSystemThread ? 'flex' : 'none';
+  if (input) {
+    input.disabled = !interactionEnabled || isSystemThread;
+    if (!interactionEnabled || isSystemThread) input.value = '';
+  }
+  if (sendButton) sendButton.disabled = !interactionEnabled || isSystemThread;
+  const host = document.getElementById('dm-quick-asks');
+  if (host) renderDmQuickAsks();
+}
+
+function syncDmRoleView() {
+  const title = document.getElementById('dm-list-title');
+  const hint = document.getElementById('dm-list-hint');
+  const input = document.getElementById('dm-input');
+  if (isDavDmMode()) {
+    if (title) title.textContent = isFeatureEnabled('fan_interaction') ? '粉丝对话' : '粉丝站内信';
+    if (hint) hint.textContent = isFeatureEnabled('fan_interaction') ? '仅展示当前租户粉丝会话' : '仅展示当前租户粉丝站内信，暂不支持回复';
+    if (input) input.placeholder = '回复粉丝问题，支持多轮沟通...';
+  } else {
+    const activeUser = getSafeActiveDemoUser();
+    if (title) title.textContent = isFeatureEnabled('fan_interaction') ? '大V对话与系统消息' : '大V消息与系统通知';
+    if (hint) hint.textContent = isFeatureEnabled('fan_interaction')
+      ? `展示所属大V ${activeUser.tenant.advisor} 的对话，以及当前租户系统通知`
+      : `展示所属大V ${activeUser.tenant.advisor} 的站内信，以及当前租户系统通知，暂不支持回复`;
+    if (input) input.placeholder = '多轮提问，投顾会基于平台证据链回复...';
+  }
+  syncDmComposerState();
+}
+
+function getDmConversationDisplayMeta(item) {
+  const record = item && typeof item === 'object' ? item : {};
+  const recordType = String(record.type || '').trim();
+  if (isDavDmMode()) {
+    return {
+      name: record.user_name || '粉丝',
+      avatar: record.user_avatar || '👤',
+      tier: record.tier || '粉丝',
+      isSystem: false,
+    };
+  }
+  if (recordType && recordType !== 'fan_interaction') {
+    return {
+      name: '系统消息',
+      avatar: '📝',
+      tier: recordType === 'agent_broadcast' ? '小金播报' : (recordType === 'broadcast_notification' ? '群发通知' : '系统通知'),
+      isSystem: true,
+    };
+  }
+  return {
+    name: record.kol_name || '所属大V',
+    avatar: record.kol_avatar || '👑',
+    tier: record.tier || '所属大V',
+    isSystem: false,
+  };
+}
+
+async function loadDmConversations() {
+  const container = document.getElementById('dm-conversations-list');
+  if (!container) return;
+  try {
+    syncDmRoleView();
+  } catch (e) {}
+  const activeUser = getSafeActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  // Use the just-published tenant state as an immediate local fallback while
+  // the message-center request is loading. This prevents a successful insight
+  // publish from briefly rendering an empty inbox when the API is slow or
+  // temporarily unavailable.
+  const localMessageState = (activeUser && activeUser.tenant && activeUser.tenant.message_center_state)
+    || (window.ACTIVE_TENANT && window.ACTIVE_TENANT.message_center_state);
+  const localThreads = localMessageState && Array.isArray(localMessageState.threads)
+    ? localMessageState.threads
+    : [];
+  dmConversationsCache = isDavDmMode() ? localThreads : [getInvestorDmConversation()];
+  dmCenterState = dmCenterState || { stats: {} };
+  try {
+    renderDmConversations(dmConversationsCache);
+  } catch (error) {
+    container.innerHTML = buildDmConversationFallbackHtml(dmConversationsCache);
+  }
+  try {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+    const resp = await fetch(`/api/dm/center?tenant=${encodeURIComponent(tenantSlug)}&sender_role=${encodeURIComponent(isDavDmMode() ? 'dav' : 'investor')}&sender_profile_id=${encodeURIComponent(activeUser.username || '')}`, controller ? { signal: controller.signal } : undefined);
+    if (timer) clearTimeout(timer);
+    const data = await resp.json();
+    if (!resp.ok || data.success === false) throw new Error(data.error || 'dm_center_load_failed');
+    applyDmCenterPayload(data);
+    const remoteThreads = Array.isArray(data.threads) ? data.threads : [];
+    dmConversationsCache = remoteThreads.length || !localThreads.length
+      ? remoteThreads
+      : localThreads;
+    if (!isDavDmMode() && !dmConversationsCache.length) dmConversationsCache = [getInvestorDmConversation()];
+    try {
+      renderDmConversations(dmConversationsCache);
+    } catch (error) {
+      container.innerHTML = buildDmConversationFallbackHtml(dmConversationsCache);
+    }
+  } catch (e) {
+    updateDmNavBadge();
+    return;
+  }
+}
+
+function getMockDmConversations() {
+  return isDavDmMode() ? DAV_DM_CONVERSATIONS.slice() : [getInvestorDmConversation()];
+}
+
+function buildDmConversationFallbackHtml(list) {
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) {
+    return '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无对话</div>';
+  }
+  return items.map((item) => {
+    const display = getDmConversationDisplayMeta(item);
+    const name = display.name;
+    const avatar = display.avatar;
+    const tier = display.tier;
+    const lastMsg = item.last_msg || '欢迎交流';
+    const time = item.time || '刚刚';
+    return `
+      <div class="dm-conv-item" onclick="openDmChat('${escapeAttr(String(item.id || ''))}','${escapeAttr(name)}','${escapeAttr(avatar)}','${escapeAttr(tier)}')">
+        <div class="dm-avatar">${escapeHtml(avatar)}</div>
+        <div class="dm-conv-info">
+          <div class="dm-conv-name">
+            ${escapeHtml(name)}
+            <span style="font-size:10px;${display.isSystem ? 'background:rgba(47,116,192,0.10);color:#2F74C0' : 'background:rgba(200,169,110,0.15);color:var(--gold)'};padding:1px 5px;border-radius:4px">${escapeHtml(tier)}</span>
+          </div>
+          <div class="dm-conv-last">${escapeHtml(lastMsg)}</div>
+        </div>
+        <div class="dm-conv-time">${escapeHtml(time)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDmConversations(list) {
+  const container = document.getElementById('dm-conversations-list');
+  if (!container) return;
+  const safeList = Array.isArray(list) ? list : [];
+  const visibleList = isDavDmMode()
+    ? safeList
+    : safeList.filter(item => {
+      const recordType = String((item && item.type) || '').trim();
+      return (recordType && recordType !== 'fan_interaction') || canAccessAdvisor(item && item.kol_name);
+    });
+  if (!visibleList.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无对话</div>';
+    return;
+  }
+  container.innerHTML = visibleList.map(c => {
+    const display = getDmConversationDisplayMeta(c);
+    return `
+    <div class="dm-conv-item" onclick="openDmChat('${escapeAttr(String(c.id || ''))}','${escapeAttr(display.name)}','${escapeAttr(display.avatar)}','${escapeAttr(display.tier)}')">
+      <div class="dm-avatar">${escapeHtml(display.avatar)}${getDmThreadUnreadCount(c)>0?'<div class="dm-unread-dot"></div>':''}</div>
+      <div class="dm-conv-info">
+        <div class="dm-conv-name">
+          ${escapeHtml(display.name)}
+          <span style="font-size:10px;${display.isSystem ? 'background:rgba(47,116,192,0.10);color:#2F74C0' : 'background:rgba(200,169,110,0.15);color:var(--gold)'};padding:1px 5px;border-radius:4px">${escapeHtml(display.tier)}</span>
+          ${c.vip_only?'<span style="font-size:10px;background:rgba(231,76,60,0.15);color:#E74C3C;padding:1px 5px;border-radius:4px">深度</span>':''}
+        </div>
+        <div class="dm-conv-last">${escapeHtml(c.last_msg || '')}</div>
+      </div>
+      <div class="dm-conv-time">${escapeHtml(c.time || '')}</div>
+    </div>
+  `;
+  }).join('');
+  renderWorkbenchFanInbox(visibleList);
+}
+
+function workbenchTierStyle(tier) {
+  const text = String(tier || '');
+  if (text.includes('核心')) return 'background:rgba(46,204,113,0.15);color:var(--green)';
+  if (text.includes('观察')) return 'background:rgba(52,152,219,0.15);color:#3498DB';
+  if (text.includes('机构') || text.includes('专业')) return 'background:rgba(200,169,110,0.2);color:var(--gold)';
+  return 'background:rgba(200,169,110,0.12);color:var(--gold)';
+}
+
+function renderWorkbenchFanInbox(list) {
+  const host = document.getElementById('wb-fan-inbox');
+  if (!host || !isDavDmMode()) return;
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) {
+    host.innerHTML = '<div style="padding:16px;color:var(--gray-400);font-size:12px">当前暂无粉丝消息</div>';
+    return;
+  }
+  host.innerHTML = items.slice(0, 6).map((item) => `
+    <div class="wb-fan-item" onclick="openDmChat('${escapeAttr(String(item.id || ''))}','${escapeAttr(item.user_name || '')}','${escapeAttr(item.user_avatar || '👤')}','${escapeAttr(item.tier || '粉丝')}')" style="cursor:pointer">
+      <div class="wb-fan-avatar">${escapeHtml(item.user_avatar || '👤')}</div>
+      <div class="wb-fan-info">
+        <div class="wb-fan-name">${escapeHtml(item.user_name || '')}</div>
+        <div class="wb-fan-msg">${escapeHtml(item.last_msg || '')}</div>
+      </div>
+      <div class="wb-fan-meta">
+        <div class="wb-fan-time">${escapeHtml(item.time || '--')}</div>
+        <div class="wb-fan-tier" style="${workbenchTierStyle(item.tier)}">${escapeHtml(item.tier || '粉丝')}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function openDmChat(kolId, name, avatar, tier) {
+  if (!isDavDmMode() && String(name || '').trim() !== '系统消息' && !canAccessAdvisor(name)) {
+    showToast('当前身份仅可与所属租户投顾互动');
+    return;
+  }
+  // Switch to DM tab if not already
+  switchTab('dm');
+  setTimeout(() => {
+    const thread = (dmConversationsCache || []).find(item => String(item.id || '') === String(kolId || '')) || null;
+    currentDmKol = { id: String(kolId || ''), name, avatar, tier, role: isDavDmMode() ? 'fan' : 'advisor', thread };
+    document.getElementById('dm-list-view').style.display = 'none';
+    document.getElementById('dm-chat-view').style.display = 'block';
+    document.getElementById('dm-chat-name').textContent = name;
+    const isSystemThread = !isDavDmMode() && thread && String(thread.type || '').trim() !== 'fan_interaction';
+    document.getElementById('dm-chat-tier').textContent = isDavDmMode()
+      ? `${tier} · 当前租户粉丝`
+      : (isSystemThread ? `${tier} · 当前租户消息` : `${tier} · 大V投顾`);
+    document.getElementById('dm-chat-avatar').textContent = avatar;
+    const badge = document.getElementById('dm-chat-badge');
+    const banner = document.getElementById('dm-compliance-banner');
+    if (badge) badge.textContent = !isFeatureEnabled('fan_interaction')
+      ? '站内信'
+      : (isDavDmMode() ? '粉丝会话' : (isSystemThread ? '系统消息' : '大V对话'));
+    if (banner) banner.textContent = !isFeatureEnabled('fan_interaction')
+      ? '当前为站内信查看模式，暂不开放回复和互动。'
+      : (isDavDmMode()
+      ? '⚠️ 回复粉丝时请保持研究表达克制，避免直接给出买卖建议，所有结论建议附上依据和风险边界。'
+      : (isSystemThread
+        ? '⚠️ 这里展示的是当前租户推送给你的系统消息与洞见提醒，可直接查看，无需回复。'
+        : '⚠️ 大V投顾分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。'));
+    syncDmComposerState();
+    loadDmMessages(kolId);
+    markDmThreadRead(kolId).catch(() => {});
+  }, 50);
+}
+
+function closeDmChat() {
+  document.getElementById('dm-list-view').style.display = 'block';
+  document.getElementById('dm-chat-view').style.display = 'none';
+  currentDmKol = null;
+  syncDmComposerState();
+}
+
+async function loadDmMessages(kolId) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (isDavDmMode()) {
+    const fallback = DAV_DM_MESSAGES[kolId] || [{id:1,sender:'user',content:'你好，想和你交流一下当前市场看法。',time:'刚刚',type:'text'}];
+    dmCurrentHistory = fallback.map(m => ({sender:m.sender, content:m.content}));
+    renderDmMessages(fallback);
+    try {
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+      const resp = await fetch(`/api/dm/messages/${encodeURIComponent(kolId)}?tenant=${encodeURIComponent(tenantSlug)}`, controller ? { signal: controller.signal } : undefined);
+      if (timer) clearTimeout(timer);
+      const data = await resp.json();
+      const list = Array.isArray(data) && data.length ? data : fallback;
+      dmCurrentHistory = list.map(m => ({sender:m.sender, content:m.content}));
+      renderDmMessages(list);
+      if (currentDmKol) currentDmKol.thread = (dmConversationsCache || []).find(item => String(item.id || '') === String(kolId || '')) || currentDmKol.thread;
+      return;
+    } catch (e) {}
+    return;
+  }
+  let data = getInvestorDmMessages();
+  renderDmMessages(data);
+  try {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+    const resp = await fetch(`/api/dm/messages/${encodeURIComponent(kolId)}?tenant=${encodeURIComponent(tenantSlug)}`, controller ? { signal: controller.signal } : undefined);
+    if (timer) clearTimeout(timer);
+    const payload = await resp.json();
+    if (Array.isArray(payload) && payload.length) data = payload;
+  } catch (e) {}
+  dmCurrentHistory = data.map(m => ({sender:m.sender, content:m.content}));
+  renderDmMessages(data);
+  if (currentDmKol) currentDmKol.thread = (dmConversationsCache || []).find(item => String(item.id || '') === String(kolId || '')) || currentDmKol.thread;
+}
+
+async function markDmThreadRead(threadId) {
+  if (!threadId) return;
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  const payload = {
+    tenant_slug: tenantSlug,
+    sender_role: isDavDmMode() ? 'dav' : 'investor',
+    sender_profile_id: activeUser && activeUser.username ? activeUser.username : '',
+  };
+  const resp = await fetch(`/api/dm/threads/${encodeURIComponent(threadId)}/read`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const data = await resp.json();
+  if (!resp.ok || data.success === false) throw new Error((data && data.error) || 'dm_mark_read_failed');
+  applyDmCenterPayload(data);
+  if (Array.isArray(data.threads)) {
+    dmConversationsCache = data.threads;
+    renderDmConversations(dmConversationsCache);
+  }
+}
+
+function renderDmMessages(messages) {
+  const container = document.getElementById('dm-messages-container');
+  container.innerHTML = messages.map(m => {
+    const isDavView = isDavDmMode();
+    const bubbleSide = isDavView
+      ? (m.sender === 'kol' ? 'user' : 'kol')
+      : m.sender;
+    const timeColor = bubbleSide === 'user' ? 'rgba(11,30,58,0.7)' : 'var(--gray-400)';
+    if (m.type === 'paid') {
+      return `
+        <div class="dm-msg from-${bubbleSide} paid-msg">
+          <div style="font-size:11px;color:var(--gold);font-weight:600;margin-bottom:6px">🔒 付费内容 · ¥${m.price}</div>
+          <div style="font-size:13px;color:var(--white);line-height:1.6">${escapeHtml(m.preview||'解锁查看完整内容')}</div>
+          <button class="btn-gold" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="unlockPaidMsg(${m.price})">解锁查看 ¥${m.price}</button>
+          <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
+        </div>`;
+    }
+    const isAgentBroadcast = m.type === 'agent_broadcast';
+    const broadcastKind = String(m.broadcast_kind || '').toLowerCase();
+    const broadcastClass = isAgentBroadcast ? ` agent-broadcast ${broadcastKind === 'night' ? 'night-broadcast' : 'noon-broadcast'}` : '';
+    const broadcastLabel = broadcastKind === 'night' ? '晚间播报' : (broadcastKind === 'morning' ? '早间播报' : '午间播报');
+    const broadcastIcon = broadcastKind === 'night' ? '☾' : (broadcastKind === 'morning' ? '◷' : '☀');
+    const insightId = String(m.insight_id || '').trim();
+    return `
+      <div class="dm-msg from-${bubbleSide}${broadcastClass}">
+        ${isAgentBroadcast ? `<div class="dm-agent-broadcast-label">${broadcastIcon} 小金智能体 · ${broadcastLabel}</div>` : ''}
+        ${escapeHtml(m.content || '').replace(/\n/g, '<br>')}
+        ${isAgentBroadcast && insightId ? `<button class="dm-broadcast-insight-link" type="button" onclick="openBroadcastInsight('${escapeAttr(insightId)}')">查看对应洞见笔记</button>` : ''}
+        <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
+      </div>`;
+  }).join('');
+  // Scroll to bottom
+  setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+}
+
+function openBroadcastInsight(insightId) {
+  const id = String(insightId || '').trim();
+  if (!id) return;
+  switchTab('review');
+  window.setTimeout(() => openReviewArticleDetail(id), 0);
+}
+
+async function sendDm() {
+  const input = document.getElementById('dm-input');
+  const text = input.value.trim();
+  if (!text || !currentDmKol) return;
+  if (isCurrentDmSystemThread()) {
+    showToast('系统消息仅支持查看');
+    return;
+  }
+  const siteFeatures = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
+  if (siteFeatures.fan_interaction === false) {
+    showToast('当前为站内信查看模式，暂不开放回复');
+    return;
+  }
+  input.value = '';
+  const container = document.getElementById('dm-messages-container');
+  try {
+    const activeUser = getActiveDemoUser();
+    const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+    const payload = {
+      thread_id: currentDmKol.id,
+      tenant_slug: tenantSlug,
+      content: text,
+      sender_role: isDavDmMode() ? 'dav' : 'investor',
+      sender_profile_id: activeUser && activeUser.username ? activeUser.username : '',
+      sender_name: activeUser && activeUser.name ? activeUser.name : '',
+      sender_avatar: activeUser && activeUser.avatar ? activeUser.avatar : '',
+      sender_membership: activeUser && activeUser.membership ? activeUser.membership : '',
+    };
+    const resp = await fetch('/api/dm/send', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error((data && data.error) || 'dm_send_failed');
+    if (data.thread_id) {
+      currentDmKol.id = String(data.thread_id);
+    }
+    applyDmCenterPayload(data);
+    await loadDmMessages(currentDmKol.id);
+    if (Array.isArray(data.threads)) {
+      dmConversationsCache = data.threads;
+      renderDmConversations(dmConversationsCache);
+    } else {
+      await loadDmConversations();
+    }
+    showToast(isDavDmMode() ? '已回复粉丝' : '消息已发送，等待大V回复');
+  } catch (e) {
+    showToast(e.message || '发送失败');
+  }
+}
+
+function unlockPaidMsg(price) {
+  showToast('解锁成功！消耗 ' + price + ' 积分');
+}
+
+function dmQuickAsk(text) {
+  document.getElementById('dm-input').value = text;
+  document.getElementById('dm-input').focus();
+}
+
+let h5CommerceState = null;
+
+async function loadH5Commerce() {
+  const user = getActiveDemoUser() || {};
+  if (!user || user.role !== 'investor' || !user.tenant) return null;
+  const response = await fetch(`/api/h5/tenant/${encodeURIComponent(user.tenant.slug)}/commerce`, {cache: 'no-store'});
+  const data = await response.json();
+  if (!response.ok || !data.ok) throw new Error(data.error || 'commerce_load_failed');
+  h5CommerceState = data.commerce || {};
+  return h5CommerceState;
+}
+
+function renderH5Commerce(user) {
+  const card = document.getElementById('profile-commerce-card');
+  const content = document.getElementById('profile-commerce-content');
+  if (!card || !content) return;
+  card.style.display = user && user.role === 'investor' ? '' : 'none';
+  if (!user || user.role !== 'investor') return;
+  loadH5Commerce().then((commerce) => {
+    if (!commerce || !commerce.enabled) {
+      card.style.display = 'none';
+      return;
+    }
+    const subscribed = !!commerce.has_subscription;
+    const products = Array.isArray(commerce.products) ? commerce.products : [];
+    document.getElementById('profile-commerce-status').textContent = subscribed ? '已订阅' : '未订阅';
+    content.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0 4px">
+        <div style="padding:12px;border:1px solid rgba(47,116,192,.12);border-radius:10px;background:#F8FBFF">
+          <strong style="color:var(--text-main)">常规用户权益</strong>
+          <div class="profile-overview-desc" style="margin-top:6px">阅读公开洞见、查看公开市场观点和基础内容。</div>
+        </div>
+        <div style="padding:12px;border:1px solid rgba(200,169,110,.28);border-radius:10px;background:rgba(200,169,110,.08)">
+          <strong style="color:var(--text-main)">订阅用户权益</strong>
+          <div class="profile-overview-desc" style="margin-top:6px">包含常规权益，并解锁订阅专享的高质量详细洞见，例如个股详细复盘信息、完整判断依据与风险说明。</div>
+        </div>
+      </div>
+      ${products.length ? products.map((product) => `
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-top:1px solid rgba(47,116,192,.1)">
+        <div><strong style="color:var(--text-main)">${escapeHtml(product.name)}</strong><div class="profile-overview-desc">${escapeHtml(product.description || '订阅租户研究内容')} · ${product.billing_period_days}天</div></div>
+        <button class="btn-gold" type="button" style="white-space:nowrap;padding:8px 10px;font-size:11px" onclick="createH5CommerceOrder(${Number(product.id)})">¥${Number(product.price_yuan).toFixed(2)} 订阅</button>
+      </div>`).join('') : '<div class="profile-overview-desc" style="padding-top:10px">当前暂无可购买的订阅产品。</div>'}`;
+  }).catch(() => { content.textContent = '订阅服务暂不可用，请稍后重试。'; });
+}
+
+async function createH5CommerceOrder(productId) {
+  const user = getActiveDemoUser() || {};
+  const tenantSlug = user.tenant && user.tenant.slug;
+  if (!tenantSlug) return;
+  try {
+    const response = await fetch(`/api/h5/tenant/${encodeURIComponent(tenantSlug)}/commerce/orders`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({product_id: productId})});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'commerce_order_failed');
+    const order = data.order || {};
+    const qr = order.collection_qr_url ? `<img src="${escapeAttr(order.collection_qr_url)}" alt="收款二维码" style="width:180px;height:180px;object-fit:contain;margin:12px auto;display:block">` : '';
+    openH5CommerceModal('完成订阅支付', `<div style="line-height:1.8;font-size:13px">订单号：${escapeHtml(order.order_no)}<br>应付：<strong>¥${Number(order.amount_yuan).toFixed(2)}</strong><br>${escapeHtml(order.payment_instructions || '')}${qr}<div style="font-size:11px;color:var(--gray-400)">支付完成后请等待大V核验到账。当前订单状态：待支付。</div></div>`);
+    showToast('订单已创建，请按说明完成支付');
+  } catch (error) { showToast(error.message || '订阅下单失败'); }
+}
+
+function openH5CommerceModal(title, html) {
+  const host = document.getElementById('workbench-ops-modal-content');
+  const modal = document.getElementById('workbench-ops-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `<div class="modal-title" style="margin-bottom:12px">${escapeHtml(title)}</div>${html}`;
+  modal.classList.add('show');
+}
+
+// ===== KOL WORKBENCH =====
+function wbQuickReply(isPaid) {
+  const text = document.getElementById('wb-quick-reply').value.trim();
+  if (!text) { showToast('请输入回复内容'); return; }
+  const selected = currentDmKol && currentDmKol.id
+    ? (dmConversationsCache || []).find(item => String(item.id || '') === String(currentDmKol.id || ''))
+    : (dmConversationsCache && dmConversationsCache.length ? dmConversationsCache[0] : null);
+  if (!selected || !selected.id) {
+    showToast('请先进入一条粉丝会话');
+    return;
+  }
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  fetch('/api/kol/reply', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      thread_id: selected.id,
+      tenant_slug: tenantSlug,
+      content: text,
+      is_paid: !!isPaid,
+    })
+  }).then(async (resp) => {
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error((data && data.error) || 'kol_reply_failed');
+    document.getElementById('wb-quick-reply').value = '';
+    applyDmCenterPayload(data);
+    if (Array.isArray(data.threads)) {
+      dmConversationsCache = data.threads;
+      renderDmConversations(dmConversationsCache);
+    } else {
+      await loadDmConversations();
+    }
+    showToast(isPaid ? '付费回复已发送' : '回复已发送');
+  }).catch((error) => {
+    showToast(error.message || '回复发送失败');
+  });
+}
+
+async function sendBroadcast() {
+  const text = document.getElementById('wb-broadcast-text').value.trim();
+  const target = document.getElementById('wb-broadcast-target').value;
+  if (!text) { showToast('请输入群发内容'); return; }
+  try {
+    const resp = await fetch('/api/kol/broadcast', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({content:text, target, tenant_slug: ((getActiveDemoUser() || {}).tenant || {}).slug || ''})
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.success === false) throw new Error((data && data.error) || 'broadcast_failed');
+    applyDmCenterPayload(data);
+    if (Array.isArray(data.threads)) {
+      dmConversationsCache = data.threads;
+      renderDmConversations(dmConversationsCache);
+    }
+    showToast(`群发成功！触达 ${data.reach.toLocaleString()} 位订阅者`);
+    document.getElementById('wb-broadcast-text').value = '';
+  } catch (e) {
+    showToast(e.message || '群发失败');
+  }
+}
+
+// ===== TOAST =====
+let toastTimer = null;
+function showToast(msg, duration) {
+  duration = duration || 2000;
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+let wbSmartIndicatorEditingCode = '';
+let wbSmartIndicatorSelectedCodes = [];
+let tenantSmartIndicatorCatalogState = null;
+let wbSmartIndicatorDraft = {
+  slotIndex: -1,
+  indicatorName: '',
+  promptText: '',
+  category: '',
+  unit: '',
+  selectedTagCodes: [],
+  suppressedTagCodes: [],
+  isGenerating: false,
+  directIndicatorCode: '',
+  preview: null,
+};
+
+function cloneSimpleDashboardConfig(config) {
+  return config ? JSON.parse(JSON.stringify(config)) : null;
+}
+
+function normalizeInitialRemoteDashboardState(payload) {
+  const dashboard = payload && typeof payload === 'object' ? payload : {};
+  const state = dashboard.fund_dashboard_state && typeof dashboard.fund_dashboard_state === 'object'
+    ? dashboard.fund_dashboard_state
+    : { published: dashboard.fund_dashboard || null, draft: null };
+  return {
+    published: cloneSimpleDashboardConfig(state.published),
+    draft: cloneSimpleDashboardConfig(state.draft),
+  };
+}
+
+function ensureTenantFundDashboardState(tenantId) {
+  if (!tenantFundDashboardState[tenantId]) {
+    tenantFundDashboardState[tenantId] = {
+      published: cloneSimpleDashboardConfig(tenantFundDashboardRemoteState.published) || { layout: '2x2', cards: [] },
+      draft: cloneSimpleDashboardConfig(tenantFundDashboardRemoteState.draft),
+    };
+    persistTenantFundDashboardState();
+  }
+  return tenantFundDashboardState[tenantId];
+}
+
+function getTenantFundDashboardState() {
+  const activeUser = getActiveDemoUser();
+  return ensureTenantFundDashboardState(activeUser.tenant.id);
+}
+
+function getPublishedFundDashboard() {
+  const state = getTenantFundDashboardState();
+  return cloneSimpleDashboardConfig((tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.published) || state.published);
+}
+
+function getDraftFundDashboard() {
+  const state = getTenantFundDashboardState();
+  return cloneSimpleDashboardConfig((tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.draft) || state.draft);
+}
+
+function formatWorkbenchDashboardValue(item) {
+  const value = item && item.value;
+  if (item && (item.data_status === 'unavailable' || item.data_unavailable === true)) return '--';
+  if (value !== null && value !== undefined && String(value).trim() !== '') {
+    const selected = Array.isArray(item && item.selectedIndicators) ? item.selectedIndicators : [];
+    const directSnapshotCodes = new Set([
+      'source_shanghai_index', 'source_shenzhen_index', 'source_hsi', 'source_hscei', 'source_hscci',
+      'source_dji', 'source_nasdaq', 'source_sp500', 'source_nikkei',
+      'source_cpi', 'source_ppi', 'source_manufacturing_pmi', 'source_industrial_production_yoy',
+      'source_retail_sales_yoy', 'source_fixed_asset_investment_yoy', 'source_urban_unemployment',
+      'source_real_estate_investment_yoy',
+    ]);
+    const isDirectSnapshot = selected.length === 1
+      && directSnapshotCodes.has(String(selected[0].indicator_code || ''))
+      && !/[+\-*/()]/.test(String(item && item.prompt || ''));
+    if (isDirectSnapshot && Number.isFinite(Number(value))) return Number(value).toFixed(2);
+    return String(value);
+  }
+  if (item && item.numeric_value !== null && item.numeric_value !== undefined) return String(item.numeric_value);
+  return '--';
+}
+
+tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(INITIAL_TENANT_DASHBOARD);
+
+function buildInitialTenantSmartCatalog() {
+  const payloadCatalog = (INITIAL_TENANT_DASHBOARD && INITIAL_TENANT_DASHBOARD.smart_indicator_catalog) || {};
+  if (payloadCatalog.tenant_smart_indicators || payloadCatalog.base_indicators || payloadCatalog.available_tags) {
+    return JSON.parse(JSON.stringify(payloadCatalog));
+  }
+  const hub = H5_INDICATOR_HUB || {};
+  return {
+    tenant_smart_indicators: Array.isArray(hub.smart_items) ? hub.smart_items.map((item) => ({
+      indicator_code: item.id,
+      indicator_name: item.name,
+      category: item.category || '智能指标',
+      unit: item.unit || '',
+      value: item.value !== null && item.value !== undefined && String(item.value).trim() ? item.value : '--',
+      assessment: item.assessment || '',
+      prompt_text: item.prompt_text || '',
+      formula_js: item.formula_js || '',
+      algorithm_detail: item.algorithm_detail || item.description || '',
+      interpretation: item.interpretation || item.assessment || '',
+      selected_indicators: Array.isArray(item.selected_indicators) ? item.selected_indicators : [],
+      data_status: item.data_status || '',
+      data_status_label: item.data_status_label || '',
+      data_unavailable: item.data_unavailable === true,
+    })) : [],
+    base_indicators: Array.isArray(hub.items) ? hub.items.filter((item) => item && item.id && item.numeric_value !== null && item.numeric_value !== undefined).map((item) => ({
+      indicator_code: item.id,
+      indicator_name: item.name,
+      category: item.category || '未分类指标',
+      value: item.value !== null && item.value !== undefined && String(item.value).trim() ? item.value : '--',
+      numeric_value: item.numeric_value,
+      source_type_label: item.source_type_label || item.source_type || '',
+      data_status: item.data_status || '',
+      data_status_label: item.data_status_label || '',
+      data_unavailable: item.data_unavailable === true,
+    })) : [],
+    available_tags: [],
+  };
+}
+
+function getTenantSmartCatalog() {
+  if (!tenantSmartIndicatorCatalogState) tenantSmartIndicatorCatalogState = buildInitialTenantSmartCatalog();
+  return tenantSmartIndicatorCatalogState;
+}
+
+function setTenantSmartCatalog(payload) {
+  const catalog = payload && payload.smart_indicator_catalog ? payload.smart_indicator_catalog : payload;
+  if (!catalog || typeof catalog !== 'object') return;
+  tenantSmartIndicatorCatalogState = JSON.parse(JSON.stringify(catalog));
+}
+
+function buildFallbackTenantSmartTags(catalog) {
+  const tags = [];
+  const seen = new Set();
+  Object.values(WATCHLIST_DETAILS_MAP || {}).forEach((detail) => {
+    const stockCode = String(detail.code || '').toUpperCase();
+    const relatedIds = Array.isArray(detail.related_indicator_ids) ? detail.related_indicator_ids : [];
+    const relatedNames = Array.isArray(detail.related_indicator_names) ? detail.related_indicator_names : [];
+    if (!stockCode || !relatedIds.length) return;
+    const tagCode = `watchlist:${stockCode}`;
+    if (seen.has(tagCode)) return;
+    seen.add(tagCode);
+    tags.push({
+      tag_code: tagCode,
+      label: detail.name || stockCode,
+      tag_type: 'watchlist',
+      category: detail.industry || '自选股',
+      subtitle: '自选股标签',
+      selected_indicators: relatedIds.map((indicatorCode, index) => ({
+        indicator_code: indicatorCode,
+        indicator_name: relatedNames[index] || indicatorCode,
+      })),
+    });
+  });
+  (catalog.base_indicators || []).forEach((item) => {
+    const indicatorCode = String(item.indicator_code || '').trim();
+    if (!indicatorCode) return;
+    const tagCode = `indicator:${indicatorCode}`;
+    if (seen.has(tagCode)) return;
+    seen.add(tagCode);
+    tags.push({
+      tag_code: tagCode,
+      label: item.indicator_name || indicatorCode,
+      tag_type: 'indicator',
+      category: item.category || '指标',
+      subtitle: item.source_type_label || '基础指标',
+      selected_indicators: [{ indicator_code: indicatorCode, indicator_name: item.indicator_name || indicatorCode }],
+    });
+  });
+  return tags;
+}
+
+function getTenantSmartTagCatalog() {
+  const catalog = getTenantSmartCatalog();
+  if (Array.isArray(catalog.available_tags) && catalog.available_tags.length) return catalog.available_tags;
+  return buildFallbackTenantSmartTags(catalog);
+}
+
+function sortWorkbenchSmartIndicatorsByRecent(items) {
+  return (Array.isArray(items) ? items.slice() : []).sort((left, right) => {
+    const leftTime = Date.parse(String(left && (left.last_updated || left.updated_at || left.created_at) || '')) || 0;
+    const rightTime = Date.parse(String(right && (right.last_updated || right.updated_at || right.created_at) || '')) || 0;
+    return rightTime - leftTime;
+  });
+}
+
+function renderWorkbenchSmartLayoutRow() {
+  const host = document.getElementById('wb-smart-layout-row');
+  if (!host) return;
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2' };
+  const currentLayout = normalizeDashboardLayout(active.layout || '2x2');
+  host.innerHTML = ['2x2', '2x3', '4x2', '5x2'].map((layout) => `
+    <button class="btn-outline ${currentLayout === layout ? 'active' : ''}" style="padding:8px 12px;font-size:12px" type="button" onclick="selectFundDashboardLayout('${layout}')">${layout.toUpperCase()}</button>
+  `).join('');
+}
+
+function renderWorkbenchSmartIndicatorLibrary() {
+  const host = document.getElementById('wb-smart-indicator-library');
+  if (!host) return;
+  const items = sortWorkbenchSmartIndicatorsByRecent(
+    (getTenantSmartCatalog().tenant_smart_indicators || []).filter((item) => item && item.indicator_code),
+  );
+  if (!items.length) {
+    host.innerHTML = '<div class="feature-note">当前租户还没有已保存的智能指标。</div>';
+    return;
+  }
+  const recentItems = items.slice(0, 3);
+  const remainingCount = Math.max(0, items.length - recentItems.length);
+  host.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+      <div class="feature-note" style="margin:0">${items.length} 个已保存指标 · 最近 ${recentItems.length} 个</div>
+      <button class="btn-outline" type="button" style="padding:6px 10px;font-size:11px;flex:0 0 auto" onclick="openWorkbenchSmartIndicatorLibraryModal()">${remainingCount ? `更多（${remainingCount}）` : '管理指标'}</button>
+    </div>
+    <div style="display:grid;gap:8px">
+      ${recentItems.map((item) => `
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid rgba(47,116,192,0.14);border-radius:10px;padding:10px 12px;background:rgba(47,116,192,0.035)">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.indicator_name || '未命名指标')}</div>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.category || '智能指标')} · ${escapeHtml(formatWorkbenchDashboardValue(item))}${escapeHtml(item.unit || '')} · ${escapeHtml(item.last_updated || '未记录')}</div>
+          </div>
+          <span style="font-size:11px;color:#2F74C0;white-space:nowrap">已保存</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function openWorkbenchSmartIndicatorLibraryModal() {
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (!host || !modal) return;
+  const items = sortWorkbenchSmartIndicatorsByRecent(
+    (getTenantSmartCatalog().tenant_smart_indicators || []).filter((item) => item && item.indicator_code),
+  );
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">已保存智能指标</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">共 ${items.length} 个指标。这里集中管理指标定义；可编辑、加入 Dashboard 草稿或删除指标定义。</div>
+    ${items.length ? `<div style="display:grid;gap:8px">
+      ${items.map((item) => `
+        <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px;border:1px solid rgba(47,116,192,0.14);border-radius:10px;padding:10px 12px;background:rgba(47,116,192,0.035)">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.indicator_name || '未命名指标')}</div>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.category || '智能指标')} · ${escapeHtml(formatWorkbenchDashboardValue(item))}${escapeHtml(item.unit || '')} · ${escapeHtml(item.last_updated || '未记录')}</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="openWorkbenchSmartIndicatorLibraryDetail('${escapeAttr(item.indicator_code)}')">编辑</button>
+            <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="addExistingWorkbenchSmartIndicatorToDraft('${escapeAttr(item.indicator_code)}')">加入草稿</button>
+            <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.20)" onclick="requestWorkbenchSmartIndicatorDelete('${escapeAttr(item.indicator_code)}')">删除定义</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>` : '<div class="feature-note">当前租户还没有已保存的智能指标。</div>'}
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn-outline" type="button" onclick="closeWorkbenchSmartIndicatorDetailModal()">关闭</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+async function addExistingWorkbenchSmartIndicatorToDraft(indicatorCode) {
+  const code = String(indicatorCode || '').trim();
+  if (!code) return;
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
+  const layout = normalizeDashboardLayout(active.layout || '2x2');
+  const target = getDashboardCardTarget(layout);
+  const cards = Array.from({ length: target }, (_, index) => {
+    const raw = Array.isArray(active.cards) && typeof active.cards[index] === 'object' ? active.cards[index] : {};
+    return raw.indicatorCode || raw.indicator_code ? { indicatorCode: raw.indicatorCode || raw.indicator_code } : {};
+  });
+  if (cards.some((card) => card.indicatorCode === code)) {
+    showToast('该指标已经在 Dashboard 草稿中');
+    return;
+  }
+  const emptyIndex = cards.findIndex((card) => !card.indicatorCode);
+  if (emptyIndex < 0) {
+    showToast('当前布局已无空白格，请先调整布局或移除一个指标');
+    return;
+  }
+  cards[emptyIndex] = { indicatorCode: code };
+  try {
+    await syncTenantDashboardState('save_draft', { ...active, layout, cards });
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('已加入 Dashboard 草稿');
+  } catch (error) {
+    showToast(error.message || '加入草稿失败');
+  }
+}
+
+function buildWorkbenchSmartSlotCards(layout, cards) {
+  const target = getDashboardCardTarget(normalizeDashboardLayout(layout || '2x2'));
+  const list = Array.isArray(cards) ? cards : [];
+  const seenCodes = new Set();
+  return Array.from({ length: target }, (_, index) => {
+    const raw = typeof list[index] === 'object' ? list[index] : {};
+    const indicatorCode = String(raw && (raw.indicatorCode || raw.indicator_code) || '').trim();
+    if (indicatorCode) {
+      if (seenCodes.has(indicatorCode)) return { isEmpty: true };
+      seenCodes.add(indicatorCode);
+    }
+    if (!raw || raw.isEmpty) return { isEmpty: true };
+    if (indicatorCode) {
+      // Dashboard state may intentionally contain only an indicator reference
+      // after a delete/update response. Rehydrate it from the fresh catalog so
+      // one mutation cannot turn every remaining card into "智能指标 / --".
+      const hydrated = buildWorkbenchDashboardDetailCard(raw, { slotIndex: index });
+      if (hydrated && (hydrated.name || hydrated.value !== '--')) {
+        return { ...hydrated, ...raw, slotIndex: index, isEmpty: false };
+      }
+      return { isEmpty: true };
+    }
+    return raw.name || raw.prompt ? { ...raw, slotIndex: index } : { isEmpty: true };
+  });
+}
+
+function getWorkbenchSmartCardIndicatorCode(card) {
+  return String((card && (card.indicatorCode || card.indicator_code)) || '').trim();
+}
+
+function buildWorkbenchSmartDashboardCardRefs(active, layout, slotIndex, nextIndicatorCode) {
+  const target = getDashboardCardTarget(normalizeDashboardLayout(layout || '2x2'));
+  const sourceCards = Array.isArray((active || {}).cards) ? active.cards : [];
+  const seenCodes = new Set();
+  return Array.from({ length: target }, (_, index) => {
+    const rawCard = sourceCards[index] && typeof sourceCards[index] === 'object' ? sourceCards[index] : {};
+    if (index === slotIndex) {
+      const replacementCode = String(nextIndicatorCode || '').trim();
+      if (!replacementCode || seenCodes.has(replacementCode)) return {};
+      seenCodes.add(replacementCode);
+      return { indicatorCode: replacementCode };
+    }
+    const indicatorCode = getWorkbenchSmartCardIndicatorCode(sourceCards[index]);
+    if (indicatorCode) {
+      if (seenCodes.has(indicatorCode)) return {};
+      seenCodes.add(indicatorCode);
+      return { ...rawCard, indicatorCode };
+    }
+    // Legacy/full dashboard cards may carry display data without an indicatorCode.
+    // Keep them in place while replacing a different slot.
+    if (!rawCard.isEmpty && (rawCard.name || rawCard.value || rawCard.assessment || rawCard.prompt)) return rawCard;
+    return {};
+  });
+}
+
+function getWorkbenchSmartEditingBaseDashboard() {
+  const draft = getDraftFundDashboard();
+  if (draft) return draft;
+  const published = getPublishedFundDashboard();
+  const layout = normalizeDashboardLayout((published && published.layout) || '2x2');
+  return {
+    layout,
+    title: (published && published.title) || '智能指标 Dashboard',
+    note: (published && published.note) || '大V 自定义智能指标草稿。',
+    cards: Array.isArray(published && published.cards)
+      ? published.cards.slice(0, getDashboardCardTarget(layout))
+      : Array.from({ length: getDashboardCardTarget(layout) }, () => ({})),
+  };
+}
+
+function openWorkbenchSmartIndicatorEditor(slotIndex) {
+  wbSmartIndicatorDraft = {
+    slotIndex,
+    indicatorName: '',
+    promptText: '',
+    category: '',
+    unit: '',
+    selectedTagCodes: [],
+    suppressedTagCodes: [],
+    isGenerating: false,
+    directIndicatorCode: '',
+    preview: null,
+    isSaving: false,
+  };
+  renderWorkbenchSmartIndicatorEditorModal();
+}
+
+function normalizeWorkbenchSmartTagLabel(label) {
+  return String(label || '').replace(/[【】]/g, '').trim();
+}
+
+function escapeWorkbenchRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function collectWorkbenchPromptMatchedTagCodes(promptText, tagCatalog) {
+  const prompt = String(promptText || '').trim();
+  if (!prompt) return [];
+  const normalize = (value) => String(value || '').replace(/[\s_\-.\/：:，,。.!！?？【】\[\]()（）]/g, '').toLowerCase();
+  const normalizedPrompt = normalize(prompt);
+  const catalog = Array.isArray(tagCatalog) ? tagCatalog.slice() : [];
+  const explicitLabels = Array.from(prompt.matchAll(/【([^】]+)】/g)).map((match) => normalizeWorkbenchSmartTagLabel(match[1]));
+  // Bracketed values are structural formula references produced by the
+  // editor. Resolve only their exact tag, never every label sharing a prefix.
+  if (explicitLabels.length) {
+    return Array.from(new Set(explicitLabels.map((label) => {
+      const tag = catalog.find((item) => normalizeWorkbenchSmartTagLabel(item && item.label) === label);
+      return tag && tag.tag_code;
+    }).filter(Boolean)));
+  }
+  return catalog
+    .filter((tag) => tag && tag.auto_match !== false)
+    .sort((left, right) => normalizeWorkbenchSmartTagLabel(right.label).length - normalizeWorkbenchSmartTagLabel(left.label).length)
+    .filter((tag) => {
+      const candidates = [tag && tag.label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []);
+      return candidates.some((candidate) => {
+        const normalizedCandidate = normalize(normalizeWorkbenchSmartTagLabel(candidate));
+        if (!normalizedCandidate) return false;
+        if (normalizedPrompt.includes(normalizedCandidate)) return true;
+        if (normalizedPrompt.length >= 3 && normalizedCandidate.includes(normalizedPrompt)) return true;
+        return normalizedPrompt.length >= 3 && normalizedPrompt.length <= 8 && normalizedCandidate.includes(normalizedPrompt);
+      });
+    })
+    .map((tag) => tag.tag_code)
+    .filter(Boolean);
+}
+
+function getWorkbenchSmartIndicatorEffectiveTagCodes() {
+  const manualCodes = Array.isArray(wbSmartIndicatorDraft.selectedTagCodes) ? wbSmartIndicatorDraft.selectedTagCodes : [];
+  const matchedCodes = collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog());
+  const suppressed = new Set(wbSmartIndicatorDraft.suppressedTagCodes || []);
+  return Array.from(new Set(manualCodes.concat(matchedCodes))).filter((code) => !suppressed.has(code));
+}
+
+function findWorkbenchSmartTagByCode(tagCode) {
+  return getTenantSmartTagCatalog().find((tag) => tag.tag_code === tagCode) || null;
+}
+
+function findWorkbenchBaseIndicator(indicatorCode) {
+  const code = String(indicatorCode || '').trim();
+  if (!code) return null;
+  return (getTenantSmartCatalog().base_indicators || []).find((entry) => String(entry.indicator_code || '').trim() === code) || null;
+}
+
+function findWorkbenchIndicatorForTag(tagCode) {
+  const tag = findWorkbenchSmartTagByCode(tagCode);
+  const selectedIndicators = tag && Array.isArray(tag.selected_indicators) ? tag.selected_indicators : [];
+  if (!tag || selectedIndicators.length !== 1) return null;
+  const indicatorCode = String(selectedIndicators[0].indicator_code || '').trim();
+  const smart = findWorkbenchSmartIndicator(indicatorCode);
+  const base = findWorkbenchBaseIndicator(indicatorCode);
+  return smart || base || {
+    indicator_code: indicatorCode,
+    indicator_name: selectedIndicators[0].indicator_name || tag.label || indicatorCode,
+    category: tag.category || '指标',
+    value: tag.value || '--',
+    unit: tag.unit || '',
+    assessment: tag.subtitle || '',
+    interpretation: tag.subtitle || '',
+    selected_indicators: selectedIndicators,
+  };
+}
+
+function getWorkbenchDirectPreviewCandidate(selectedTagCodes) {
+  const tagCodes = Array.isArray(selectedTagCodes) ? selectedTagCodes.filter(Boolean) : [];
+  if (tagCodes.length !== 1) return null;
+  const prompt = String(wbSmartIndicatorDraft.promptText || '').trim();
+  const tag = findWorkbenchSmartTagByCode(tagCodes[0]);
+  if (!tag) return null;
+  const normalizedLabel = normalizeWorkbenchSmartTagLabel(tag.label);
+  if (!normalizedLabel) return null;
+  const allowedForms = new Set([normalizedLabel, `【${normalizedLabel}】`]);
+  if (!allowedForms.has(prompt)) return null;
+  const indicator = findWorkbenchIndicatorForTag(tagCodes[0]);
+  if (!indicator || !String(indicator.indicator_code || '').trim()) return null;
+  const selectedIndicators = Array.isArray(indicator.selected_indicators) && indicator.selected_indicators.length
+    ? indicator.selected_indicators
+    : [{ indicator_code: indicator.indicator_code, indicator_name: indicator.indicator_name || normalizedLabel }];
+  return {
+    indicator_code: String(indicator.indicator_code || '').trim(),
+    indicator_name: wbSmartIndicatorDraft.indicatorName || indicator.indicator_name || normalizedLabel,
+    category: indicator.category || tag.category || '直接引用指标',
+    value: indicator.value || '--',
+    numeric_value: indicator.numeric_value,
+    unit: indicator.unit || '',
+    assessment: indicator.interpretation || indicator.assessment || '直接引用原指标，不需要额外加工。',
+    interpretation: indicator.interpretation || indicator.assessment || '直接引用原指标，不需要额外加工。',
+    algorithm_detail: indicator.algorithm_detail || indicator.description || '直接引用已有指标，不生成新的计算公式。',
+    prompt_text: prompt,
+    selected_indicators: selectedIndicators,
+    formula_js: indicator.formula_js || '',
+    formula_meta: { generator: 'direct_reference', llm_used: false },
+    direct_reference: true,
+  };
+}
+
+function tokenizeWorkbenchSmartPrompt(promptText, tagCatalog) {
+  const prompt = String(promptText || '');
+  if (!prompt) return [];
+  const regex = /(【[^】]+】|[\+\-\*\/\(\)])/g;
+  const rawParts = prompt.split(regex).filter((part) => part !== '');
+  return rawParts.map((part) => {
+    if (/^【[^】]+】$/.test(part)) {
+      const normalizedLabel = normalizeWorkbenchSmartTagLabel(part);
+      const matchedTag = (Array.isArray(tagCatalog) ? tagCatalog : []).find((tag) => normalizeWorkbenchSmartTagLabel(tag.label) === normalizedLabel);
+      return {
+        type: 'reference',
+        text: part,
+        label: normalizedLabel,
+        tagCode: matchedTag ? matchedTag.tag_code : '',
+      };
+    }
+    if (/^[\+\-\*\/\(\)]$/.test(part)) {
+      return { type: 'operator', text: part };
+    }
+    if (/^\s+$/.test(part)) {
+      return { type: 'space', text: part };
+    }
+    if (/^\d+(\.\d+)?$/.test(part.trim())) {
+      return { type: 'number', text: part.trim() };
+    }
+    return { type: 'text', text: part };
+  });
+}
+
+function escapeWorkbenchSmartRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Convert a recognized alias into a canonical reference token immediately.
+// An unclosed reference is user input in progress (especially after Backspace),
+// so it must not be matched again and wrapped in another pair of brackets.
+function canonicalizeWorkbenchSmartPrompt(promptText, tagCatalog) {
+  const source = String(promptText || '');
+  const candidates = [];
+  const seen = new Set();
+  (Array.isArray(tagCatalog) ? tagCatalog : []).filter((tag) => tag && tag.auto_match !== false).forEach((tag) => {
+    const label = normalizeWorkbenchSmartTagLabel(tag && tag.label);
+    if (!label) return;
+    [label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []).forEach((value) => {
+      const alias = normalizeWorkbenchSmartTagLabel(value);
+      const key = `${alias}\u0000${label}`;
+      if (!alias || alias.length < 2 || seen.has(key)) return;
+      seen.add(key);
+      candidates.push({ alias, label });
+    });
+  });
+  candidates.sort((left, right) => right.alias.length - left.alias.length);
+  if (!candidates.length) return source;
+  const pattern = new RegExp(candidates.map((item) => escapeWorkbenchSmartRegExp(item.alias)).join('|'), 'gi');
+  return source.split(/(【[^】]*(?:】|$))/g).map((part) => {
+    if (/^【/.test(part)) return part;
+    return part.replace(pattern, (match) => {
+      const normalized = normalizeWorkbenchSmartTagLabel(match).toLowerCase();
+      const found = candidates.find((item) => item.alias.toLowerCase() === normalized);
+      return found ? `【${found.label}】` : match;
+    });
+  }).join('');
+}
+
+function buildWorkbenchSmartPromptTokenHtml(token) {
+  if (!token || token.type === 'space') return '';
+  if (token.type === 'reference') {
+    return `<span class="review-watchlist-chip selectable active" style="cursor:pointer" title="再次点击上方指标可继续插入">${escapeHtml(token.label || token.text || '')}</span>`;
+  }
+  if (token.type === 'operator') {
+    return `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:28px;padding:0 8px;border-radius:10px;background:rgba(47,116,192,0.08);border:1px solid rgba(47,116,192,0.12);font-size:13px;font-weight:800;color:#1F497D">${escapeHtml(token.text || '')}</span>`;
+  }
+  if (token.type === 'number') {
+    return `<span style="display:inline-flex;align-items:center;min-height:28px;padding:0 8px;border-radius:10px;background:rgba(15,39,69,0.04);border:1px solid rgba(15,39,69,0.08);font-size:12px;font-weight:700;color:var(--text-main)">${escapeHtml(token.text || '')}</span>`;
+  }
+  return `<span style="display:inline-flex;align-items:center;min-height:28px;padding:0 4px;font-size:12px;color:var(--text-main);line-height:1.7">${escapeHtml(token.text || '')}</span>`;
+}
+
+function insertWorkbenchSmartPromptFragment(fragment, options = {}) {
+  const normalizedFragment = String(fragment || '');
+  if (!normalizedFragment) return;
+  const input = document.getElementById('wb-smart-indicator-draft-prompt');
+  const shouldFocus = options.focus !== false;
+  if (input && typeof input.setRangeText === 'function') {
+    const start = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
+    const end = typeof input.selectionEnd === 'number' ? input.selectionEnd : input.value.length;
+    input.focus();
+    input.setRangeText(normalizedFragment, start, end, 'end');
+    wbSmartIndicatorDraft.promptText = input.value;
+    wbSmartIndicatorDraft.preview = null;
+    renderWorkbenchSmartTagSelection();
+    if (shouldFocus) {
+      const nextCursor = start + normalizedFragment.length;
+      input.setSelectionRange(nextCursor, nextCursor);
+      input.focus();
+    }
+    return;
+  }
+  wbSmartIndicatorDraft.promptText = `${wbSmartIndicatorDraft.promptText || ''}${normalizedFragment}`;
+  wbSmartIndicatorDraft.preview = null;
+  renderWorkbenchSmartTagSelection();
+}
+
+function insertWorkbenchSmartTagReference(tagCode) {
+  const tag = findWorkbenchSmartTagByCode(tagCode);
+  if (!tag) return;
+  const normalizedLabel = normalizeWorkbenchSmartTagLabel(tag.label);
+  if (!normalizedLabel) return;
+  if (!Array.isArray(wbSmartIndicatorDraft.selectedTagCodes)) wbSmartIndicatorDraft.selectedTagCodes = [];
+  wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).filter((code) => code !== tagCode);
+  if (!wbSmartIndicatorDraft.selectedTagCodes.includes(tagCode)) {
+    wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.concat(tagCode);
+  }
+  insertWorkbenchSmartPromptFragment(`【${normalizedLabel}】`);
+}
+
+function insertWorkbenchSmartOperator(operator) {
+  insertWorkbenchSmartPromptFragment(String(operator || ''));
+}
+
+function renderWorkbenchSmartTagSelection() {
+  const tagCatalog = getTenantSmartTagCatalog();
+  const effectiveTagCodes = getWorkbenchSmartIndicatorEffectiveTagCodes();
+  const selectedTagSet = new Set(effectiveTagCodes);
+  const selectedTags = tagCatalog.filter((tag) => selectedTagSet.has(tag.tag_code));
+  const selectedHost = document.getElementById('wb-smart-indicator-selected-tags');
+  const poolHost = document.getElementById('wb-smart-indicator-tag-pool');
+  const toggleHost = document.getElementById('wb-smart-indicator-tag-toggle');
+  const formulaToolsHost = document.getElementById('wb-smart-indicator-formula-tools');
+  const formulaHintHost = document.getElementById('wb-smart-indicator-formula-hint');
+  const matchedCodes = new Set(collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, tagCatalog));
+  const previewList = wbSmartIndicatorDraft.tagPoolExpanded ? tagCatalog : tagCatalog.slice(0, 5);
+  const formulaTokens = tokenizeWorkbenchSmartPrompt(wbSmartIndicatorDraft.promptText, tagCatalog);
+  if (selectedHost) {
+    selectedHost.innerHTML = formulaTokens.length
+      ? formulaTokens.map((token) => buildWorkbenchSmartPromptTokenHtml(token)).join('')
+      : '<span style="font-size:12px;color:var(--gray-400)">先点击上方指标或下方运算符，把公式片段插入到这里；数字和补充规则也可以直接输入。</span>';
+  }
+  if (poolHost) {
+    poolHost.innerHTML = previewList.map((tag) => `<button class="review-watchlist-chip selectable ${selectedTagSet.has(tag.tag_code) ? 'active' : ''}" onclick="insertWorkbenchSmartTagReference('${escapeHtml(tag.tag_code)}')" title="点击插入到公式编辑器">${escapeHtml(tag.label)}</button>`).join('');
+  }
+  if (toggleHost) {
+    toggleHost.innerHTML = tagCatalog.length > 5
+      ? `<button class="review-watchlist-chip selectable" onclick="toggleWorkbenchSmartTagPool()">${wbSmartIndicatorDraft.tagPoolExpanded ? '收起' : '...'}</button>`
+      : '';
+  }
+  if (formulaToolsHost) {
+    formulaToolsHost.innerHTML = ['+', '-', '*', '/', '(', ')'].map((operator) => (
+      `<button class="review-watchlist-chip selectable" onclick="insertWorkbenchSmartOperator('${operator}')" title="插入 ${operator}">${escapeHtml(operator)}</button>`
+    )).join('');
+  }
+  if (formulaHintHost) {
+    formulaHintHost.innerHTML = selectedTags.length
+      ? selectedTags.map((tag) => {
+          const autoMatched = matchedCodes.has(tag.tag_code);
+          return `<button type="button" class="review-watchlist-chip selectable active" onclick="toggleWorkbenchSmartTag('${escapeHtml(tag.tag_code)}')" title="点击移除该标签">${escapeHtml(tag.label)}${autoMatched ? ' · 已识别' : ''} ×</button>`;
+        }).join('')
+      : '<span style="font-size:11px;color:var(--gray-400)">当前还没有识别到引用指标。</span>';
+  }
+}
+
+function toggleWorkbenchSmartTagPool() {
+  wbSmartIndicatorDraft.tagPoolExpanded = !wbSmartIndicatorDraft.tagPoolExpanded;
+  renderWorkbenchSmartTagSelection();
+}
+
+function handleWorkbenchSmartIndicatorPromptInput(value) {
+  const input = document.getElementById('wb-smart-indicator-draft-prompt');
+  wbSmartIndicatorDraft.promptText = canonicalizeWorkbenchSmartPrompt(value, getTenantSmartTagCatalog());
+  if (input && input.value !== wbSmartIndicatorDraft.promptText) input.value = wbSmartIndicatorDraft.promptText;
+  wbSmartIndicatorDraft.isGenerating = false;
+  wbSmartIndicatorDraft.directIndicatorCode = '';
+  wbSmartIndicatorDraft.preview = null;
+  const matchedCodes = collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog());
+  // A formula reference is the source of truth. Drop tags left over from the
+  // previous formula instead of sending unrelated dependencies downstream.
+  wbSmartIndicatorDraft.selectedTagCodes = (wbSmartIndicatorDraft.selectedTagCodes || [])
+    .filter((code) => matchedCodes.includes(code));
+  wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).filter((code) => matchedCodes.includes(code));
+  renderWorkbenchSmartTagSelection();
+}
+
+function focusWorkbenchSmartPrompt() {
+  const input = document.getElementById('wb-smart-indicator-draft-prompt');
+  if (input) input.focus();
+}
+
+function toggleWorkbenchSmartTag(tagCode) {
+  const effective = getWorkbenchSmartIndicatorEffectiveTagCodes();
+  const matched = collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog()).includes(tagCode);
+  if (effective.includes(tagCode)) {
+    wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.filter((code) => code !== tagCode);
+    if (matched && !(wbSmartIndicatorDraft.suppressedTagCodes || []).includes(tagCode)) wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).concat(tagCode);
+  } else {
+    wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).filter((code) => code !== tagCode);
+    wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.concat(tagCode);
+  }
+  wbSmartIndicatorDraft.preview = null;
+  renderWorkbenchSmartIndicatorEditorModal();
+}
+
+function closeWorkbenchSmartIndicatorEditor() {
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function renderWorkbenchSmartIndicatorEditorModal() {
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (!host || !modal) return;
+  const scrollSnapshot = captureModalSheetScroll('dashboard-cell-modal-content');
+  const preview = wbSmartIndicatorDraft.preview;
+  const isGenerating = wbSmartIndicatorDraft.isGenerating === true;
+  const isSaving = wbSmartIndicatorDraft.isSaving === true;
+  const isDirectPreview = preview && preview.direct_reference === true;
+  if (typeof wbSmartIndicatorDraft.tagPoolExpanded !== 'boolean') wbSmartIndicatorDraft.tagPoolExpanded = false;
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">新增智能指标</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">可直接输入个股、热门行业、CPI 或市场指数；系统会在服务端自动识别真实底层指标。也可点击下方指标和运算符补充公式规则，确认展示后才正式保存。</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">指标名称</label>
+      <input id="wb-smart-indicator-draft-name" class="knowledge-modal-textarea" style="min-height:auto;height:42px" placeholder="可选，不填则系统自动命名" value="${escapeHtml(wbSmartIndicatorDraft.indicatorName || '')}">
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">计算对象</label>
+      <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:6px">先展示热门指标 5 个；点击指标会直接插入下方公式编辑器，点击“...”后可展开全部指标。</div>
+      <div id="wb-smart-indicator-tag-pool" class="review-watchlist-row" style="margin-top:10px"></div>
+      <div id="wb-smart-indicator-tag-toggle" class="review-watchlist-row" style="margin-top:8px"></div>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">公式编辑器</label>
+      <div onclick="focusWorkbenchSmartPrompt()" style="margin-top:10px;border:1px solid rgba(47,116,192,0.16);border-radius:14px;background:#ffffff;padding:12px 12px 10px;cursor:text;box-shadow:inset 0 1px 0 rgba(255,255,255,0.7)">
+        <div style="font-size:11px;color:var(--gray-400);margin-bottom:8px">引用指标 / 运算符 / 数值规则</div>
+        <div id="wb-smart-indicator-formula-tools" class="review-watchlist-row" style="margin-top:0;margin-bottom:8px"></div>
+        <div id="wb-smart-indicator-selected-tags" class="review-watchlist-row" style="margin-top:0;min-height:36px;padding:2px 0"></div>
+        <textarea id="wb-smart-indicator-draft-prompt" class="knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="handleWorkbenchSmartIndicatorPromptInput(this.value)" style="margin-top:10px;border:none;background:transparent;padding:0;min-height:108px;box-shadow:none;resize:none;color:var(--text-main)">${escapeHtml(wbSmartIndicatorDraft.promptText || '')}</textarea>
+      </div>
+      <div id="wb-smart-indicator-formula-hint" class="review-watchlist-row" style="margin-top:8px"></div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">服务端会模糊识别注册目录中的市场一览、热门行业、宏观经济和个股标签；自动识别的标签可点击“×”移除，避免不必要的匹配继续参与计算。</div>
+    </div>
+    ${isGenerating ? `
+      <div class="knowledge-modal-block" style="border:1px solid rgba(47,116,192,0.18);background:linear-gradient(135deg,rgba(47,116,192,0.08),rgba(200,169,110,0.08));border-radius:14px;padding:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="dot-anim" style="color:#2F74C0;font-weight:800"><span>.</span><span>.</span><span>.</span></span>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--text-main)">正在生成智能指标预览</div>
+            <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:4px">系统正在解析引用指标、调用智能引擎生成临时 JS，并计算本次预览。完成前不会保存到数据库。</div>
+          </div>
+        </div>
+      </div>
+    ` : ''}
+    ${preview ? `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">${isDirectPreview ? '直接预览' : '生成结果预览'}</label>
+        ${isDirectPreview ? '<div style="font-size:12px;color:#2F74C0;line-height:1.7;margin-bottom:8px">这是已有指标的直接引用，不需要等待 LLM 生成，也不会重复生成 JS。</div>' : ''}
+        <div style="font-size:12px;color:var(--gray-300);line-height:1.8">名称：${escapeHtml(preview.indicator_name || '智能指标')}</div>
+        <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:6px">当前值：${escapeHtml(`${preview.value || '--'}${preview.unit || ''}`)}</div>
+        <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:10px">算法详情：${escapeHtml(preview.algorithm_detail || '暂无算法详情')}</div>
+        <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:10px">解读：${escapeHtml(preview.interpretation || preview.assessment || '暂无解读')}</div>
+        <div style="font-size:12px;line-height:1.8;margin-top:10px;color:${preview.data_status === 'available' ? '#146B4A' : '#A56A00'}">数据状态：${escapeHtml(preview.data_status_label || (preview.value && preview.value !== '--' ? '已读取最新快照' : '已识别，等待底层数据同步'))}</div>
+      </div>
+    ` : ''}
+    ${isSaving ? `
+      <div class="knowledge-modal-block" style="border:1px solid rgba(47,116,192,0.18);background:rgba(47,116,192,0.06);border-radius:14px;padding:12px">
+        <div style="display:flex;align-items:center;gap:10px;color:#2F74C0;font-weight:700">
+          <span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+          <span>正在保存指标并加入 Dashboard 草稿</span>
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:6px">正在写入指标定义、计算结果和当前看板槽位，请稍候。</div>
+      </div>
+    ` : ''}
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeWorkbenchSmartIndicatorEditor()" ${isGenerating || isSaving ? 'disabled' : ''}>取消</button>
+      <button class="btn-outline" onclick="previewWorkbenchSmartIndicator()" ${isGenerating || isSaving ? 'disabled' : ''}>${isGenerating ? '生成中...' : '生成预览'}</button>
+      ${preview && !isGenerating && !isSaving ? '<button class="btn-gold" onclick="confirmWorkbenchSmartIndicator()">确认展示</button>' : ''}
+    </div>
+  `;
+  modal.classList.add('show');
+  renderWorkbenchSmartTagSelection();
+  restoreModalSheetScroll('dashboard-cell-modal-content', scrollSnapshot);
+}
+
+async function previewWorkbenchSmartIndicator() {
+  if (wbSmartIndicatorDraft.isGenerating) return;
+  const nameInput = document.getElementById('wb-smart-indicator-draft-name');
+  const promptInput = document.getElementById('wb-smart-indicator-draft-prompt');
+  wbSmartIndicatorDraft.indicatorName = nameInput ? nameInput.value.trim() : '';
+  wbSmartIndicatorDraft.promptText = canonicalizeWorkbenchSmartPrompt(promptInput ? promptInput.value.trim() : '', getTenantSmartTagCatalog());
+  if (promptInput) promptInput.value = wbSmartIndicatorDraft.promptText;
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!wbSmartIndicatorDraft.promptText) {
+    showToast('请先填写提示词');
+    return;
+  }
+  const selectedTagCodes = getWorkbenchSmartIndicatorEffectiveTagCodes();
+  const directPreview = getWorkbenchDirectPreviewCandidate(selectedTagCodes);
+  if (directPreview) {
+    wbSmartIndicatorDraft.isGenerating = false;
+    wbSmartIndicatorDraft.selectedTagCodes = selectedTagCodes;
+    wbSmartIndicatorDraft.directIndicatorCode = directPreview.indicator_code || '';
+    wbSmartIndicatorDraft.preview = directPreview;
+    renderWorkbenchSmartIndicatorEditorModal();
+    showToast('已直接引用指标，无需等待生成');
+    return;
+  }
+  wbSmartIndicatorDraft.directIndicatorCode = '';
+  wbSmartIndicatorDraft.isGenerating = true;
+  wbSmartIndicatorDraft.preview = null;
+  renderWorkbenchSmartIndicatorEditorModal();
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'preview',
+        indicator_name: wbSmartIndicatorDraft.indicatorName,
+        prompt_text: wbSmartIndicatorDraft.promptText,
+        selected_tag_codes: selectedTagCodes,
+        suppressed_tag_codes: wbSmartIndicatorDraft.suppressedTagCodes || [],
+        formula_tokens: tokenizeWorkbenchSmartPrompt(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog()),
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_preview_failed');
+    setTenantSmartCatalog(payload.smart_indicator_catalog);
+    wbSmartIndicatorDraft.preview = payload.preview || null;
+    const resolvedCodes = (wbSmartIndicatorDraft.preview && Array.isArray(wbSmartIndicatorDraft.preview.selected_indicators))
+      ? wbSmartIndicatorDraft.preview.selected_indicators.map((item) => item && item.indicator_code).filter(Boolean)
+      : [];
+    const resolvedTagCodes = getTenantSmartTagCatalog()
+      .filter((tag) => (tag.selected_indicators || []).some((item) => resolvedCodes.includes(item.indicator_code)))
+      .map((tag) => tag.tag_code);
+    wbSmartIndicatorDraft.selectedTagCodes = Array.from(new Set(selectedTagCodes.concat(resolvedTagCodes)));
+    if (wbSmartIndicatorDraft.preview && wbSmartIndicatorDraft.preview.indicator_name) {
+      wbSmartIndicatorDraft.indicatorName = wbSmartIndicatorDraft.preview.indicator_name;
+    }
+    wbSmartIndicatorDraft.isGenerating = false;
+    renderWorkbenchSmartIndicatorEditorModal();
+  } catch (error) {
+    wbSmartIndicatorDraft.isGenerating = false;
+    renderWorkbenchSmartIndicatorEditorModal();
+    showToast(error.message || '预览生成失败');
+  }
+}
+
+async function confirmWorkbenchSmartIndicator() {
+  if (wbSmartIndicatorDraft.isSaving) return;
+  const preview = wbSmartIndicatorDraft.preview;
+  if (!preview) {
+    showToast('请先生成预览');
+    return;
+  }
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  const active = getWorkbenchSmartEditingBaseDashboard();
+  const layout = normalizeDashboardLayout(active.layout || '2x2');
+  wbSmartIndicatorDraft.isSaving = true;
+  renderWorkbenchSmartIndicatorEditorModal();
+  try {
+    if (preview.direct_reference === true && preview.indicator_code) {
+      const nextCards = buildWorkbenchSmartDashboardCardRefs(active, layout, wbSmartIndicatorDraft.slotIndex, preview.indicator_code);
+      await syncTenantDashboardState('save_draft', {
+        ...active,
+        layout,
+        cards: nextCards,
+      });
+      wbSmartIndicatorEditingCode = preview.indicator_code;
+      wbSmartIndicatorSelectedCodes = ((preview.selected_indicators || []).map((item) => item.indicator_code)).filter(Boolean);
+      wbSmartIndicatorDraft.isSaving = false;
+      closeWorkbenchSmartIndicatorEditor();
+      renderWorkbenchFundDashboard();
+      renderFundMacroDashboard();
+      showToast('已直接加入 Dashboard 草稿');
+      return;
+    }
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save',
+        indicator_name: preview.indicator_name || wbSmartIndicatorDraft.indicatorName,
+        prompt_text: preview.prompt_text || wbSmartIndicatorDraft.promptText,
+        category: preview.category || '',
+        unit: preview.unit || '',
+        selected_indicators: preview.selected_indicators || [],
+        formula_js: preview.formula_js || '',
+        add_to_dashboard: false,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_save_failed');
+    setTenantSmartCatalog(payload.smart_indicator_catalog);
+    const nextCards = buildWorkbenchSmartDashboardCardRefs(active, layout, wbSmartIndicatorDraft.slotIndex, ((payload.definition || {}).indicator_code) || '');
+    await syncTenantDashboardState('save_draft', {
+      ...active,
+      layout,
+      cards: nextCards,
+    });
+    wbSmartIndicatorEditingCode = ((payload.definition || {}).indicator_code) || '';
+    wbSmartIndicatorSelectedCodes = ((preview.selected_indicators || []).map((item) => item.indicator_code)).filter(Boolean);
+    wbSmartIndicatorDraft.isSaving = false;
+    closeWorkbenchSmartIndicatorEditor();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('智能指标已加入 Dashboard 草稿');
+  } catch (error) {
+    wbSmartIndicatorDraft.isSaving = false;
+    renderWorkbenchSmartIndicatorEditorModal();
+    showToast(error.message || '智能指标保存失败');
+  }
+}
+
+async function removeWorkbenchDashboardIndicator(index) {
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
+  const activeCard = Array.isArray(active.cards) ? active.cards[index] : null;
+  const indicatorCode = String((activeCard && (activeCard.indicatorCode || activeCard.indicator_code)) || '').trim();
+  if (!indicatorCode) {
+    showToast('未找到可移除的指标');
+    return;
+  }
+  const stripIndicator = (dashboard) => {
+    if (!dashboard || typeof dashboard !== 'object') return dashboard;
+    const layout = normalizeDashboardLayout(dashboard.layout || '2x2');
+    const cards = Array.from({ length: getDashboardCardTarget(layout) }, (_, slotIndex) => {
+      const raw = Array.isArray(dashboard.cards) && typeof dashboard.cards[slotIndex] === 'object' ? dashboard.cards[slotIndex] : {};
+      const code = String(raw.indicatorCode || raw.indicator_code || '').trim();
+      return code === indicatorCode ? {} : (code ? { indicatorCode: code } : {});
+    });
+    return { ...dashboard, layout, cards };
+  };
+  const tenantState = getTenantFundDashboardState();
+  const previousPublished = cloneDashboardConfig(tenantState.published);
+  const previousDraft = cloneDashboardConfig(tenantState.draft);
+  const optimisticPublished = cloneDashboardConfig(tenantState.published || getPublishedFundDashboard());
+  const optimisticDraft = stripIndicator(tenantState.draft || tenantState.published || getPublishedFundDashboard());
+  tenantState.published = optimisticPublished;
+  tenantState.draft = optimisticDraft;
+  tenantFundDashboardRemoteState.published = cloneDashboardConfig(optimisticPublished);
+  tenantFundDashboardRemoteState.draft = cloneDashboardConfig(optimisticDraft);
+  persistTenantFundDashboardState();
+  closeWorkbenchSmartIndicatorDetailModal();
+  renderWorkbenchFundDashboard();
+  renderFundMacroDashboard();
+  showToast('已从看板移除', 1800);
+  try {
+    await syncTenantDashboardState('remove_indicator', { indicator_code: indicatorCode });
+  } catch (error) {
+    tenantState.published = previousPublished;
+    tenantState.draft = previousDraft;
+    tenantFundDashboardRemoteState.published = cloneDashboardConfig(previousPublished);
+    tenantFundDashboardRemoteState.draft = cloneDashboardConfig(previousDraft);
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('移除失败，请稍后重试');
+  }
+}
+
+async function selectFundDashboardLayout(layout) {
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
+  const nextLayout = normalizeDashboardLayout(layout || '2x2');
+  const currentCards = Array.isArray(active.cards) ? active.cards : [];
+  const target = getDashboardCardTarget(nextLayout);
+  const nextCards = Array.from({ length: target }, (_, index) => {
+    const raw = typeof currentCards[index] === 'object' ? currentCards[index] : {};
+    const indicatorCode = raw && (raw.indicatorCode || raw.indicator_code) ? (raw.indicatorCode || raw.indicator_code) : '';
+    return indicatorCode ? { indicatorCode } : {};
+  });
+  try {
+    await syncTenantDashboardState('save_draft', {
+      ...active,
+      layout: nextLayout,
+      cards: nextCards,
+    });
+    renderWorkbenchFundDashboard();
+    showToast(`已切换为 ${nextLayout.toUpperCase()} 布局草稿`);
+  } catch (error) {
+    showToast('布局切换失败，请稍后重试');
+  }
+}
+
+function findWorkbenchSmartIndicator(indicatorCode) {
+  return (getTenantSmartCatalog().tenant_smart_indicators || []).find((entry) => entry.indicator_code === indicatorCode);
+}
+
+function openWorkbenchSmartIndicatorLibraryDetail(indicatorCode) {
+  const item = findWorkbenchSmartIndicator(indicatorCode);
+  if (!item) return;
+  openWorkbenchSmartIndicatorDetailModal(buildWorkbenchDashboardDetailCard(item, { indicatorCode }));
+}
+
+function isWorkbenchSmartPlaceholderCard(card) {
+  const item = card && typeof card === 'object' ? card : {};
+  const indicatorCode = String(item.indicatorCode || item.indicator_code || '').trim();
+  const name = String(item.name || '').trim();
+  return !!(
+    item.isEmpty
+    || (!indicatorCode && /^待添加智能指标\s*\d*$/u.test(name))
+    || (!indicatorCode && !String(item.prompt || '').trim() && !Array.isArray(item.selectedIndicators))
+  );
+}
+
+function buildWorkbenchDashboardDetailCard(rawCard, fallback = {}) {
+  const card = rawCard && typeof rawCard === 'object' ? rawCard : {};
+  const indicatorCode = String(card.indicatorCode || card.indicator_code || fallback.indicatorCode || '').trim();
+  const smartIndicator = findWorkbenchSmartIndicator(indicatorCode);
+  const baseIndicator = findWorkbenchBaseIndicator(indicatorCode);
+  const isTenantSmart = !!smartIndicator;
+  const isBaseIndicator = !isTenantSmart && !!baseIndicator;
+  const sourceType = String((baseIndicator && (baseIndicator.source_type_label || baseIndicator.source_type)) || '').trim();
+  const baseName = (baseIndicator && baseIndicator.indicator_name) || indicatorCode;
+  const baseAlgorithmDetail = (baseIndicator && baseIndicator.algorithm_detail) || (sourceType
+    ? `基础指标：${baseName}。数据口径由平台统一指标库维护，数据类型：${sourceType}。`
+    : `基础指标：${baseName}。数据口径由平台统一指标库维护。`);
+  const baseInterpretation = (baseIndicator && (baseIndicator.interpretation || baseIndicator.assessment))
+    || `${baseName}为统一维护的基础指标，可作为智能指标的计算对象。`;
+  const usableValue = (value) => value !== null && value !== undefined && String(value).trim() !== '' && String(value).trim() !== '--';
+  const cardIndicators = Array.isArray(card.selectedIndicators) && card.selectedIndicators.length ? card.selectedIndicators : null;
+  const smartIndicators = smartIndicator && Array.isArray(smartIndicator.selected_indicators) && smartIndicator.selected_indicators.length
+    ? smartIndicator.selected_indicators
+    : null;
+  const baseIndicators = isBaseIndicator ? [{ indicator_code: indicatorCode, indicator_name: baseName }] : null;
+  return {
+    indicatorCode,
+    name: card.name || (smartIndicator && smartIndicator.indicator_name) || (baseIndicator && baseIndicator.indicator_name) || fallback.name || '指标详情',
+    value: usableValue(card.value) ? card.value : (usableValue(smartIndicator && smartIndicator.value) ? smartIndicator.value : (usableValue(baseIndicator && baseIndicator.value) ? baseIndicator.value : (fallback.value || '--'))),
+    unit: card.unit || (smartIndicator && smartIndicator.unit) || (baseIndicator && baseIndicator.unit) || fallback.unit || '',
+    prompt: card.prompt || (smartIndicator && smartIndicator.prompt_text) || (baseIndicator && (baseIndicator.prompt_text || baseIndicator.indicator_name)) || '',
+    updatedAt: usableValue(card.value) ? (card.updatedAt || (smartIndicator && smartIndicator.last_updated) || fallback.updatedAt || '') : ((baseIndicator && baseIndicator.last_updated) || (smartIndicator && smartIndicator.last_updated) || card.updatedAt || fallback.updatedAt || ''),
+    dataAt: card.dataAt || (smartIndicator && smartIndicator.data_at) || (baseIndicator && baseIndicator.data_at) || fallback.dataAt || '',
+    snapshotAt: card.snapshotAt || (smartIndicator && smartIndicator.last_updated) || fallback.snapshotAt || '',
+    data_status: card.data_status || (smartIndicator && smartIndicator.data_status) || '',
+    data_status_label: card.data_status_label || (smartIndicator && smartIndicator.data_status_label) || '',
+    data_unavailable: card.data_unavailable === true || (smartIndicator && smartIndicator.data_unavailable === true),
+    category: card.category || (smartIndicator && smartIndicator.category) || (baseIndicator && baseIndicator.category) || '',
+    algorithmDetail: isBaseIndicator ? baseAlgorithmDetail : (card.algorithmDetail || (smartIndicator && smartIndicator.algorithm_detail) || fallback.algorithmDetail || '暂无算法详情'),
+    interpretation: isBaseIndicator ? baseInterpretation : (card.interpretation || card.assessment || (smartIndicator && (smartIndicator.interpretation || smartIndicator.assessment)) || fallback.interpretation || '暂无解读'),
+    selectedIndicators: cardIndicators || smartIndicators || baseIndicators || [],
+    isTenantSmart,
+    isBaseIndicator,
+    sourceType,
+    slotIndex: fallback.slotIndex,
+  };
+}
+
+function openWorkbenchSmartIndicatorLibraryDetail(indicatorCode) {
+  const item = findWorkbenchSmartIndicator(indicatorCode) || findWorkbenchBaseIndicator(indicatorCode);
+  if (!item) return;
+  openWorkbenchSmartIndicatorDetailModal(buildWorkbenchDashboardDetailCard(item, { indicatorCode }));
+}
+
+function openWorkbenchDashboardIndicatorDetail(index, sourceType) {
+  const source = sourceType === 'published' ? getPublishedFundDashboard() : (getDraftFundDashboard() || getPublishedFundDashboard());
+  const cards = source && Array.isArray(source.cards) ? source.cards : [];
+  const item = cards[index];
+  if (!item) return;
+  if (isWorkbenchSmartPlaceholderCard(item)) {
+    openWorkbenchSmartIndicatorEditor(index);
+    return;
+  }
+  openWorkbenchSmartIndicatorDetailModal(buildWorkbenchDashboardDetailCard(item, {
+    updatedAt: (source && source.updatedAt) || '',
+    slotIndex: index,
+  }));
+}
+
+// The H5 fundamental page is a fan-facing read-only projection. Dashboard
+// mutations remain available only from the H5/Web KOL workbench.
+function openFundamentalDashboardIndicatorDetail(index) {
+  const source = getPublishedFundDashboard();
+  const cards = source && Array.isArray(source.cards) ? source.cards : [];
+  const item = cards[index];
+  if (!item || isWorkbenchSmartPlaceholderCard(item)) return;
+  openWorkbenchSmartIndicatorDetailModal({
+    ...buildWorkbenchDashboardDetailCard(item, {
+      updatedAt: (source && source.updatedAt) || '',
+      slotIndex: index,
+    }),
+    readOnly: true,
+  });
+}
+
+function openWorkbenchSmartIndicatorDetailModal(card) {
+  if (isWorkbenchSmartPlaceholderCard(card)) {
+    openWorkbenchSmartIndicatorEditor(Number.isInteger(card.slotIndex) ? card.slotIndex : 0);
+    return;
+  }
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (!host || !modal || !card) return;
+  const isDav = isDavCapableUser(getActiveDemoUser());
+  const isReadOnly = card.readOnly === true;
+  const canEdit = !isReadOnly && isDav && card.isTenantSmart === true && !!card.indicatorCode;
+  const showWorkbenchEditor = !isReadOnly && isDav && !!card.indicatorCode;
+  const canRemoveFromDashboard = !isReadOnly && isDav && Number.isInteger(card.slotIndex) && !!card.indicatorCode;
+  const canDeleteDefinition = canEdit && !canRemoveFromDashboard;
+  const isSaving = card.isSaving === true;
+  const isDeleting = card.isDeleting === true;
+  const selectedIndicators = Array.isArray(card.selectedIndicators) ? card.selectedIndicators : [];
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${showWorkbenchEditor ? '智能指标详情' : escapeHtml(card.name || '智能指标详情')}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
+      当前值：${escapeHtml(`${card.value || '--'}${card.unit || ''}`)} · 数据日期：${escapeHtml(formatDashboardDataDate(card.dataAt))} · 最近计算：${escapeHtml(card.snapshotAt || card.updatedAt || '未记录')}
+    </div>
+    ${showWorkbenchEditor ? `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">指标定义</label>
+      <div style="display:grid;gap:8px">
+        <input id="wb-smart-indicator-detail-name" class="knowledge-modal-textarea" style="min-height:auto;height:42px" value="${escapeHtml(card.name || '')}" placeholder="指标名称" ${canEdit ? '' : 'disabled'}>
+        <input id="wb-smart-indicator-detail-category" class="knowledge-modal-textarea" style="min-height:auto;height:42px" value="${escapeHtml(card.category || '')}" placeholder="指标分类" ${canEdit ? '' : 'disabled'}>
+        <input id="wb-smart-indicator-detail-unit" class="knowledge-modal-textarea" style="min-height:auto;height:42px" value="${escapeHtml(card.unit || '')}" placeholder="单位，例如：点、%" ${canEdit ? '' : 'disabled'}>
+      </div>
+      ${card.isBaseIndicator ? '<div style="font-size:11px;color:var(--gray-400);margin-top:8px">基础指标定义由平台统一维护，租户侧只读。</div>' : ''}
+    </div>
+    ` : ''}
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">算法详情</label>
+      ${showWorkbenchEditor ? `<textarea id="wb-smart-indicator-detail-algorithm" class="knowledge-modal-textarea" ${canEdit ? '' : 'disabled'}>${escapeHtml(card.algorithmDetail || '')}</textarea>` : `<div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.algorithmDetail || '暂无算法详情')}</div>`}
+      <div class="review-watchlist-row" style="margin-top:10px">
+        ${selectedIndicators.map((item) => `<span class="review-watchlist-chip">${escapeHtml(item.indicator_name || item.indicator_code || '')}</span>`).join('') || '<span class="review-watchlist-chip">未选择计算对象</span>'}
+      </div>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">解读</label>
+      ${showWorkbenchEditor ? `<textarea id="wb-smart-indicator-detail-interpretation" class="knowledge-modal-textarea" ${canEdit ? '' : 'disabled'}>${escapeHtml(card.interpretation || '')}</textarea>` : `<div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.interpretation || '暂无解读')}</div>`}
+    </div>
+    ${showWorkbenchEditor ? `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">提示词</label>
+      <textarea id="wb-smart-indicator-detail-prompt" class="knowledge-modal-textarea" ${canEdit && !(isSaving || isDeleting) ? '' : 'disabled'}>${escapeHtml(card.prompt || '')}</textarea>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">${canEdit ? '保存后系统会自动重算该智能指标，不直接展示内部公式。' : '基础指标由统一数据源和指标库维护，不在租户侧修改计算口径。'}</div>
+    </div>
+    ` : ''}
+    ${(isSaving || isDeleting) ? `<div style="font-size:12px;color:var(--gold);margin:8px 0">正在${isDeleting ? '删除指标并同步看板' : '保存并重算指标'}<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div>` : ''}
+    <div class="modal-actions">
+      <button class="btn-outline" type="button" onclick="closeWorkbenchSmartIndicatorDetailModal()">关闭</button>
+      ${canRemoveFromDashboard ? `<button class="btn-outline" type="button" onclick="requestWorkbenchDashboardRemoval(${card.slotIndex}, '${escapeAttr(card.name || '当前指标')}')" ${isSaving || isDeleting ? 'disabled' : ''}>从看板移除</button>` : ''}
+      ${canDeleteDefinition ? `<button class="btn-outline" type="button" style="color:#B42318;border-color:rgba(180,35,24,0.20)" onclick="requestWorkbenchSmartIndicatorDelete('${card.indicatorCode}')" ${isSaving || isDeleting ? 'disabled' : ''}>删除指标定义</button>` : ''}
+      ${canEdit ? `<button class="btn-gold" type="button" onclick="saveWorkbenchSmartIndicatorDefinition('${card.indicatorCode}')" ${isSaving || isDeleting ? 'disabled' : ''}>${isSaving ? '保存中...' : '保存并更新指标'}</button>` : ''}
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function closeWorkbenchSmartIndicatorDetailModal() {
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function saveWorkbenchSmartIndicatorDefinition(indicatorCode) {
+  const item = findWorkbenchSmartIndicator(indicatorCode);
+  const nameInput = document.getElementById('wb-smart-indicator-detail-name');
+  const categoryInput = document.getElementById('wb-smart-indicator-detail-category');
+  const unitInput = document.getElementById('wb-smart-indicator-detail-unit');
+  const algorithmInput = document.getElementById('wb-smart-indicator-detail-algorithm');
+  const interpretationInput = document.getElementById('wb-smart-indicator-detail-interpretation');
+  const promptInput = document.getElementById('wb-smart-indicator-detail-prompt');
+  const name = nameInput ? nameInput.value.trim() : '';
+  const category = categoryInput ? categoryInput.value.trim() : '';
+  const unit = unitInput ? unitInput.value.trim() : '';
+  const algorithm = algorithmInput ? algorithmInput.value.trim() : '';
+  const interpretation = interpretationInput ? interpretationInput.value.trim() : '';
+  const promptText = promptInput ? promptInput.value.trim() : '';
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!item || !name || !promptText) {
+    showToast('名称和提示词不能为空');
+    return;
+  }
+  openWorkbenchSmartIndicatorDetailModal({...buildWorkbenchDashboardDetailCard(item), name, category, unit, algorithmDetail: algorithm, interpretation, prompt: promptText, isSaving: true});
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 90000);
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        action: 'save',
+        indicator_code: item.indicator_code,
+        indicator_name: name,
+        category,
+        unit,
+        prompt_text: promptText,
+        description: algorithm,
+        assessment_template: interpretation,
+        alert_template: item.alert || '',
+        selected_indicator_codes: (item.selected_indicators || []).map((entry) => entry.indicator_code).filter(Boolean),
+        add_to_dashboard: false,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_update_failed');
+    setTenantSmartCatalog(payload.smart_indicator_catalog);
+    tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    const tenantState = getTenantFundDashboardState();
+    tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
+    tenantState.draft = tenantFundDashboardRemoteState.draft;
+    persistTenantFundDashboardState();
+    closeWorkbenchSmartIndicatorDetailModal();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('提示词已更新，指标结果已重算');
+  } catch (error) {
+    const message = error && error.name === 'AbortError' ? '保存超时，请检查服务端任务状态后重试' : (error.message || '指标更新失败');
+    openWorkbenchSmartIndicatorDetailModal({...buildWorkbenchDashboardDetailCard(item), name, category, unit, algorithmDetail: algorithm, interpretation, prompt: promptText});
+    showToast(message);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+async function saveWorkbenchSmartIndicatorPrompt(indicatorCode) {
+  return saveWorkbenchSmartIndicatorDefinition(indicatorCode);
+}
+
+function requestWorkbenchDashboardRemoval(index, indicatorName) {
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  const safeIndex = Number(index);
+  if (!host || !modal || !Number.isInteger(safeIndex) || safeIndex < 0) {
+    showToast('当前看板卡片位置无效，无法移除');
+    return;
+  }
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">从智能看板移除</div>
+    <div style="font-size:13px;color:var(--text-main);line-height:1.8">确定从当前智能看板移除“${escapeHtml(indicatorName || '当前指标')}”吗？</div>
+    <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:8px">只移除看板投影，不删除指标定义、历史数据或指标库记录。</div>
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn-outline" type="button" onclick="closeWorkbenchSmartIndicatorDetailModal()">取消</button>
+      <button class="btn-gold" type="button" onclick="removeWorkbenchDashboardIndicator(${safeIndex})">确认移除</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function requestWorkbenchSmartIndicatorDelete(indicatorCode) {
+  const normalizedCode = String(indicatorCode || '').trim();
+  const item = findWorkbenchSmartIndicator(normalizedCode);
+  const host = document.getElementById('dashboard-cell-modal-content');
+  if (!normalizedCode || !host) {
+    showToast('当前指标缺少有效代码，无法删除');
+    return;
+  }
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">删除智能指标</div>
+    <div style="font-size:13px;color:var(--text-main);line-height:1.8">确定删除“${escapeHtml((item && item.indicator_name) || '当前智能指标')}”吗？</div>
+    <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:8px">删除后会从指标库、草稿和已发布看板中移除，且无法撤销。</div>
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn-outline" type="button" onclick="${item ? `openWorkbenchSmartIndicatorDetailModal(buildWorkbenchDashboardDetailCard(findWorkbenchSmartIndicator('${escapeAttr(normalizedCode)}')))` : 'closeWorkbenchSmartIndicatorDetailModal()'}">取消</button>
+      <button class="btn-gold" type="button" style="background:#B42318;border-color:#B42318" onclick="deleteWorkbenchSmartIndicator('${escapeAttr(normalizedCode)}', true)">确认删除</button>
+    </div>
+  `;
+}
+
+async function deleteWorkbenchSmartIndicator(indicatorCode, confirmed = false) {
+  const normalizedCode = String(indicatorCode || '').trim();
+  const item = findWorkbenchSmartIndicator(normalizedCode);
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!confirmed) {
+    requestWorkbenchSmartIndicatorDelete(normalizedCode);
+    return;
+  }
+  if (!normalizedCode) {
+    showToast('当前看板卡片缺少指标代码，无法删除');
+    return;
+  }
+  if (!item) {
+    showToast('基础指标不能删除，请通过指标库维护');
+    return;
+  }
+  const deletingCard = item
+    ? buildWorkbenchDashboardDetailCard(item)
+    : { indicatorCode: normalizedCode, name: '当前智能指标', isTenantSmart: true, selectedIndicators: [] };
+  openWorkbenchSmartIndicatorDetailModal({...deletingCard, isDeleting: true});
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'delete', indicator_code: indicatorCode}),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_delete_failed');
+    setTenantSmartCatalog(payload.smart_indicator_catalog);
+    tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    persistTenantFundDashboardState();
+    closeWorkbenchSmartIndicatorDetailModal();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('智能指标已删除');
+  } catch (error) {
+    openWorkbenchSmartIndicatorDetailModal(deletingCard);
+    showToast(error.message || '指标删除失败');
+  }
+}
+
+function renderFundMacroDashboard() {
+  const host = document.getElementById('feed-macro-dashboard');
+  if (!host) return;
+  const published = getPublishedFundDashboard();
+  const publishedCards = published && Array.isArray(published.cards)
+    ? buildWorkbenchSmartSlotCards(published.layout || '2x2', published.cards)
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item && !isWorkbenchSmartPlaceholderCard(item))
+    : [];
+  const layout = normalizeDashboardLayout((published && published.layout) || '2x2');
+  const gridClass = publishedCards.length === 1 ? 'single-card' : 'cols-3';
+  if (!publishedCards.length) {
+    host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">智能指标 Dashboard</div><div class="fund-column-subtitle">暂无看板内容</div></div><span class="tag tag-gold">暂无内容</span></div></div>';
+    return;
+  }
+  host.innerHTML = `
+    <div class="fund-column-card">
+      <div class="fund-column-head">
+        <div>
+          <div class="fund-column-title">今日核心指标面板 · ${escapeHtml(layout.toUpperCase())}</div>
+          <div class="fund-column-subtitle">当前已发布 ${publishedCards.length} 个有效指标。这里仅供查看详情；指标的新增、修改和移除请前往大V工作台。</div>
+        </div>
+        <span class="tag tag-gold">${escapeHtml(layout.toUpperCase())} · 已发布</span>
+      </div>
+      <div class="wb-dashboard-summary-grid ${gridClass}">
+        ${publishedCards.map(({ item, index }) => `
+          <div class="wb-dashboard-summary-card filled" onclick="openFundamentalDashboardIndicatorDetail(${index})">
+            <div class="wb-dashboard-summary-head">
+              <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
+              <div class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</div>
+            </div>
+            <div class="wb-dashboard-summary-value">${escapeHtml(`${formatWorkbenchDashboardValue(item)}${item.unit || ''}`)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderWorkbenchFundDashboard() {
+  return;
+  const previewHost = document.getElementById('wb-dashboard-preview');
+  const metaHost = document.getElementById('wb-dashboard-meta');
+  if (!previewHost || !metaHost) return;
+  const activeUser = getActiveDemoUser();
+  const layoutHost = document.getElementById('wb-smart-layout-row');
+  const libraryHost = document.getElementById('wb-smart-indicator-library');
+  const sectionTitleHost = document.getElementById('wb-dashboard-section-title');
+  const sectionDescHost = document.getElementById('wb-dashboard-section-desc');
+  const actionHost = document.querySelector('.wb-dashboard-actions');
+  if (!isDavCapableUser(activeUser)) {
+    const published = getPublishedFundDashboard() || { cards: [] };
+    const cards = Array.isArray(published.cards)
+      ? buildWorkbenchSmartSlotCards(published.layout || '2x2', published.cards)
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item && !item.isEmpty)
+      : [];
+    if (layoutHost) {
+      layoutHost.innerHTML = '';
+      layoutHost.style.display = 'none';
+    }
+    if (libraryHost) {
+      libraryHost.innerHTML = '';
+      libraryHost.style.display = 'none';
+    }
+    if (actionHost) actionHost.style.display = 'none';
+    if (sectionTitleHost) sectionTitleHost.textContent = '智能指标 Dashboard';
+    if (sectionDescHost) sectionDescHost.textContent = '这里仅展示当前已发布的智能指标内容。';
+    metaHost.textContent = cards.length ? `当前已发布 ${cards.length} 个智能指标` : '暂无看板内容';
+    previewHost.innerHTML = cards.length ? `
+      <div class="wb-dashboard-summary-grid cols-3">
+        ${cards.map(({ item, index }) => `
+        <div class="wb-dashboard-summary-card filled" onclick="openFundamentalDashboardIndicatorDetail(${index})">
+          <div class="wb-dashboard-summary-head">
+            <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
+            <span class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</span>
+          </div>
+          <div class="wb-dashboard-summary-value">${escapeHtml(`${formatWorkbenchDashboardValue(item)}${item.unit || ''}`)}</div>
+        </div>
+        `).join('')}
+      </div>
+    ` : `
+      <div class="wb-dashboard-summary-grid cols-3">
+        <div class="wb-dashboard-summary-card empty" style="cursor:default">
+          <div>
+            <div class="wb-dashboard-summary-empty-title">暂无看板内容</div>
+            <div class="wb-dashboard-summary-empty-desc">当前还没有已发布的智能指标。</div>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  if (layoutHost) layoutHost.style.display = 'flex';
+  if (libraryHost) libraryHost.style.display = 'block';
+  if (actionHost) actionHost.style.display = 'flex';
+  if (sectionTitleHost) sectionTitleHost.textContent = '智能指标 Dashboard';
+  if (sectionDescHost) sectionDescHost.textContent = '先选布局，再点击加号弹框。你可以用标签和提示词组合描述计算逻辑，系统先生成一版临时结果给你确认，确认后才会正式保存成智能指标。';
+  renderWorkbenchSmartLayoutRow();
+  renderWorkbenchSmartIndicatorLibrary();
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { cards: [], layout: '2x2' };
+  const cards = buildWorkbenchSmartSlotCards(active.layout || '2x2', active.cards || []);
+  const filledCount = cards.filter((item) => item && !item.isEmpty).length;
+  metaHost.textContent = getDraftFundDashboard()
+    ? `当前是草稿版 · ${filledCount} 个智能指标 · ${active.layout || '2x2'} · 粉丝端仍展示已发布版，发布后才同步`
+    : `当前展示已发布版本 · ${filledCount} 个智能指标`;
+  previewHost.innerHTML = `
+    <div class="wb-dashboard-summary-grid cols-3">
+      ${cards.map((item, index) => `
+        ${item && !item.isEmpty ? `
+        <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, '${getDraftFundDashboard() ? 'draft' : 'published'}')">
+          <div class="wb-dashboard-summary-head">
+            <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
+            <span class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</span>
+          </div>
+          <div class="wb-dashboard-summary-value">${escapeHtml(`${formatWorkbenchDashboardValue(item)}${item.unit || ''}`)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(47,116,192,0.10)">
+            <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="event.stopPropagation();openWorkbenchDashboardIndicatorDetail(${index}, '${getDraftFundDashboard() ? 'draft' : 'published'}')">编辑</button>
+            <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="event.stopPropagation();requestWorkbenchDashboardRemoval(${index}, '${escapeAttr(item.name || '当前指标')}')">移除</button>
+          </div>
+        </div>
+        ` : `
+        <div class="wb-dashboard-summary-card empty" onclick="openWorkbenchSmartIndicatorEditor(${index})">
+          <div>
+            <div class="wb-dashboard-summary-plus">+</div>
+            <div class="wb-dashboard-summary-empty-title">新增智能指标</div>
+            <div class="wb-dashboard-summary-empty-desc">点击后用标签和提示词生成预览。</div>
+          </div>
+        </div>
+        `}
+      `).join('')}
+    </div>
+  `;
+}
+
+async function saveWorkbenchSmartIndicator() {
+  showToast('请点击 Dashboard 空位上的加号创建智能指标');
+}
+
+function setWorkbenchDashboardActionState(action) {
+  workbenchDashboardAction = action || '';
+  if (workbenchDashboardActionTimer) {
+    clearInterval(workbenchDashboardActionTimer);
+    workbenchDashboardActionTimer = null;
+  }
+  const publishButton = document.getElementById('wb-dashboard-publish-button');
+  const resetButton = document.getElementById('wb-dashboard-reset-button');
+  const metaHost = document.getElementById('wb-dashboard-meta');
+  const isPublishing = action === 'publish';
+  const isRestoring = action === 'restore';
+  [publishButton, resetButton].filter(Boolean).forEach((button) => {
+    button.disabled = !!action;
+    button.style.opacity = action ? '0.65' : '';
+    button.style.cursor = action ? 'wait' : '';
+  });
+  if (publishButton) publishButton.innerHTML = isPublishing
+    ? '正在发布 <span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>'
+    : '发布到基本面首页';
+  if (resetButton) resetButton.innerHTML = isRestoring
+    ? '正在恢复 <span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>'
+    : '恢复当前发布版';
+  if (!action || !metaHost) return;
+  const renderProgress = () => {
+    const message = isPublishing ? '正在发布到基本面首页' : '正在等待服务端确认草稿已恢复';
+    metaHost.innerHTML = `<span style="color:#2F74C0;font-weight:600">${message}</span> <span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>`;
+  };
+  renderProgress();
+}
+
+async function publishFundDashboard() {
+  if (workbenchDashboardAction) return;
+  const tenantState = getTenantFundDashboardState();
+  if (!tenantState.draft) {
+    showToast('请先至少生成一个智能指标草稿');
+    return;
+  }
+  setWorkbenchDashboardActionState('publish');
+  try {
+    const payload = await syncTenantDashboardState('publish', tenantState.draft);
+    const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    tenantState.published = state.published || tenantState.published;
+    tenantState.draft = state.draft;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('已发布到基本面首页顶部');
+  } catch (error) {
+    showToast('发布失败，请稍后重试');
+  } finally {
+    setWorkbenchDashboardActionState('');
+  }
+}
+
+async function resetFundDashboardDraft() {
+  if (workbenchDashboardAction) return;
+  const tenantState = getTenantFundDashboardState();
+  setWorkbenchDashboardActionState('restore');
+  try {
+    const payload = await syncTenantDashboardState('reset_draft');
+    const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    tenantState.published = state.published || tenantState.published;
+    tenantState.draft = state.draft;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    showToast('已恢复到当前发布版');
+  } catch (error) {
+    showToast('恢复失败，请稍后重试');
+  } finally {
+    setWorkbenchDashboardActionState('');
+  }
+}
+
+// ===== INIT =====
+function initH5SplashScreen() {
+  const splash = document.getElementById('h5-splash-screen');
+  if (!splash) return;
+
+  const tenant = window.ACTIVE_TENANT && typeof window.ACTIVE_TENANT === 'object' ? window.ACTIVE_TENANT : {};
+  const brand = window.SITE_CONFIG && typeof window.SITE_CONFIG.brand === 'object' ? window.SITE_CONFIG.brand : {};
+  const productName = String(tenant.short_name || tenant.name || tenant.advisor || brand.short_name || brand.name || '智能投研平台').trim() || '智能投研平台';
+  const quotes = [
+    '投资的第一原则是不要亏损。——本杰明·格雷厄姆',
+    '市场短期是投票机，长期是称重机。——本杰明·格雷厄姆',
+    '风险来自你不知道自己在做什么。——沃伦·巴菲特',
+    '价格是你付出的，价值是你得到的。——沃伦·巴菲特',
+    '耐心是投资者最重要的品质之一。——查理·芒格',
+    '投资不是智商竞赛，而是纪律与耐心的考验。——彼得·林奇'
+  ];
+  let quoteIndex = Math.floor(Math.random() * quotes.length);
+  try {
+    const previousIndex = Number(window.sessionStorage.getItem('gangtise_h5_splash_quote_index'));
+    if (quotes.length > 1 && Number.isInteger(previousIndex) && previousIndex === quoteIndex) quoteIndex = (quoteIndex + 1) % quotes.length;
+    window.sessionStorage.setItem('gangtise_h5_splash_quote_index', String(quoteIndex));
+  } catch (error) {
+    // Private browsing can reject sessionStorage; the random quote still works.
+  }
+  const productHost = document.getElementById('h5-splash-product-name');
+  const quoteHost = document.getElementById('h5-splash-quote');
+  if (productHost) productHost.textContent = productName;
+  if (quoteHost) quoteHost.textContent = quotes[quoteIndex];
+
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const hideDelay = reduceMotion ? 900 : 2600;
+  window.setTimeout(() => {
+    splash.classList.add('is-hidden');
+    window.setTimeout(() => splash.remove(), reduceMotion ? 0 : 600);
+  }, hideDelay);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  removeLegacyWorkbenchDashboardMarkup();
+  initH5SplashScreen();
+  renderFundNewsHome();
+  window.GangtiseReleaseNotes?.init({ surface: 'h5', autoShow: false });
+  syncDemoUsersWithActiveTenant();
+  applySiteFeatureFlags();
+  refreshH5RuntimeEnv();
+  handleH5LoginQueryFeedback();
+  renderH5LoginScreen();
+  refreshH5AuthOptions({ silent: true, render: true });
+  if (hasLoggedInH5User()) {
+    renderDemoProfile(getDefaultDemoUser());
+    refreshH5OnboardingStatus({ silent: true });
+    const initialParams = new URLSearchParams(window.location.search);
+    const hasReviewRoute = ['compose', 'drafts'].includes(initialParams.get('review'))
+      || ['home', 'list', 'detail'].includes(String(initialParams.get('review_view') || '').trim().toLowerCase());
+    switchTab(hasReviewRoute ? 'review' : getFirstEnabledTab());
+    if (!hasReviewRoute && initialParams.get('news_view') === 'list') {
+      openFundNewsList({ activeTabKey: initialParams.get('news_tab') || 'summary', skipHistory: true, skipScroll: true });
+    }
+  } else {
+    setH5ShellLoggedOut(true);
+  }
+});
+
+window.addEventListener('focus', () => {
+  refreshH5SiteConfig({silent: true});
+  if (hasLoggedInH5User()) {
+    refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});
+  }
+});
+
+window.addEventListener('popstate', () => {
+  const user = getActiveDemoUser();
+  const routeParams = new URLSearchParams(window.location.search);
+  const shouldShowProductionPage = routeParams.get('review') === 'compose';
+  const shouldShowDraftLibrary = routeParams.get('review') === 'drafts';
+  const shouldShowReviewPage = shouldShowProductionPage
+    || shouldShowDraftLibrary
+    || ['home', 'list', 'detail'].includes(String(routeParams.get('review_view') || '').trim().toLowerCase());
+  reviewProductionPage = shouldShowProductionPage && user && isDavCapableUser(user);
+  insightDraftLibraryView = shouldShowDraftLibrary && user && isDavCapableUser(user);
+  if (shouldShowReviewPage && !document.getElementById('page-review')?.classList.contains('active')) {
+    switchTab('review');
+    return;
+  }
+  if (document.getElementById('page-review')?.classList.contains('active')) renderReviewExperience();
+  if (!shouldShowReviewPage && routeParams.get('news_view') === 'list') {
+    switchTab('feed');
+    openFundNewsList({ activeTabKey: routeParams.get('news_tab') || 'summary', skipHistory: true, skipScroll: true });
+    return;
+  }
+  if (document.getElementById('page-fund-news-list')?.classList.contains('active')) {
+    closeFundNewsList({ skipHistory: true, skipScroll: true });
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    refreshH5SiteConfig({silent: true});
+    if (hasLoggedInH5User()) {
+      refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});
+    }
+  }
+});
+
+window.addEventListener('storage', (event) => {
+  if (event.key === SITE_CONFIG_BROADCAST_KEY) {
+    refreshH5SiteConfig({silent: true});
+    refreshTenantDashboardRemoteState({force: true, rerenderFeed: true, rerenderWorkbench: true, rerenderReviews: true});
+  }
+});
+
+removeLegacyWorkbenchDashboardMarkup();
