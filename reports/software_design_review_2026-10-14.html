@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gangtise Demo 软件设计全面评估报告</title>
+  <style>
+    :root{--ink:#172B4D;--sub:#526581;--line:#D9E2EC;--bg:#F5F8FC;--panel:#fff;--blue:#1769AA;--green:#197A53;--amber:#A15C00;--red:#B42318;--gold:#8A6A22}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+    main{max-width:1240px;margin:0 auto;padding:28px 22px 64px}.hero{background:linear-gradient(135deg,#173B68,#246FA8);color:#fff;padding:30px 32px;border-radius:14px;box-shadow:0 12px 30px #17436b25}.hero h1{margin:0 0 8px;font-size:28px}.hero p{margin:4px 0;color:#E4F0FA}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}.metric{background:#ffffff18;border:1px solid #ffffff30;border-radius:9px;padding:12px}.metric b{display:block;font-size:22px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:18px;box-shadow:0 4px 14px #173b6809}.panel h2{font-size:19px;margin:0 0 12px}.panel h3{font-size:15px;margin:18px 0 6px}.muted{color:var(--sub)}.small{font-size:12px;color:var(--sub)}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:9px 8px}th{background:#EEF4FA;color:#274B70;white-space:nowrap}.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}.good{color:var(--green);background:#EAF7F0}.warn{color:var(--amber);background:#FFF4DF}.bad{color:var(--red);background:#FDEDEC}.info{color:var(--blue);background:#EAF3FC}.score{font-weight:800;color:var(--blue);white-space:nowrap}.finding{border-left:4px solid var(--amber);padding:10px 14px;background:#FFF9EC;margin:10px 0}.finding.badline{border-color:var(--red);background:#FFF4F2}.finding.goodline{border-color:var(--green);background:#F0FAF5}code{background:#F0F3F7;padding:1px 4px;border-radius:4px;font-size:12px}ul{margin:6px 0 8px;padding-left:22px}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}.foot{margin-top:20px;color:var(--sub);font-size:12px}@media(max-width:800px){main{padding:14px}.grid,.two{grid-template-columns:1fr 1fr}.hero{padding:22px}.hero h1{font-size:22px}table{display:block;overflow:auto;white-space:normal}}
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>Gangtise Demo 软件设计全面评估</h1>
+    <p>评估日期：2026-10-14 · 范围：当前工作区代码、启动脚本、数据库迁移、前端资源与自动化测试</p>
+    <p>结论：产品功能覆盖较完整，领域拆分和异步任务方向正确；但系统仍处于“可持续迭代的单体应用”阶段，前端单体体积、服务边界、数据源职责和生产可观测性是扩展前必须治理的重点。</p>
+    <div class="grid">
+      <div class="metric"><span>总体设计成熟度</span><b>中上</b></div>
+      <div class="metric"><span>功能设计平均评价</span><b>7.2 / 10</b></div>
+      <div class="metric"><span>自动化测试</span><b>800 通过</b></div>
+      <div class="metric"><span>已识别高风险项</span><b>6 项</b></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>一、审查依据与边界</h2>
+    <p>本报告是静态设计审查，依据当前代码和测试结果生成，不等同于生产压测、渗透测试或真实多用户容量测试。</p>
+    <table><tr><th>项目</th><th>现状</th><th>评价</th></tr>
+      <tr><td>代码规模</td><td>约 13 万行；<code>market_services.py</code> 约 12,900 行，<code>ai_services.py</code> 约 12,000 行，<code>core_services.py</code> 约 11,000 行。</td><td><span class="tag warn">职责过重</span></td></tr>
+      <tr><td>前端体积</td><td><code>h5.html</code> 约 1 MB，<code>h5-app.js</code> 约 800 KB，Admin/Workbench 仍有大体量模板。</td><td><span class="tag bad">首屏风险</span></td></tr>
+      <tr><td>接口规模</td><td>静态扫描约 456 个路由声明。</td><td><span class="tag warn">需模块化治理</span></td></tr>
+      <tr><td>数据库迁移</td><td>82 个 PostgreSQL 迁移文件，已包含租户、任务、内容、消息、指标、商业化等领域。</td><td><span class="tag good">演进能力较好</span></td></tr>
+      <tr><td>回归测试</td><td>50 个测试文件；本次全量结果为 800 passed、6 skipped、1 failed。</td><td><span class="tag warn">尚有阻断项</span></td></tr>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>二、总体架构判断</h2>
+    <div class="two">
+      <div><h3>当前架构</h3><p>浏览器 → Flask 页面/API → PostgreSQL；Gunicorn Web、独立 Worker、独立 Scheduler；市场、LLM、内容、消息等能力集中在 Python Domain Service 层。</p><p>这是适合当前规模的模块化单体（Modular Monolith），不是无结构的大单体。它比立即拆成 Node.js + Python 两个业务服务更稳妥。</p></div>
+      <div><h3>设计原则符合度</h3><table><tr><td>单一职责</td><td class="score">6/10</td></tr><tr><td>依赖倒置/边界清晰</td><td class="score">6/10</td></tr><tr><td>数据一致性</td><td class="score">7/10</td></tr><tr><td>可观测性</td><td class="score">6/10</td></tr><tr><td>可测试性</td><td class="score">8/10</td></tr><tr><td>演进可扩展性</td><td class="score">6/10</td></tr></table></div>
+    </div>
+    <div class="finding goodline"><b>正确方向：</b>Web、Worker、Scheduler 已分离；任务状态落库；数据库连接在 app context teardown 关闭；共享市场快照、按需个股数据和租户配置已有明确建模。</div>
+    <div class="finding badline"><b>主要结构风险：</b>业务边界仍靠模块内函数约定维持，跨域导入和兼容回退较多；当用户、任务、数据源和功能继续增长时，变更容易产生隐性耦合。</div>
+  </section>
+
+  <section class="panel">
+    <h2>三、按功能逐项评估</h2>
+    <table><tr><th>功能</th><th>当前设计</th><th>符合原则</th><th>主要风险</th><th>建议</th></tr>
+      <tr><td>登录、注册与角色</td><td>Flask Session + PostgreSQL 用户；admin、dav、investor 角色；注册渠道、所属大V和账号管理已有能力。</td><td><span class="tag good">7/10</span></td><td>角色判定和租户范围在多处 API 中重复处理，容易出现 H5/Web/Admin 口径漂移。</td><td>集中为身份上下文与 Policy 层；所有租户资源强制使用统一 scope helper。</td></tr>
+      <tr><td>租户与粉丝关系</td><td>用户含 tenant_slug，消息、评论、自选股和统计已有租户过滤。</td><td><span class="tag good">7/10</span></td><td>历史兼容数据和前端 bootstrap 同时存在；关系约束依赖迁移与代码双重保证。</td><td>补充跨租户负向测试、数据库 FK/唯一约束审计和统一 repository。</td></tr>
+      <tr><td>自选股与个股详情</td><td>用户级持久化自选股；K线/分时按需获取；支持标注、评论、分析和预测。</td><td><span class="tag good">7.5/10</span></td><td>缓存缺失时搜索链路仍可能触发远程 provider，页面读取与外部 API 边界不够纯。</td><td>页面组合只读本地快照；远程搜索/刷新只能由明确 API 或任务触发，设置超时、熔断和限流。</td></tr>
+      <tr><td>市场、热门行业、宏观指标</td><td>统一快照、任务同步、租户选择配置、页面读取数据库。</td><td><span class="tag good">7.5/10</span></td><td>数据源历史上经历 AKShare/Gangtise 切换，兼容回退多，容易出现“同步成功但展示旧值”。</td><td>统一 provider contract、source/version/as_of 字段和数据新鲜度 SLA；禁止隐式回退。</td></tr>
+      <tr><td>新闻聚合与标注</td><td>新闻源聚合、过滤、去重、V4 标注和行业映射。</td><td><span class="tag warn">6.5/10</span></td><td>新闻源解析、规则、LLM 和统计集中在大模块；外部 200 不代表内容有效，异常分支复杂。</td><td>拆成 source adapters、normalizer、classifier、publisher 四层，记录每步质量指标。</td></tr>
+      <tr><td>小金智能体/Hermes</td><td>意图、工具计划、Gangtise 工具、LLM 严格绑定、会话和异步任务已有体系。</td><td><span class="tag good">7/10</span></td><td>工具编排、提示词、模型配置和兼容逻辑仍大量集中在 AI service；SSE/JSON 多契约并存。</td><td>建立统一 Agent Runtime contract；工具只返回结构化结果，编排层统一超时、重试、trace_id 和错误码。</td></tr>
+      <tr><td>洞见笔记与复盘</td><td>草稿、URL/文件/语音输入、富文本、审核、发布、修订、置顶、消息通知。</td><td><span class="tag good">7.5/10</span></td><td>发布是多个副作用组合；正文、消息、广播、粉丝线程的最终一致性需要更清晰。</td><td>采用发布事务 + outbox/event delivery；版本、发布状态和通知状态分离。</td></tr>
+      <tr><td>消息与互动</td><td>消息线程、广播、粉丝互动、评论分析和租户隔离。</td><td><span class="tag warn">6.5/10</span></td><td>消息中心既有领域表又保留历史 JSON 兼容路径，读写分支复杂。</td><td>逐步完成 JSON compatibility sunset；以 message domain 表为唯一读源。</td></tr>
+      <tr><td>盲盒答题与统计</td><td>题库、随机发放、重复作答、得分、题型统计和大V观察。</td><td><span class="tag good">7/10</span></td><td>统计查询随着作答量增加可能变重，题目发放幂等性需持续验证。</td><td>按 user/day/question 建唯一键；预聚合用户和题型统计，异步刷新图表。</td></tr>
+      <tr><td>Admin/大V任务中心</td><td>统一任务配置、运行记录、手动执行、暂停/重启和 Scheduler 统一调度。</td><td><span class="tag good">7.5/10</span></td><td>任务代码和业务实现仍有历史重复命名/兼容逻辑；停止状态与运行进程需严格区分。</td><td>任务状态机标准化；每个任务定义 owner、锁、幂等键、超时、重试和取消语义。</td></tr>
+      <tr><td>商业化与二维码注册</td><td>产品、订单、订阅、邀请码和注册入口已有数据库模型。</td><td><span class="tag warn">6.5/10</span></td><td>支付核验、权益开通和邀请注册属于高风险业务，目前更像 MVP 级闭环。</td><td>增加订单状态机、支付回调验签、审计日志、权益快照和过期任务。</td></tr>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>四、性能评估</h2>
+    <table><tr><th>领域</th><th>现状判断</th><th>影响</th><th>优先级</th></tr>
+      <tr><td>首屏 HTML/JS</td><td>H5 模板约 1 MB，单体脚本约 800 KB；Web 复用 H5 壳体。</td><td>5MB 带宽环境下首屏解析、下载和执行都偏重。</td><td><span class="tag bad">P1</span></td></tr>
+      <tr><td>首屏数据</td><td>已做 bootstrap 精简和 Web 延迟 Dashboard，但仍有多个指标/新闻/配置初始化。</td><td>数据库查询和 JSON 序列化可能叠加，慢登录仍有风险。</td><td><span class="tag bad">P1</span></td></tr>
+      <tr><td>数据库</td><td>连接池和 teardown 已有；大量领域查询、JSONB 兼容、统计查询并存。</td><td>连接数、慢查询、重复聚合是主要不确定性。</td><td><span class="tag bad">P1</span></td></tr>
+      <tr><td>外部 API</td><td>Gangtise、AKShare、LLM 有缓存/任务/按需路径，但仍有 fallback 和直接调用边界。</td><td>外部延迟会串入页面或任务；错误容易表现为“200但无内容”。</td><td><span class="tag bad">P1</span></td></tr>
+      <tr><td>后台进程</td><td>Gunicorn + Worker + Scheduler，启动脚本已具备 PID/停止/锁。</td><td>内存总体可控，但 Python 大模块和多个 sidecar 会放大 RSS。</td><td><span class="tag warn">P2</span></td></tr>
+      <tr><td>缓存</td><td>有进程内缓存、数据库快照和 no-store API；未见统一 Redis 缓存层。</td><td>多进程之间缓存不共享，部署扩容后命中率和一致性不稳定。</td><td><span class="tag warn">P2</span></td></tr>
+    </table>
+    <div class="finding"><b>性能判断：</b>当前最值得优化的是“首屏和数据查询”，不是先增加 Node.js。Node.js 只会增加一跳服务，不能解决 Python 端大模板、数据库聚合和外部 API 等主瓶颈。</div>
+  </section>
+
+  <section class="panel">
+    <h2>五、可扩展性评估</h2>
+    <div class="two"><div><h3>可扩展性优点</h3><ul><li>领域模块已经分出 market、AI、commerce、knowledge、quiz、workbench。</li><li>任务配置和运行记录落库，可持续加入新任务。</li><li>PostgreSQL 迁移顺序和测试体系较完整。</li><li>前台能力通过 API 与 bootstrap 状态组合，具备逐步前后端分离基础。</li></ul></div><div><h3>扩展瓶颈</h3><ul><li>核心 Domain Service 文件过大，新增功能容易产生跨模块修改。</li><li>模板中同时存在 HTML、CSS、JavaScript 和状态管理，前端复用困难。</li><li>数据库访问没有统一 repository/query service 边界。</li><li>进程内缓存无法支撑多 Web 实例共享失效。</li><li>发布通知、外部同步等副作用还缺少统一事件总线。</li></ul></div></div>
+    <p><b>建议目标：</b>先把当前系统治理为“模块化单体 + 可独立扩展的 Worker”，等 API 契约稳定、性能指标达到瓶颈后，再按数据同步、Agent Runtime、通知投递等边界拆服务。</p>
+  </section>
+
+  <section class="panel">
+    <h2>六、用户体验与前端设计</h2>
+    <table><tr><th>维度</th><th>评价</th><th>观察</th></tr>
+      <tr><td>角色体验</td><td><span class="tag good">较好</span></td><td>H5、Web、大V和 Admin 有明确入口，部分能力保持一致。</td></tr>
+      <tr><td>反馈状态</td><td><span class="tag warn">需加强</span></td><td>任务执行、同步、发布和外部 API 失败历史上出现过“实际成功但前端失败”或“点击无反应”。</td></tr>
+      <tr><td>移动端适配</td><td><span class="tag warn">中等</span></td><td>功能较全，但大体量 DOM、悬浮控件、复杂卡片和工作台复用会增加小屏布局风险。</td></tr>
+      <tr><td>内容可读性</td><td><span class="tag good">较好</span></td><td>洞见颜色、标签、富文本和修订标识已有产品化处理，但模板与 CSS 分散容易回归。</td></tr>
+      <tr><td>可访问性</td><td><span class="tag warn">不足</span></td><td>有部分 aria-label 和键盘处理，但大型动态区域、错误提示、焦点管理和对比度尚未形成统一规范。</td></tr>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>七、技术栈评估</h2>
+    <table><tr><th>技术</th><th>适配性</th><th>建议</th></tr>
+      <tr><td>Python 3.10 + Flask 3</td><td><span class="tag good">适合当前阶段</span></td><td>业务开发效率高；继续强化蓝图、服务接口、类型检查和边界测试。</td></tr>
+      <tr><td>Gunicorn gthread</td><td><span class="tag good">可用</span></td><td>适合当前 I/O 型请求；通过压测确定 worker/thread，不要用经验盲目加进程。</td></tr>
+      <tr><td>PostgreSQL + psycopg2</td><td><span class="tag good">合适</span></td><td>核心数据、任务、消息和 JSONB 均适合；补充慢查询监控、连接池上限和索引审计。</td></tr>
+      <tr><td>Jinja + 原生 JavaScript</td><td><span class="tag warn">短期可用，长期受限</span></td><td>建议先拆分模块和资源，再考虑 React/Vue；不建议为换 Node.js 而整体重写。</td></tr>
+      <tr><td>ECharts / Quill</td><td><span class="tag good">适合</span></td><td>应统一本地资源、版本和按需加载，避免 CDN 依赖影响生产可用性。</td></tr>
+      <tr><td>AKShare / Gangtise / LLM</td><td><span class="tag warn">需适配器化</span></td><td>以统一 provider contract 屏蔽供应商，明确实时性、失败、空内容、计费和回退规则。</td></tr>
+      <tr><td>Docker/启动 shell</td><td><span class="tag warn">能运行，运维仍偏手工</span></td><td>逐步迁移到 systemd/Supervisor/Kubernetes 任一规范进程管理，统一健康检查和优雅停止。</td></tr>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>八、当前必须关注的问题</h2>
+    <div class="finding badline"><b>P1：页面读取路径仍可能触发远程市场搜索。</b><br>全量测试失败 <code>test_page_watchlist_catalog_never_fetches_a_provider_when_cache_is_missing</code>。页面组合函数在缓存缺失时进入 Gangtise 搜索，违反“页面只读快照、远程调用由显式刷新/任务负责”的边界，可能造成首屏慢和外部 API 消耗。</div>
+    <div class="finding badline"><b>P1：首屏前端单体过大。</b><br>H5 模板和脚本承载多个产品面、状态、渲染器和 API 调用。应继续拆成 shell、feature chunks，并将 Dashboard、Hermes、Workbench、知识库按进入页面后加载。</div>
+    <div class="finding"><b>P1：外部数据成功语义不够统一。</b><br>HTTP 200、业务成功、内容可读、数据日期和数据源有效性应分开建模，否则会重复出现“接口成功但播报失败/指标为空”的问题。</div>
+    <div class="finding"><b>P2：兼容路径较多。</b><br>JSON 旧字段、数据库表、模拟数据清理、AKShare/Gangtise 回退和旧客户端兼容逻辑增加了认知负担。需要设定弃用周期和迁移完成指标。</div>
+    <div class="finding"><b>P2：缺少生产级容量基线。</b><br>已有大量 BDD 和单元测试，但尚未替代真实压测。应建立 10/50/100 并发、首屏 TTFB、API P95、DB pool 使用率、RSS 和外部 API 延迟基线。</div>
+    <div class="finding"><b>P2：异步副作用没有统一事件投递层。</b><br>发布、通知、广播、粉丝线程、嵌入和统计之间仍有多个 try/except 组合。应增加 outbox 或可靠任务事件，避免“主记录成功但前端误报失败”。</div>
+    <div class="finding"><b>P2：鉴权/租户范围需要统一中间件。</b><br>目前各 API 自行检查角色和 tenant_slug，虽有测试覆盖，但重复逻辑容易产生边界遗漏。</div>
+  </section>
+
+  <section class="panel">
+    <h2>九、建议路线图</h2>
+    <table><tr><th>阶段</th><th>目标</th><th>具体动作</th><th>完成标准</th></tr>
+      <tr><td>现在至 2 周</td><td>稳定边界与首屏</td><td>禁止页面路径远程调用；统一 provider 结果契约；修复当前 1 个失败测试；压缩/拆分首屏资源。</td><td>全量测试 0 fail；首屏 API 无外部调用；TTFB/P95 有基线。</td></tr>
+      <tr><td>2 至 6 周</td><td>治理领域边界</td><td>拆分 market provider、news pipeline、agent runtime、review publishing；引入统一 auth scope 和 task state machine。</td><td>核心模块可独立测试；新增功能不直接修改超大核心文件。</td></tr>
+      <tr><td>6 至 12 周</td><td>支撑用户增长</td><td>引入 Redis 或等价共享缓存；增加 outbox/event delivery；建立压测、慢查询、队列和外部 API 监控。</td><td>多 Web 实例可扩展；关键 API 有 P95、错误率和新鲜度告警。</td></tr>
+      <tr><td>之后</td><td>选择性拆服务</td><td>仅在指标证明需要时拆数据同步服务、Agent Runtime 或通知服务；前端再评估 SPA/Node BFF。</td><td>拆分有明确容量收益，不以技术偏好驱动。</td></tr>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>十、最终结论</h2>
+    <p>当前软件设计<strong>符合模块化单体的合理实践，但还没有达到高并发、多人协作和快速独立交付的成熟平台级水平</strong>。继续使用 Python + Flask + Gunicorn + PostgreSQL 是合理的；优先治理首屏、数据源边界、异步发布一致性、统一鉴权和大模块拆分，比新增 Node.js 前端服务更能改善性能与可扩展性。</p>
+    <p>Node.js 可以作为未来独立前端构建/SSR/BFF 的选择，但不应作为当前性能问题的直接解法。当前最重要的工程动作是让页面只读快照、让任务负责采集、让 API 返回可验证的数据新鲜度、让异步副作用具备可靠状态。</p>
+  </section>
+  <p class="foot">报告生成于 2026-10-14。静态审查来源：当前工作区代码与迁移文件；自动化验证：全量 pytest，结果为 800 passed、6 skipped、1 failed。未执行生产压测、网络链路压测和数据库真实执行计划分析。</p>
+</main>
+</body>
+</html>
