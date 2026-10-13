@@ -240,7 +240,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("openWatchlistDetail('${escapeHtml(item.security_code || item.code || '')}','overview','etf-detail')", html)
         self.assertIn("renderColumn('涨幅', gains", html)
         self.assertIn("renderColumn('跌幅', losses", html)
-        self.assertIn("candleLabel: `${data.name || '标的'} 日K线${data.kline_contains_intraday ? '（含盘中）' : ''}`", html)
+        self.assertIn("candleLabel: `${data.name || '标的'} 日K线（近90个交易日）${data.kline_contains_intraday ? '（含盘中）' : ''}`", html)
         self.assertIn("data.annotation_key || data.indicator_code || data.code", html)
 
     def test_h5_watchlist_detail_is_a_page_with_kline_analysis_after_comments(self):

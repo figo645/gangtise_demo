@@ -19,7 +19,7 @@ from html import escape as html_escape
 from html.parser import HTMLParser
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g, abort
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit, parse_qsl, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -154,6 +154,17 @@ app = Flask(
     template_folder=str(PROJECT_ROOT / "templates"),
     static_folder=str(PROJECT_ROOT / "static"),
 )
+# Gunicorn does not imply that templates must be immutable. Keep local
+# development responsive to edits while retaining Jinja's template cache in
+# staging/production. An explicit flag is available for CI or special deploys.
+runtime_environment = str(os.environ.get("GANGTISE_RUNTIME_ENV", "local") or "local").strip().lower()
+template_reload_override = os.environ.get("GANGTISE_TEMPLATE_AUTO_RELOAD")
+if template_reload_override is None:
+    template_auto_reload = runtime_environment in {"local", "development", "dev"}
+else:
+    template_auto_reload = str(template_reload_override).strip().lower() in {"1", "true", "yes", "y", "on"}
+app.config["TEMPLATES_AUTO_RELOAD"] = template_auto_reload
+app.jinja_env.auto_reload = template_auto_reload
 # Static assets are versioned in the templates when they change. Cache them in
 # browsers so shared libraries such as ECharts are not fetched on every visit.
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 7 * 24 * 60 * 60
@@ -657,7 +668,7 @@ DEFAULT_USERS = [
     },
 ]
 
-ALLOWED_PORTAL_HTML_TAGS = {"p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "h2", "h3", "blockquote", "a", "img", "table", "thead", "tbody", "tr", "th", "td"}
+ALLOWED_PORTAL_HTML_TAGS = {"p", "br", "strong", "b", "em", "i", "u", "mark", "ul", "ol", "li", "h2", "h3", "h4", "h5", "blockquote", "hr", "a", "img", "table", "thead", "tbody", "tr", "th", "td"}
 
 
 class PortalHtmlSanitizer(HTMLParser):
@@ -668,8 +679,8 @@ class PortalHtmlSanitizer(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag not in ALLOWED_PORTAL_HTML_TAGS:
             return
-        if tag == "br":
-            self.parts.append("<br>")
+        if tag in {"br", "hr"}:
+            self.parts.append(f"<{tag}>")
             return
         attr_map = dict(attrs or [])
         if tag == "a":
@@ -693,7 +704,7 @@ class PortalHtmlSanitizer(HTMLParser):
         self.parts.append(f"<{tag}>")
 
     def handle_endtag(self, tag):
-        if tag in ALLOWED_PORTAL_HTML_TAGS and tag != "br":
+        if tag in ALLOWED_PORTAL_HTML_TAGS and tag not in {"br", "hr"}:
             self.parts.append(f"</{tag}>")
 
     def handle_data(self, data):
@@ -916,7 +927,8 @@ DEFAULT_SITE_CONFIG = {
             "你的任务是先对大V输入的原始材料做轻量整理和润色，删除明显重复、口语噪音和无效赘述，"
             "但必须保留原有事实、判断、风险提示和不确定性。"
             "不要新增原文没有出现的观点、数据和投资建议。"
-            "输出纯文本，按自然段组织，保持便于后续继续组合成完整复盘。"
+            "输出受控 Markdown，按标题、自然段、列表和引用组织，保持便于后续继续组合成完整复盘。"
+            "允许使用 ##/### 标题、**加粗**、==重点高亮==、__下划线__、无序/有序列表、> 引用和缩进层级；不要输出原始 HTML、代码围栏或解释性前缀。"
         ),
         "polish_user_template": (
             "内容类型：洞见\n"
@@ -925,6 +937,7 @@ DEFAULT_SITE_CONFIG = {
             "触发入口：{entry_point}\n\n"
             "请先把下面的原始输入整理成更干净、更适合后续继续生成复盘正文的中间稿。"
             "重点保留：市场主线、行业判断、重点个股、验证节点、风险边界。\n\n"
+            "请直接返回 Markdown 正文，不要输出 JSON、原始 HTML 或处理说明。\n\n"
             "原始输入：\n{source_text}"
         ),
         "compose_system_prompt": (
@@ -932,7 +945,8 @@ DEFAULT_SITE_CONFIG = {
             "你要基于大V自己的输入，以及已选中的智能仪表盘卡片，生成一版完整洞见草稿。"
             "必须优先保留大V自己的核心判断和风险表达，智能仪表盘只用于补充证据、结构和验证节点。"
             "不要编造事实、数字、新闻或结论。"
-            "输出纯文本，语言专业、克制、可直接给大V继续人工修改。"
+            "输出受控 Markdown，语言专业、克制、可直接给大V继续人工修改。"
+            "使用清晰的标题、自然段、列表和引用；关键判断用 **加粗**，风险或注意事项可用 ==高亮==，必要时使用 __下划线__；不要输出原始 HTML、代码围栏或解释性前缀。"
             "尽量压缩表达，草稿长度默认应少于原始输入长度。"
         ),
         "compose_user_template": (
@@ -971,7 +985,7 @@ DEFAULT_SITE_CONFIG = {
         "kol_module": True,
         "fundamental_analysis": True,
         "watchlist": True,
-        "stock_forecast": False,
+        "stock_forecast": True,
         "daily_review": True,
         "core_indicators": False,
         "knowledge": False,

@@ -4983,7 +4983,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">已发布洞见</div>
-              <div class="kw-card-desc">与 H5 共用同一洞见目录，支持查询全部历史内容并按需继续加载。</div>
+              <div class="kw-card-desc">与 H5 共用同一洞见目录，支持查询全部历史内容并按需继续加载。置顶最多 5 篇，每篇默认保留 7 天，超时自动恢复普通排序。</div>
             </div>
             <span class="kw-tag">Published</span>
           </div>
@@ -4991,7 +4991,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <label class="visually-hidden" for="kw-published-review-search">查询已发布洞见</label>
             <input id="kw-published-review-search" class="kw-input" type="search" placeholder="搜索标题、正文、个股或标签" autocomplete="off" oninput="kwHandlePublishedReviewSearch(this.value)">
           </div>
-          <div id="kw-published-review-meta" class="kw-dashboard-panel-note" style="margin:0 0 10px"></div>
+          <div id="kw-published-review-meta" class="kw-dashboard-panel-note" style="margin:0 0 10px">置顶管理：{{ workbench.published_reviews | selectattr('is_pinned') | list | length }}/5 · 有效期 7 天</div>
           <div id="kw-published-review-list" class="kw-broadcast-list">
             {% for item in workbench.published_reviews %}
             <div class="kw-broadcast-item">
@@ -5000,6 +5000,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 <span class="kw-tag">{{ item.period }}</span>
                 <span class="kw-tag">{{ item.access_label or '常规笔记' }}</span>
                 {% if item.is_pinned %}<span class="kw-tag" style="color:#8E6A1E;border-color:rgba(200,169,110,.42);background:rgba(200,169,110,.10)">置顶</span>{% endif %}
+                {% if item.revision_count %}<span class="kw-tag">第 {{ item.revision_count }} 次修改</span>{% endif %}
               </div>
               <div class="kw-broadcast-meta">{{ item.time }} · {{ item.summary }}</div>
               <div data-workbench-review-annotation="{{ loop.index0 }}" style="margin-top:10px"></div>
@@ -5009,6 +5010,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 {% endfor %}
               </div>
               <div style="display:flex;justify-content:flex-end;margin-top:10px">
+                <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px" onclick="kwEditPublishedReview('{{ item.id }}')">编辑并重新发布</button>
                 <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#8E6A1E;border-color:rgba(200,169,110,.42)" onclick="kwTogglePublishedReviewPin('{{ item.id }}', {{ 'false' if item.is_pinned else 'true' }})">{{ '取消置顶' if item.is_pinned else '置顶' }}</button>
                 <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="kwDeletePublishedReview('{{ item.id }}')">删除洞见</button>
               </div>
@@ -7460,6 +7462,8 @@ let kwReviewDraft = {
   reviewTitle: '',
   accessMode: 'public',
   insightDraftId: '',
+  editingPublishedInsightId: '',
+  editingPublishedRevisionCount: 0,
   sourceMode: 'manual',
   paragraphMode: 'manual',
   skipAiProcessing: true,
@@ -10141,6 +10145,8 @@ async function kwPublishReviewContent(text, transcriptionEngine, transcriptModel
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       text,
+      content_html: kwGetReviewPreviewHtml(),
+      insight_id: kwReviewDraft.editingPublishedInsightId || '',
       tenant_slug: tenant.slug || '',
       period: kwReviewDraft.period || 'day',
       review_title: String(kwReviewDraft.reviewTitle || '').trim(),
@@ -11501,6 +11507,8 @@ function kwOpenReviewTriggerModal(sourceMode) {
   kwReviewDraft.reviewTitle = '';
   kwReviewDraft.accessMode = 'public';
   kwReviewDraft.insightDraftId = '';
+  kwReviewDraft.editingPublishedInsightId = '';
+  kwReviewDraft.editingPublishedRevisionCount = 0;
   kwReviewDraft.selectedWatchlist = [];
   kwReviewDraft.watchlistDecision = '';
   kwReviewDraft.paragraphMode = 'manual';
@@ -11918,6 +11926,7 @@ function kwRenderPublishedReviewList() {
         <span class="kw-tag">${escapeHtml(item.period || '')}</span>
         <span class="kw-tag">${escapeHtml(item.access_label || (item.access_mode === 'subscriber' ? '订阅专享' : '常规笔记'))}</span>
         ${item.is_pinned ? '<span class="kw-tag" style="color:#8E6A1E;border-color:rgba(200,169,110,.42);background:rgba(200,169,110,.10)">置顶</span>' : ''}
+        ${item.revision_count ? `<span class="kw-tag">第 ${Number(item.revision_count)} 次修改</span>` : ''}
       </div>
       <div class="kw-broadcast-meta">${escapeHtml(item.time || '')} · ${escapeHtml(item.summary || '')}</div>
       <div data-workbench-review-annotation="${index}" style="margin-top:10px"></div>
@@ -11925,6 +11934,7 @@ function kwRenderPublishedReviewList() {
         ${Array.isArray(item.tags) ? item.tags.map(tag => `<span class="kw-chip">${escapeHtml(tag)}</span>`).join('') : ''}
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px" onclick="kwEditPublishedReview('${escapeAttr(item.id || '')}')">编辑并重新发布</button>
         <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#8E6A1E;border-color:rgba(200,169,110,.42)" onclick="kwTogglePublishedReviewPin('${escapeAttr(item.id || '')}', ${item.is_pinned ? 'false' : 'true'})">${item.is_pinned ? '取消置顶' : '置顶'}</button>
         <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="kwDeletePublishedReview('${escapeAttr(item.id || '')}')">删除洞见</button>
       </div>
@@ -11932,13 +11942,14 @@ function kwRenderPublishedReviewList() {
   `).join('') || '<div class="kw-dashboard-panel-note">当前没有匹配的已发布洞见。</div>';
   const meta = document.getElementById('kw-published-review-meta');
   if (meta) {
+    const pinnedCount = reviews.filter((item) => item && item.is_pinned).length;
     meta.textContent = kwPublishedInsightDirectory.error
       ? kwPublishedInsightDirectory.error
       : (kwPublishedInsightDirectory.loading
-        ? '正在加载洞见...'
+        ? '正在加载洞见... · 置顶最多 5 篇，每篇有效 7 天'
         : (stateIsCurrent && kwPublishedInsightDirectory.loaded
-          ? `已加载 ${reviews.length} / ${kwPublishedInsightDirectory.total} 篇${kwPublishedInsightDirectory.query ? '匹配洞见' : '洞见'}`
-          : '正在准备全部历史洞见...'));
+          ? `置顶 ${pinnedCount}/5 · 每篇有效 7 天 · 已加载 ${reviews.length} / ${kwPublishedInsightDirectory.total} 篇${kwPublishedInsightDirectory.query ? '匹配洞见' : '洞见'}`
+          : '正在准备全部历史洞见... · 置顶最多 5 篇，每篇有效 7 天'));
   }
   const more = document.getElementById('kw-published-review-more');
   if (more) {
@@ -11980,6 +11991,27 @@ async function kwDeletePublishedReview(reviewId) {
   }
 }
 
+function kwEditPublishedReview(reviewId) {
+  const normalizedId = String(reviewId || '').trim();
+  const source = (kwPublishedInsightDirectory.items || []).find((item) => String((item || {}).id || '') === normalizedId)
+    || ((window.WORKBENCH_DATA && Array.isArray(window.WORKBENCH_DATA.published_reviews)) ? window.WORKBENCH_DATA.published_reviews.find((item) => String((item || {}).id || '') === normalizedId) : null);
+  const tenant = window.ACTIVE_TENANT || {};
+  if (!source || !tenant.slug) return;
+  kwReviewDraft.editingPublishedInsightId = normalizedId;
+  kwReviewDraft.editingPublishedRevisionCount = Number(source.revision_count || source.revisionCount || 0);
+  kwReviewDraft.reviewTitle = String(source.title || '').trim();
+  kwReviewDraft.accessMode = source.access_mode === 'subscriber' ? 'subscriber' : 'public';
+  kwReviewDraft.sourceMode = String(source.source_mode || 'manual').trim() || 'manual';
+  kwReviewDraft.manualHtml = String(source.content_html || '').trim() || kwPlainTextToKnowledgeHtml(source.content_text || '');
+  kwReviewDraft.draftReviewHtml = kwReviewDraft.manualHtml;
+  kwReviewDraft.draftReviewText = String(source.content_text || kwKnowledgeHtmlToPlainText(kwReviewDraft.manualHtml)).trim();
+  kwReviewDraft.generatedPreviewText = '';
+  kwReviewDraft.flowStage = 'intake';
+  kwReviewWorkspacePanel = 'input';
+  kwRenderReviewStudio();
+  showToast('已载入已发布洞见，请修改后重新发布');
+}
+
 async function kwTogglePublishedReviewPin(reviewId, pinned) {
   const normalizedReviewId = String(reviewId || '').trim();
   const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
@@ -11994,7 +12026,7 @@ async function kwTogglePublishedReviewPin(reviewId, pinned) {
       body: JSON.stringify({pinned: !!pinned}),
     });
     const payload = await response.json();
-    if (!response.ok || !payload.ok) throw new Error(payload.error || 'review_pin_update_failed');
+    if (!response.ok || !payload.ok) throw new Error(payload.message || payload.error || 'review_pin_update_failed');
     kwSyncPublishedReviewState(payload);
     kwInvalidatePublishedInsightDirectory();
     if (window.WORKBENCH_DATA) {

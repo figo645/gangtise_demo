@@ -17,9 +17,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HISTORY_DB = Path.home() / ".codex/thread_history_1.sqlite"
-OUTPUT_CSV = ROOT / "Codex项目会话Token估算明细_2026-09-18.csv"
-OUTPUT_DAILY_CSV = ROOT / "Codex项目会话Token估算曲线_2026-09-18.csv"
-OUTPUT_HTML = ROOT / "tests/reports/codex_project_token_estimate_2026-09-18.html"
+AUDIT_DATE = "2026-10-12"
+OUTPUT_CSV = ROOT / f"Codex项目会话Token估算明细_{AUDIT_DATE}.csv"
+OUTPUT_DAILY_CSV = ROOT / f"Codex项目会话Token估算曲线_{AUDIT_DATE}.csv"
+OUTPUT_HTML = ROOT / f"tests/reports/codex_project_token_estimate_{AUDIT_DATE}.html"
 WORKSPACE_MARKER = "/Users/xuchenfei/PycharmProjects/gangtise_demo"
 TOKENIZER_METHOD = "offline_cjk_heuristic"
 try:
@@ -184,11 +185,14 @@ def write_html(turns: list[dict[str, object]], daily_rows: list[dict[str, object
         ]) + "</tr>"
         for row in daily_rows
     )
+    date_range = (
+        f"{daily_rows[0]['日期']} 至 {daily_rows[-1]['日期']}" if daily_rows else "无可用会话"
+    )
     OUTPUT_HTML.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_HTML.write_text(f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>Codex 项目会话 Token 估算</title>
 <style>body{{margin:0;background:#f5f7fb;color:#152033;font:14px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif}}main{{max-width:1100px;margin:32px auto;padding:0 22px}}.hero{{background:linear-gradient(135deg,#0d2740,#165b79);color:white;border-radius:18px;padding:28px}}.metrics{{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}}.metric{{background:#fff;border-radius:12px;padding:15px;min-width:180px;color:#182b3d}}.metric b{{display:block;font-size:24px;margin-top:5px}}section{{background:#fff;border-radius:16px;padding:22px;margin-top:20px;box-shadow:0 5px 20px #16305512}}svg{{width:100%;height:auto;background:#f8fbfd;border-radius:12px}}table{{width:100%;border-collapse:collapse}}th,td{{padding:10px;border-bottom:1px solid #e7edf3;text-align:right}}th:first-child,td:first-child{{text-align:left}}.note{{color:#5f6f80;line-height:1.7}}</style></head>
-<body><main><div class="hero"><h1>Codex 项目会话 Token 估算曲线</h1><p>范围：{len(turns)} 个可见用户请求轮次；项目相关本地会话，2026-05-20 至 2026-09-18。</p></div>
+<body><main><div class="hero"><h1>Codex 项目会话 Token 估算曲线</h1><p>范围：{len(turns)} 个可见用户请求轮次；项目相关本地会话，{date_range}。</p></div>
 <div class="metrics"><div class="metric">上行估算<b>{total_input:,}</b></div><div class="metric">下行估算<b>{total_output:,}</b></div><div class="metric">总计估算<b>{total_input + total_output:,}</b></div><div class="metric">下行占比<b>{(total_output / max(total_input + total_output, 1)):.1%}</b></div></div>
 <section><h2>累计 Token 曲线</h2><svg viewBox="0 0 {width} {height}" role="img" aria-label="累计 Token 估算曲线"><line x1="{pad}" y1="{height-pad}" x2="{width-pad}" y2="{height-pad}" stroke="#cbd7e2"/><line x1="{pad}" y1="{pad}" x2="{pad}" y2="{height-pad}" stroke="#cbd7e2"/><polyline fill="none" stroke="#ed7d31" stroke-width="4" points="{' '.join(points)}"/><text x="{pad}" y="{pad-12}" fill="#526577">累计总 Token：{max_value:,}</text></svg></section>
 <section><h2>按日汇总</h2><table><thead><tr><th>日期</th><th>轮次</th><th>上行</th><th>下行</th><th>当日</th><th>累计</th></tr></thead><tbody>{rows}</tbody></table></section>

@@ -1337,6 +1337,14 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             "purpose": str(evidence_chain_model.get("purpose") or "").strip()[:120],
         } if evidence_chain_model else {},
     }
+    raw_pinned = bool(raw.get("is_pinned"))
+    raw_pinned_at = str(raw.get("pinned_at") or "").strip()[:40]
+    is_pinned = _is_active_published_insight_pin(raw_pinned, raw_pinned_at)
+    raw_payload = raw.get("payload_json") if isinstance(raw.get("payload_json"), dict) else {}
+    try:
+        revision_count = max(0, int(raw.get("revision_count") if raw.get("revision_count") is not None else raw_payload.get("revision_count") or 0))
+    except (TypeError, ValueError):
+        revision_count = 0
     return {
         "id": str(raw.get("id") or f"{tenant['slug']}-review-{index + 1}").strip() or f"{tenant['slug']}-review-{index + 1}",
         "title": title,
@@ -1352,8 +1360,10 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "content_html": content_html,
         "access_mode": access_mode,
         "access_label": access_label,
-        "is_pinned": bool(raw.get("is_pinned")),
-        "pinned_at": str(raw.get("pinned_at") or "").strip()[:40],
+        "is_pinned": is_pinned,
+        "pinned_at": raw_pinned_at if is_pinned else "",
+        "revision_count": revision_count,
+        "revision_label": f"第 {revision_count} 次修改" if revision_count else "首次发布",
         "view_count": view_count,
         "dav_id": str(raw.get("dav_id") or "").strip()[:160],
         "external_id": str(raw.get("external_id") or "").strip()[:160],
@@ -1931,6 +1941,12 @@ def _decode_published_insight_payload(value):
 
 def _published_insight_row_to_snapshot(row, tenant, index=0):
     payload = _decode_published_insight_payload((row or {}).get("payload_json"))
+    # Keep version metadata available at the normalized top level even when
+    # the database driver returns payload_json in a driver-specific shape.
+    if "revision_count" not in payload and (row or {}).get("revision_count") is not None:
+        payload["revision_count"] = (row or {}).get("revision_count")
+    if "revision_label" not in payload and (row or {}).get("revision_label") is not None:
+        payload["revision_label"] = (row or {}).get("revision_label")
     payload.update({
         "id": str((row or {}).get("insight_id") or payload.get("id") or "").strip(),
         "title": str((row or {}).get("title") or payload.get("title") or "").strip(),
@@ -2035,11 +2051,18 @@ def list_tenant_published_insights_page(
     sql = f"""
         SELECT insight_id, dav_id, external_id, title, content_text, content_html,
                access_mode, source_mode, published_date, published_at, imported_at,
-               view_count, is_pinned, pinned_at, payload_json
+               view_count,
+               CASE WHEN is_pinned = TRUE AND pinned_at IS NOT NULL
+                         AND pinned_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+                    THEN TRUE ELSE FALSE END AS is_pinned,
+               CASE WHEN is_pinned = TRUE AND pinned_at IS NOT NULL
+                         AND pinned_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+                    THEN pinned_at ELSE NULL END AS pinned_at,
+               payload_json
         FROM tenant_published_insights
         WHERE {where_sql}
     """
-    sql += " ORDER BY is_pinned DESC, pinned_at DESC NULLS LAST, published_date DESC, published_at DESC, imported_at DESC, id DESC LIMIT ? OFFSET ?"
+    sql += " ORDER BY (is_pinned = TRUE AND pinned_at IS NOT NULL AND pinned_at >= CURRENT_TIMESTAMP - INTERVAL '7 days') DESC, pinned_at DESC NULLS LAST, published_date DESC, published_at DESC, imported_at DESC, id DESC LIMIT ? OFFSET ?"
     rows = get_db().execute(sql, tuple(params + [safe_limit, safe_offset])).fetchall()
     items = [
         _published_insight_row_to_snapshot(row, tenant, index=index)
@@ -2078,7 +2101,14 @@ def get_tenant_published_insight(tenant_slug, review_id):
     row = get_db().execute(
         """SELECT insight_id, dav_id, external_id, title, content_text, content_html,
                   access_mode, source_mode, published_date, published_at, imported_at,
-                  view_count, is_pinned, pinned_at, payload_json
+                  view_count,
+                  CASE WHEN is_pinned = TRUE AND pinned_at IS NOT NULL
+                            AND pinned_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+                       THEN TRUE ELSE FALSE END AS is_pinned,
+                  CASE WHEN is_pinned = TRUE AND pinned_at IS NOT NULL
+                            AND pinned_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+                       THEN pinned_at ELSE NULL END AS pinned_at,
+                  payload_json
              FROM tenant_published_insights WHERE tenant_slug = ? AND insight_id = ?""",
         (normalized_tenant_slug, normalized_review_id),
     ).fetchone()
@@ -2164,8 +2194,24 @@ def save_tenant_published_insight(tenant_slug, snapshot, published_date=None, ex
     return get_tenant_published_insight(normalized_tenant_slug, insight_id) or normalized
 
 
+PUBLISHED_INSIGHT_PIN_LIMIT = 5
+PUBLISHED_INSIGHT_PIN_DAYS = 7
+
+
+def _is_active_published_insight_pin(pinned, pinned_at):
+    if not pinned or not str(pinned_at or "").strip():
+        return False
+    try:
+        pinned_dt = datetime.fromisoformat(str(pinned_at).strip().replace("Z", "+00:00"))
+        if pinned_dt.tzinfo is None:
+            pinned_dt = pinned_dt.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) - pinned_dt <= timedelta(days=PUBLISHED_INSIGHT_PIN_DAYS)
+    except (TypeError, ValueError):
+        return False
+
+
 def set_tenant_published_insight_pin(tenant_slug, review_id, pinned):
-    """Apply an explicit editorial pin without changing publication time."""
+    """Apply a seven-day editorial pin with a five-item tenant limit."""
     normalized_tenant_slug = str(tenant_slug or "").strip().lower()
     normalized_review_id = str(review_id or "").strip()
     tenant = get_tenant_by_slug(normalized_tenant_slug)
@@ -2173,6 +2219,18 @@ def set_tenant_published_insight_pin(tenant_slug, review_id, pinned):
         raise ValueError("tenant_not_found")
     normalized_pinned = bool(pinned)
     try:
+        if normalized_pinned:
+            active_count = get_db().execute(
+                """SELECT COUNT(*) AS total
+                   FROM tenant_published_insights
+                   WHERE tenant_slug = ? AND is_pinned = TRUE
+                     AND pinned_at IS NOT NULL
+                     AND pinned_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+                     AND insight_id <> ?""",
+                (normalized_tenant_slug, normalized_review_id),
+            ).fetchone() or {}
+            if int(active_count.get("total") or 0) >= PUBLISHED_INSIGHT_PIN_LIMIT:
+                raise ValueError("review_pin_limit_reached")
         row = get_db().execute(
             """UPDATE tenant_published_insights
                SET is_pinned = ?, pinned_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
@@ -2196,9 +2254,29 @@ def set_tenant_published_insight_pin(tenant_slug, review_id, pinned):
         if not _published_insights_storage_unavailable(exc):
             raise
     snapshots = resolve_tenant_review_snapshots(tenant, snapshots=tenant.get("review_snapshots"), include_simulated=True)
+    now = datetime.now(timezone.utc)
+    active_pinned = []
+    for item in snapshots:
+        if not item.get("is_pinned"):
+            continue
+        pinned_at = str(item.get("pinned_at") or "").strip()
+        try:
+            pinned_dt = datetime.fromisoformat(pinned_at.replace("Z", "+00:00"))
+            if pinned_dt.tzinfo is None:
+                pinned_dt = pinned_dt.replace(tzinfo=timezone.utc)
+            if now - pinned_dt <= timedelta(days=PUBLISHED_INSIGHT_PIN_DAYS):
+                active_pinned.append(item)
+            else:
+                item["is_pinned"] = False
+                item["pinned_at"] = ""
+        except (TypeError, ValueError):
+            item["is_pinned"] = False
+            item["pinned_at"] = ""
     matched = next((item for item in snapshots if str(item.get("id") or "").strip() == normalized_review_id), None)
     if matched is None:
         raise ValueError("review_not_found")
+    if normalized_pinned and not matched.get("is_pinned") and len(active_pinned) >= PUBLISHED_INSIGHT_PIN_LIMIT:
+        raise ValueError("review_pin_limit_reached")
     matched["is_pinned"] = normalized_pinned
     matched["pinned_at"] = now_ts() if normalized_pinned else ""
     snapshots.sort(key=lambda item: (
@@ -7981,10 +8059,12 @@ def _execute_workflow_node(node, upstream_values, contexts, tuning):
     }
 
 
-def run_forecast_workflow_graph(graph):
+def run_forecast_workflow_graph(graph, runtime_contexts=None):
     normalized_graph = normalize_forecast_workflow_graph(graph)
     tuning = workflow_graph_to_tuning(normalized_graph)
-    contexts = _build_runtime_contexts(tuning)
+    # The workbench preview intentionally retains its deterministic sample
+    # context. Product forecasts pass a real, per-security context instead.
+    contexts = runtime_contexts if isinstance(runtime_contexts, dict) else _build_runtime_contexts(tuning)
     ordered_nodes = _topological_nodes(normalized_graph)
     node_lookup = {item["id"]: item for item in normalized_graph["nodes"]}
     incoming_map = {item["id"]: [] for item in normalized_graph["nodes"]}
@@ -8043,6 +8123,169 @@ def run_forecast_workflow_graph(graph):
         "node_results": node_results,
     }
     return final_value, workflow
+
+
+def _forecast_trading_dates(last_date, count):
+    """Return weekday labels after the last real candle without inventing prices."""
+    try:
+        cursor = datetime.strptime(str(last_date or ""), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        cursor = datetime.now().date()
+    dates = []
+    while len(dates) < count:
+        cursor += timedelta(days=1)
+        if cursor.weekday() < 5:
+            dates.append(cursor.isoformat())
+    return dates
+
+
+def build_watchlist_kline_forecast(candles=None, analysis=None, graph=None, horizon=60):
+    """Run the configured forecast workflow from real daily K-line observations.
+
+    The output deliberately remains a statistical range, not a synthetic price
+    series. It is unavailable when there are not enough real observations.
+    """
+    rows = []
+    for item in candles or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            close = float(item.get("close"))
+        except (TypeError, ValueError):
+            continue
+        if close > 0:
+            rows.append({**item, "close": close})
+    rows.sort(key=lambda item: str(item.get("date") or ""))
+    if len(rows) < 30:
+        return {
+            "available": False,
+            "reason": "insufficient_real_kline_history",
+            "message": "至少需要 30 个真实交易日 K 线后才能生成预测区间。",
+        }
+
+    closes = [item["close"] for item in rows]
+    returns = [closes[index] / closes[index - 1] - 1 for index in range(1, len(closes)) if closes[index - 1] > 0]
+    recent_returns = returns[-30:]
+    daily_vol = statistics.pstdev(recent_returns) if len(recent_returns) > 1 else 0.0
+    momentum_20 = (closes[-1] / closes[-21] - 1) * 100 if len(closes) >= 21 else 0.0
+    momentum_5 = (closes[-1] / closes[-6] - 1) * 100 if len(closes) >= 6 else 0.0
+    rolling_20 = [
+        (closes[index] / closes[index - 20] - 1) * 100
+        for index in range(20, len(closes)) if closes[index - 20] > 0
+    ]
+    backtest_anchor = statistics.mean(rolling_20) if rolling_20 else momentum_20
+    up_probability = (sum(1 for item in rolling_20 if item > 0) / len(rolling_20) * 100) if rolling_20 else 50.0
+    if graph is None:
+        try:
+            graph = load_forecast_workflow_graph()
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            # A transient workflow-config read failure must not make a real
+            # quote page unavailable. The shipped graph has the same contract.
+            app.logger.warning("Forecast workflow config unavailable; using default graph")
+            graph = build_default_forecast_workflow_graph()
+    tuning = workflow_graph_to_tuning(graph)
+    sample_confidence = min(1.0, len(rolling_20) / 60.0)
+    trend_alignment = bool((analysis or {}).get("trend_alignment"))
+    confidence = min(90.0, 35.0 + sample_confidence * 35.0 + (12.0 if trend_alignment else 0.0) + (8.0 if daily_vol <= 0.025 else 0.0))
+    confidence_penalty = max(0.0, (tuning["confidence_floor"] - confidence) * tuning["confidence_penalty_scale"] / 10.0)
+    contexts = {
+        "signals_bundle": {
+            "stance": "上行" if momentum_20 > 1 else "下行" if momentum_20 < -1 else "震荡",
+            "raw_factor_signal": momentum_20 * 0.55 + momentum_5 * 0.45,
+            "factor_signal": max(-tuning["factor_signal_limit"], min(tuning["factor_signal_limit"], momentum_20)),
+            "momentum_signal": max(-tuning["momentum_signal_limit"], min(tuning["momentum_signal_limit"], momentum_5)),
+            "fundamental_adjustment": 0.0,
+            "bullish_confidence": round(up_probability, 2),
+        },
+        "volatility_context": {
+            "realized_daily_vol": daily_vol,
+            "volatility_cap": max(1.0, daily_vol * math.sqrt(20) * 100 * tuning["volatility_cap_multiplier"]),
+        },
+        "backtest_context": {
+            "avg_return_pct": round(backtest_anchor, 4),
+            "up_probability": round(up_probability, 2),
+            "sample_size": len(rolling_20),
+            "sample_confidence": sample_confidence,
+            "backtest_anchor": backtest_anchor,
+        },
+        "confidence_context": {
+            "confidence": confidence,
+            "confidence_floor": tuning["confidence_floor"],
+            "confidence_penalty": confidence_penalty,
+            "range_bound_multiplier": tuning["range_bound_multiplier"],
+        },
+    }
+    predicted_change, workflow = run_forecast_workflow_graph(graph, runtime_contexts=contexts)
+    horizon = max(20, min(int(horizon or 60), 60))
+    last_close = closes[-1]
+    dates = _forecast_trading_dates(rows[-1].get("date"), horizon)
+    # Preserve the configured model's target as the drift, while retaining a
+    # deterministic, damped version of the most recent real return pattern.
+    # This produces a wavy forecast path and OHLC candles without inventing
+    # random prices or bypassing the existing workflow result.
+    recent_pattern = returns[-20:] or [0.0]
+    pattern_mean = statistics.mean(recent_pattern)
+    shock_cap = max(daily_vol * 1.5, 0.0025)
+    target_log_return = math.log(max(0.01, 1.0 + predicted_change / 100.0))
+    daily_log_drift = target_log_return / 20.0
+    points = []
+    previous_close = last_close
+    for index, date in enumerate(dates, start=1):
+        raw_shock = recent_pattern[(index - 1) % len(recent_pattern)] - pattern_mean
+        shock = max(-shock_cap, min(shock_cap, raw_shock * 0.65))
+        close = previous_close * math.exp(daily_log_drift + shock)
+        open_price = previous_close
+        intraday_range = max(daily_vol * 1.35, 0.004)
+        high = max(open_price, close) * (1 + intraday_range)
+        low = min(open_price, close) * (1 - intraday_range)
+        width_pct = max(0.35, daily_vol * math.sqrt(index) * 100 * 1.96 * tuning["range_bound_multiplier"])
+        points.append({
+            "date": date,
+            "value": round(close, 4),
+            "open": round(open_price, 4),
+            "high": round(high, 4),
+            "low": round(low, 4),
+            "close": round(close, 4),
+            "lower": round(close * (1 - width_pct / 100.0), 4),
+            "upper": round(close * (1 + width_pct / 100.0), 4),
+        })
+        previous_close = close
+    key_points = []
+    for event in ((analysis or {}).get("events") or [])[-12:]:
+        if not isinstance(event, dict):
+            continue
+        index = event.get("candle_index")
+        try:
+            index = int(index)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= index < len(rows):
+            key_points.append({
+                "date": rows[index].get("date"),
+                "value": rows[index].get("high") or rows[index]["close"],
+                "title": str(event.get("strength") or "价格异动"),
+                "analysis": "单日涨跌或成交量显著偏离近 20 个交易日，建议结合公告、新闻和行业变化核验。",
+                "change_pct": event.get("change_pct"),
+            })
+    return {
+        "available": True,
+        "model": str(graph.get("title") or "预测算法工作流"),
+        "horizon_days": horizon,
+        "history": rows[-90:],
+        "points": points,
+        "key_points": key_points,
+        "summary": {
+            "last_close": round(last_close, 4),
+            "target_change_20d_pct": round(predicted_change, 2),
+            "daily_volatility_pct": round(daily_vol * 100, 2),
+            "confidence": round(confidence, 1),
+            "sample_size": len(rows),
+        },
+        "workflow": workflow,
+        "disclaimer": "预测区间由真实历史日 K 的动量、波动率和历史相似窗口统计生成，不构成投资建议；实际结果可能显著偏离。",
+    }
 
 
 def build_forecast_workflow_preview(graph):

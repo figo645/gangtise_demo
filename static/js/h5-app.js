@@ -198,6 +198,16 @@ function syncPublishedReviewStateToH5(tenantSlug, result) {
       };
     }
   }
+  invalidateReviewDirectory(normalizedSlug);
+  try {
+    window.localStorage.setItem('gangtise_published_review_update_v1', JSON.stringify({
+      tenant_slug: normalizedSlug,
+      published_at: new Date().toISOString(),
+      snapshot_id: payload.snapshot_id || '',
+    }));
+  } catch (error) {
+    // The current tab is already updated; private browsing may block storage.
+  }
 }
 
 function chooseTheme(mode) {
@@ -425,6 +435,8 @@ let reviewDirectoryState = {
   error: '',
   requestSeq: 0,
 };
+let publishedReviewSyncTimer = null;
+let publishedReviewSyncSignature = '';
 let reviewTriggerDraft = {
   period: 'day',
   reviewTitle: '',
@@ -450,6 +462,8 @@ let reviewTriggerDraft = {
   generatedPreviewText: '',
   draftReviewText: '',
   draftReviewHtml: '',
+  editingPublishedInsightId: '',
+  editingPublishedRevisionCount: 0,
   previewReady: false,
 };
 const reviewRuntimeStore = {};
@@ -1330,7 +1344,9 @@ function renderGangtiseMarkdown(value) {
   const renderInline = (text) => String(text || '')
     .replace(/\\ref\{(\d+)\}/g, '<sup class="review-gangtise-citation">[$1]</sup>')
     .replace(/\[(\d{1,3})\]/g, '<sup class="review-gangtise-citation">[$1]</sup>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/==([^=]+)==/g, '<mark>$1</mark>')
+    .replace(/__([^_]+)__/g, '<u>$1</u>');
   const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line);
   const isTableDivider = (line) => {
     if (!isTableRow(line)) return false;
@@ -1382,6 +1398,28 @@ function renderGangtiseMarkdown(value) {
       }
       index -= 1;
       blocks.push(`<ul>${items.map((item) => `<li>${renderInline(item)}</li>`).join('')}</ul>`);
+      continue;
+    }
+    if (/^\s*\d+[.)]\s+/.test(line)) {
+      flushParagraph();
+      const items = [];
+      while (index < lines.length && /^\s*\d+[.)]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\s*\d+[.)]\s+/, ''));
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(`<ol>${items.map((item) => `<li>${renderInline(item)}</li>`).join('')}</ol>`);
+      continue;
+    }
+    if (/^\s*>\s?/.test(line)) {
+      flushParagraph();
+      const quoteLines = [];
+      while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+        quoteLines.push(lines[index].replace(/^\s*>\s?/, '').trim());
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(`<blockquote>${renderInline(quoteLines.join('<br>'))}</blockquote>`);
       continue;
     }
     if (!line.trim()) {
@@ -2322,6 +2360,8 @@ function buildReviewArticleData(review) {
     accessLabel: String(review.access_label || (review.access_mode === 'subscriber' ? '订阅专享' : '常规笔记')),
     isPinned: !!review.is_pinned,
     pinnedAt: String(review.pinned_at || '').trim(),
+    revisionCount: Math.max(0, Number(review.revision_count || review.revisionCount || 0)),
+    revisionLabel: String(review.revision_label || review.revisionLabel || '').trim(),
     title: review.title,
     kicker: `${review.author} ${review.periodLabel}`,
     meta: `发布日期 ${publishedAt} · 阅读量 ${formatReviewViewCount(viewCount)}`,
@@ -2379,6 +2419,8 @@ function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
     viewCount: matched.view_count,
     is_pinned: matched.is_pinned,
     pinned_at: matched.pinned_at,
+    revision_count: matched.revision_count,
+    revision_label: matched.revision_label,
     title: matched.title || '洞见分析报告',
     content_kind: matched.content_kind || 'insight',
     broadcast_kind: matched.broadcast_kind || '',
@@ -2480,7 +2522,7 @@ function renderReviewArticleCards(articles) {
             ${article.contentKind === 'ai_broadcast' ? `<div class="review-article-broadcast-mark">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(article.broadcastLabel || '财经播报')}</div>` : ''}
             ${renderReviewArticleAccessBadge(article)}
             <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
-            <div class="review-article-cover-title">${escapeHtml(article.title)}${article.isPinned ? '<span class="review-pin-badge" aria-label="已置顶">置顶</span>' : ''}</div>
+            <div class="review-article-cover-title">${escapeHtml(article.title)}${article.isPinned ? '<span class="review-pin-badge" aria-label="已置顶">置顶</span>' : ''}${article.revisionCount ? `<span class="review-pin-badge">${escapeHtml(article.revisionLabel || `第 ${article.revisionCount} 次修改`)}</span>` : ''}</div>
             <div class="review-article-cover-meta">发布日期 ${escapeHtml(article.publishedAt || article.generatedAt || '日期未提供')} · 阅读量 ${escapeHtml(formatReviewViewCount(article.viewCount))}</div>
           </div>
           <div class="review-article-card-summary">${escapeHtml(article.summary)}</div>
@@ -2493,6 +2535,7 @@ function renderReviewArticleCards(articles) {
             </div>
             <div style="display:flex;align-items:center;gap:8px">
               <div class="review-article-card-cta">查看全文</div>
+              ${canDelete ? `<button class="review-pin-button" type="button" onclick="event.stopPropagation();editPublishedReviewArticle('${escapeAttr(article.id)}')">编辑并重新发布</button>` : ''}
               ${canDelete ? `<button class="review-pin-button" type="button" aria-label="${article.isPinned ? '取消置顶' : '置顶'}" onclick="event.stopPropagation();togglePublishedReviewPin('${escapeAttr(article.id)}', ${article.isPinned ? 'false' : 'true'})">${article.isPinned ? '取消置顶' : '置顶'}</button>` : ''}
               ${canDelete ? `<button class="btn-outline" type="button" style="padding:5px 8px;font-size:10px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="event.stopPropagation();deletePublishedReviewArticle('${escapeAttr(article.id)}')">删除</button>` : ''}
             </div>
@@ -2554,13 +2597,16 @@ function renderFeedMarketEconomy(items, title, chartId, limit = 10, description 
     value: Number(item.change_pct || 0),
   }));
   const safeChartId = chartId || `feed-market-chart-${Math.random().toString(36).slice(2, 8)}`;
-  window.setTimeout(() => renderFeedMarketEconomyChart(safeChartId, chartRows), 0);
+  window.setTimeout(() => renderFeedMarketEconomyChart(safeChartId, chartRows, 0), 0);
   return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(quoteLabel)} · ${escapeHtml(syncLabel)}</div></div>`;
 }
 
-function renderFeedMarketEconomyChart(chartId, rows) {
+function renderFeedMarketEconomyChart(chartId, rows, attempt = 0) {
   const host = document.getElementById(chartId);
-  if (!host || !window.GangtiseEcharts) return;
+  if (!host || !window.GangtiseEcharts) {
+    if (attempt < 20) window.setTimeout(() => renderFeedMarketEconomyChart(chartId, rows, attempt + 1), 100);
+    return;
+  }
   const labels = rows.map((item) => item.label);
   const values = rows.map((item) => Number.isFinite(item.value) ? item.value : 0);
   const maxAbs = Math.max(...values.map((value) => Math.abs(value)), 1);
@@ -2797,6 +2843,7 @@ async function loadFeedMarketEconomy() {
     if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
     const sectors = await sectorResponse.json().catch(() => ({}));
     const overview = await overviewResponse.json().catch(() => ({}));
+    window.feedMarketRetryCount = 0;
     renderFeedMarketEconomyPanel(overview, sectors);
     const retryAfterMs = Math.max(Number(sectors.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
     if (retryAfterMs && !window.feedMarketOnDemandRetryPending) {
@@ -2808,6 +2855,15 @@ async function loadFeedMarketEconomy() {
     }
   } catch (error) {
     renderFeedMarketEconomyPanel({}, {});
+    const retryCount = Number(window.feedMarketRetryCount || 0);
+    if (retryCount < 5 && !window.feedMarketRetryPending) {
+      window.feedMarketRetryCount = retryCount + 1;
+      window.feedMarketRetryPending = true;
+      window.setTimeout(() => {
+        window.feedMarketRetryPending = false;
+        loadFeedMarketEconomy();
+      }, Math.min(30000, 1500 * (retryCount + 1)));
+    }
   }
 }
 
@@ -2874,7 +2930,7 @@ async function togglePublishedReviewPin(articleId, pinned) {
       body: JSON.stringify({pinned: !!pinned}),
     });
     const payload = await response.json();
-    if (!response.ok || !payload.ok) throw new Error(payload.error || 'review_pin_update_failed');
+    if (!response.ok || !payload.ok) throw new Error(payload.message || payload.error || 'review_pin_update_failed');
     syncPublishedReviewStateToH5(tenantSlug, payload);
     invalidateReviewDirectory(tenantSlug);
     renderReviewExperience();
@@ -3036,6 +3092,32 @@ function loadMoreReviewDirectory() {
   }
 }
 
+async function refreshPublishedReviewsIfVisible() {
+  const reviewPage = document.getElementById('page-review');
+  if (!reviewPage || !reviewPage.classList.contains('active') || document.hidden) return;
+  const tenantSlug = getReviewDirectoryTenantSlug();
+  if (!tenantSlug) return;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/published-insights?limit=10&offset=0`, { cache: 'no-store' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok) return;
+    const incoming = Array.isArray(payload.items) ? payload.items : [];
+    const signature = incoming.map((item) => `${item.id || ''}:${item.published_at || item.time || ''}`).join('|');
+    if (signature === publishedReviewSyncSignature) return;
+    publishedReviewSyncSignature = signature;
+    currentTenantDashboardPayload = { ...(currentTenantDashboardPayload || {}), reviews: incoming };
+    invalidateReviewDirectory(tenantSlug);
+    renderReviewExperience();
+  } catch (error) {
+    // The current content remains usable when a background refresh fails.
+  }
+}
+
+function startPublishedReviewSync() {
+  if (publishedReviewSyncTimer) return;
+  publishedReviewSyncTimer = window.setInterval(refreshPublishedReviewsIfVisible, 15000);
+}
+
 function renderReviewDirectoryLoadMore() {
   if (!reviewDirectoryStateMatchesCurrentView()) return '';
   if (reviewDirectoryState.error) {
@@ -3177,7 +3259,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
         <div class="review-article-detail-kicker">${isAgentBroadcast ? `<span class="review-article-broadcast-label">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(broadcastLabel)}</span>` : escapeHtml(article.kicker)}</div>
         ${renderReviewArticleAccessLabel(article)}
       </div>
-      <div class="review-article-detail-title">${escapeHtml(article.title)}</div>
+      <div class="review-article-detail-title">${escapeHtml(article.title)}${article.revisionCount ? `<span class="review-pin-badge">${escapeHtml(article.revisionLabel || `第 ${article.revisionCount} 次修改`)}</span>` : ''}</div>
       <div class="review-article-detail-meta">${escapeHtml(article.meta)}${metaSuffix}</div>
       <div class="review-watchlist-row">
         ${(article.watchlist || []).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
@@ -3340,7 +3422,6 @@ function renderReviewHome() {
           <div class="review-directory-view-desc">按最新发布时间展示最近 3 篇洞见文章，点击后进入独立详情页。</div>
           <div class="review-access-legend" aria-label="洞见内容权限说明">
             <span class="review-access-legend-label">内容范围</span>
-            <span class="review-access-label public">常规内容</span>
             <span class="review-access-label subscriber">🔒 订阅专享</span>
           </div>
         </div>
@@ -3361,10 +3442,9 @@ function renderReviewListPage() {
       <div class="review-directory-view-head">
         <div>
           <div class="review-directory-view-title">全部洞见</div>
-          <div class="review-directory-view-desc">查看当前租户可见的全部已发布洞见文章。</div>
+          <div class="review-directory-view-desc">查看当前租户可见的全部已发布洞见文章。置顶最多 5 篇，每篇默认保留 7 天，超时自动恢复普通排序。</div>
           <div class="review-access-legend" aria-label="洞见内容权限说明">
             <span class="review-access-legend-label">内容范围</span>
-            <span class="review-access-label public">常规内容</span>
             <span class="review-access-label subscriber">🔒 订阅专享</span>
           </div>
         </div>
@@ -3387,8 +3467,7 @@ function renderReviewDetailPage() {
         <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewArticleList()">返回洞见列表</button>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
           <span class="tag tag-gold">洞见详情</span>
-          ${isDavCapableUser(getActiveDemoUser()) ? `<button class="review-pin-button" type="button" onclick="togglePublishedReviewPin('${escapeAttr(article.id)}', ${article.isPinned ? 'false' : 'true'})">${article.isPinned ? '取消置顶' : '置顶'}</button>` : ''}
-          ${renderReviewArticleAccessLabel(article)}
+          ${isDavCapableUser(getActiveDemoUser()) ? `<button class="review-pin-button" type="button" onclick="editPublishedReviewArticle('${escapeAttr(article.id)}')">编辑并重新发布</button><button class="review-pin-button" type="button" onclick="togglePublishedReviewPin('${escapeAttr(article.id)}', ${article.isPinned ? 'false' : 'true'})">${article.isPinned ? '取消置顶' : '置顶'}</button>` : ''}
         </div>
       </div>
       ${renderReviewArticleDetailContent(article)}
@@ -3509,6 +3588,8 @@ function openReviewTriggerModal(sourceMode) {
   // This entry point always starts a new note. Loading an existing draft goes
   // through editInsightDraft(), which intentionally retains its database ID.
   activeInsightDraftId = '';
+  reviewTriggerDraft.editingPublishedInsightId = '';
+  reviewTriggerDraft.editingPublishedRevisionCount = 0;
   insightDraftLibraryView = false;
   reviewTriggerDraft.period = currentReviewPeriod;
   if (sourceMode && getAvailableReviewSourceOptions().some(item => item.value === sourceMode)) {
@@ -3864,10 +3945,7 @@ function richHtmlToPlainText(html) {
 function plainTextToRichHtml(text) {
   const normalized = String(text || '').trim();
   if (!normalized) return '';
-  return normalized
-    .split(/\n{2,}/)
-    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
-    .join('');
+  return renderGangtiseMarkdown(normalized);
 }
 
 function buildReviewGeneratedHtml(text, sourceHtml) {
@@ -3883,7 +3961,8 @@ function buildReviewGeneratedHtml(text, sourceHtml) {
 }
 
 function getReviewPreviewHtml() {
-  return buildReviewGeneratedHtml(getReviewPreviewText(), reviewTriggerDraft.draftReviewHtml || reviewTriggerDraft.manualHtml);
+  return normalizeRichHtml(reviewTriggerDraft.draftReviewHtml)
+    || buildReviewGeneratedHtml(getReviewPreviewText(), reviewTriggerDraft.manualHtml);
 }
 
 function mergePlainTextIntoRichHtml(existingHtml, incomingText) {
@@ -4122,6 +4201,8 @@ async function publishReviewContent(text, transcriptionEngine, transcriptModel, 
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       text,
+      content_html: getReviewPreviewHtml(),
+      insight_id: reviewTriggerDraft.editingPublishedInsightId || '',
       tenant_slug: ((user || {}).tenant || {}).slug || '',
       period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
       review_title: String(reviewTriggerDraft.reviewTitle || '').trim(),
@@ -4145,6 +4226,28 @@ async function publishReviewContent(text, transcriptionEngine, transcriptModel, 
     throw new Error((data && data.error) || 'publish_failed');
   }
   return data;
+}
+
+function editPublishedReviewArticle(articleId) {
+  const article = getReviewArticleById(articleId);
+  const user = getActiveDemoUser();
+  if (!article || !isDavCapableUser(user)) return;
+  reviewProductionPage = true;
+  reviewTriggerDraft.editingPublishedInsightId = String(article.id || '');
+  reviewTriggerDraft.editingPublishedRevisionCount = Number(article.revisionCount || 0);
+  reviewTriggerDraft.reviewTitle = String(article.title || '').trim();
+  reviewTriggerDraft.accessMode = article.accessMode === 'subscriber' ? 'subscriber' : 'public';
+  reviewTriggerDraft.sourceMode = String(article.sourceMode || 'manual').trim() || 'manual';
+  reviewTriggerDraft.manualHtml = String(article.contentHtml || '').trim() || plainTextToRichHtml(article.contentText || '');
+  reviewTriggerDraft.draftReviewHtml = reviewTriggerDraft.manualHtml;
+  reviewTriggerDraft.draftReviewText = String(article.contentText || richHtmlToPlainText(reviewTriggerDraft.manualHtml)).trim();
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.flowStage = 'intake';
+  const url = new URL(window.location.href);
+  url.searchParams.set('review', 'compose');
+  window.history.pushState({}, '', url);
+  switchTab('review');
+  renderReviewTriggerModal(user);
 }
 
 function mapKnowledgeEntryForTenant(item, tenantId, index = 0) {
@@ -4728,6 +4831,7 @@ function resumeActiveReviewDraftJob(job) {
       const result = nextJob.result || {};
       reviewTriggerDraft.generatedPreviewText = result.text || '';
       reviewTriggerDraft.draftReviewText = result.text || getReviewDraftContentText();
+      reviewTriggerDraft.draftReviewHtml = buildReviewGeneratedHtml(reviewTriggerDraft.draftReviewText, reviewTriggerDraft.manualHtml);
       reviewIngestResult = { ...(reviewIngestResult || {}), review_draft_llm: result.llm_model || null };
       reviewDraftGenerating = false;
       reviewDraftJobState = nextJob;
@@ -5166,6 +5270,7 @@ function persistReviewDraftRuntime(runtime) {
   runtime.latestPromptTags = (reviewTriggerDraft.promptTags || []).slice(0);
   runtime.latestGeneratedPreviewText = reviewTriggerDraft.generatedPreviewText || '';
   runtime.latestDraftReviewText = reviewTriggerDraft.draftReviewText || '';
+  runtime.latestDraftReviewHtml = reviewTriggerDraft.draftReviewHtml || '';
   runtime.draftReady = true;
 }
 
@@ -5596,6 +5701,7 @@ async function submitReviewSmartOptimize() {
           const result = job.result || {};
           reviewTriggerDraft.generatedPreviewText = result.text || '';
           reviewTriggerDraft.draftReviewText = result.text || getReviewDraftContentText();
+          reviewTriggerDraft.draftReviewHtml = buildReviewGeneratedHtml(reviewTriggerDraft.draftReviewText, reviewTriggerDraft.manualHtml);
           reviewIngestResult = {
             ...(reviewIngestResult || {}),
             review_draft_llm: result.llm_model || null,
@@ -8390,6 +8496,13 @@ function switchTab(tab) {
   // Show selected page
   if (activePage) activePage.classList.add('active');
 
+  window.requestAnimationFrame(() => {
+    if (window.GangtiseEcharts && typeof window.GangtiseEcharts.resizeAll === 'function') {
+      window.GangtiseEcharts.resizeAll();
+    }
+    if (tab === 'feed') renderFundNewsAnalysisCharts();
+  });
+
   // Activate bottom nav item
   const navItem = document.getElementById('nav-' + tab);
   if (navItem) navItem.classList.add('active');
@@ -10023,8 +10136,78 @@ function closeWatchlistDetailPage() {
   currentWatchlistSection = 'overview';
 }
 
-function renderWatchlistKlineAnalysis(analysis) {
+let currentWatchlistForecastHorizon = 20;
+
+function formatForecastDate(value) {
+  const text = String(value || '');
+  return text.length >= 10 ? text.slice(5, 10) : text || '--';
+}
+
+function renderWatchlistForecastChart(forecast) {
+  const payload = forecast && typeof forecast === 'object' ? forecast : {};
+  if (!payload.available) {
+    return `<div class="watch-section-card"><div class="watch-section-title">5. 基于历史数据的未来预测</div><div class="watch-section-desc">${escapeHtml(payload.message || '预测模型暂时不可用。')}</div></div>`;
+  }
+  const summary = payload.summary || {};
+  const horizon = [20, 40, 60].includes(Number(currentWatchlistForecastHorizon)) ? Number(currentWatchlistForecastHorizon) : 20;
+  const history = Array.isArray(payload.history) ? payload.history : [];
+  const points = (Array.isArray(payload.points) ? payload.points : []).slice(0, horizon);
+  const markers = Array.isArray(payload.key_points) ? payload.key_points : [];
+  const shell = buildInlineChartShell('watchlist-forecast-kline', '330px', (element) => {
+    if (!window.GangtiseEcharts) return;
+    const labels = history.map((item) => formatForecastDate(item.date)).concat(points.map((item) => formatForecastDate(item.date)));
+    const candleData = history.map((item) => [Number(item.open || 0), Number(item.close || 0), Number(item.low || 0), Number(item.high || 0)]);
+    const forecastCandleData = Array(history.length).fill('-').concat(points.map((item) => [Number(item.open || item.value || 0), Number(item.close || item.value || 0), Number(item.low || item.value || 0), Number(item.high || item.value || 0)]));
+    const empty = Array(history.length).fill('-');
+    const center = empty.concat(points.map((item) => Number(item.value)));
+    const lower = empty.concat(points.map((item) => Number(item.lower)));
+    const span = empty.concat(points.map((item) => Number(item.upper) - Number(item.lower)));
+    const markerData = markers.map((item) => {
+      const index = history.findIndex((row) => String(row.date || '') === String(item.date || ''));
+      return index >= 0 ? { value: [index, Number(item.value || 0)], meta: item } : null;
+    }).filter(Boolean);
+    const axis = window.GangtiseEcharts.axisBase({ splitLine: { show: false }, axisLabel: { color: '#738095', fontSize: 10, hideOverlap: true } });
+    window.GangtiseEcharts.render(element, {
+      animationDuration: 360,
+      color: ['#B42318', '#2F74C0', '#2F74C0', '#8AA6C7', '#F6C453'],
+      legend: window.GangtiseEcharts.legendBase({ bottom: 2, textStyle: { color: '#445468', fontSize: 10 } }),
+      tooltip: window.GangtiseEcharts.tooltipBase((params) => {
+        const rows = Array.isArray(params) ? params : [params];
+        const marker = rows.find((item) => item.seriesName === '历史关键点' && item.data && item.data.meta);
+        if (marker) return `<div style="font-weight:700;margin-bottom:5px">${escapeHtml(marker.data.meta.title || '历史关键点')}</div>${escapeHtml(marker.data.meta.analysis || '暂无分析')}`;
+        const first = rows[0] || {};
+        const index = Number(first.dataIndex || 0);
+        const point = index >= history.length ? points[index - history.length] : null;
+        if (point) return `<div style="font-weight:700;margin-bottom:5px">${escapeHtml(String(point.date || ''))} · 未来预测K线</div>开 ${Number(point.open || point.value).toFixed(2)} · 高 ${Number(point.high || point.value).toFixed(2)}<br>低 ${Number(point.low || point.value).toFixed(2)} · 收 ${Number(point.close || point.value).toFixed(2)}<br>统计区间：${Number(point.lower).toFixed(2)} - ${Number(point.upper).toFixed(2)}`;
+        const candle = history[index] || {};
+        return `<div style="font-weight:700;margin-bottom:5px">${escapeHtml(String(candle.date || '--'))}</div>开 ${Number(candle.open || 0).toFixed(2)} · 收 ${Number(candle.close || 0).toFixed(2)}`;
+      }),
+      grid: window.GangtiseEcharts.gridBase({ top: 30, left: 14, right: 16, bottom: 62 }),
+      dataZoom: [{ type: 'inside', xAxisIndex: [0] }, { type: 'slider', xAxisIndex: [0], height: 16, bottom: 28, borderColor: 'transparent' }],
+      xAxis: { type: 'category', data: labels, boundaryGap: true, ...axis },
+      yAxis: { type: 'value', scale: true, ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#738095', fontSize: 10 } }) },
+      series: [
+        { name: '真实日K', type: 'candlestick', data: candleData.concat(Array(points.length).fill('-')), itemStyle: { color: '#B42318', color0: '#18794E', borderColor: '#B42318', borderColor0: '#18794E' } },
+        { name: '未来预测K线', type: 'candlestick', data: forecastCandleData, itemStyle: { color: '#F6C453', color0: '#D69E2E', borderColor: '#D69E2E', borderColor0: '#B7791F' } },
+        { name: '预测下沿', type: 'line', stack: '预测区间', data: lower, symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(47,116,192,0.05)' } },
+        { name: '预测区间', type: 'line', stack: '预测区间', data: span, symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(47,116,192,0.20)' } },
+        { name: '预测中轴', type: 'line', data: center, symbol: 'none', connectNulls: false, lineStyle: { color: '#2F74C0', width: 2, type: 'dashed' } },
+        { name: '未来趋势预测', type: 'line', data: center, symbol: 'circle', symbolSize: 4, connectNulls: false, lineStyle: { color: '#D97706', width: 2.5, type: 'solid' } },
+        { name: '历史关键点', type: 'scatter', data: markerData, symbolSize: 12, itemStyle: { color: '#F6C453', borderColor: '#FFFFFF', borderWidth: 2 }, label: { show: true, formatter: '注', color: '#24364B', fontSize: 9, fontWeight: 700 } },
+      ],
+    });
+  });
+  return `<div class="watch-section-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><div class="watch-section-title">5. 基于历史数据的未来预测</div><div class="watch-section-desc">真实历史日K + ${escapeHtml(payload.model || '预测模型')}。蓝色虚线为预测中轴，阴影为统计区间；黄色标记为历史关键点。</div></div><div style="display:flex;gap:5px">${[20, 40, 60].map((days) => `<button type="button" class="btn-outline" style="padding:5px 8px;font-size:11px;${horizon === days ? 'background:#2F74C0;color:#fff;border-color:#2F74C0' : ''}" onclick="setWatchlistForecastHorizon(${days})">${days}天</button>`).join('')}</div></div><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0"><div class="watch-analysis-card"><div class="watch-analysis-label">20日模型目标变动</div><div class="watch-analysis-value">${Number(summary.target_change_20d_pct || 0) >= 0 ? '+' : ''}${Number(summary.target_change_20d_pct || 0).toFixed(2)}%</div></div><div class="watch-analysis-card"><div class="watch-analysis-label">近30日波动率</div><div class="watch-analysis-value">${Number(summary.daily_volatility_pct || 0).toFixed(2)}%</div></div><div class="watch-analysis-card"><div class="watch-analysis-label">样本置信度</div><div class="watch-analysis-value">${Number(summary.confidence || 0).toFixed(0)}%</div></div></div>${shell.chartHtml}<div class="watch-section-desc" style="margin-top:8px">${escapeHtml(payload.disclaimer || '')}</div></div>`;
+}
+
+function setWatchlistForecastHorizon(days) {
+  currentWatchlistForecastHorizon = Number(days) || 20;
+  if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, 'analysis');
+}
+
+function renderWatchlistKlineAnalysis(analysis, forecast) {
   const result = analysis && typeof analysis === 'object' ? analysis : {};
+  forecast = forecast && typeof forecast === 'object' ? forecast : {};
   const trends = result.trends && typeof result.trends === 'object' ? result.trends : {};
   const rolling = result.rolling_returns && typeof result.rolling_returns === 'object' ? result.rolling_returns : {};
   const volatility = result.volatility && typeof result.volatility === 'object' ? result.volatility : {};
@@ -10126,6 +10309,7 @@ function renderWatchlistKlineAnalysis(analysis) {
       <div class="watch-section-title">使用前请注意</div>
       <ul class="watch-analysis-limitations">${(limitations.length ? limitations : ['过去的走势只是参考，不能保证未来也会这样走。']).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
     </div>
+    ${renderWatchlistForecastChart(forecast)}
   `;
 }
 
@@ -10141,14 +10325,18 @@ function renderWatchlistDetail(data, section) {
   const allowFanToFan = commentSettings.allow_fan_to_fan !== false;
   const annotationKey = data.annotation_key || data.indicator_code || data.code;
   const hasRealMarketPrice = data.data_unavailable !== true && Number.isFinite(Number(data.price)) && Number(data.price) > 0;
+  const analysisSeries = data.history_kline && Array.isArray(data.history_kline.candles)
+    ? data.history_kline.candles
+    : (data.kline || []);
+  const overviewKlineSeries = analysisSeries.slice(-90);
   // The session cache is hydrated from the server on open and is updated after
   // each write. Rendering from it avoids stale markers after an edit or delete.
   const annotations = getWatchlistAnnotations(activeUser.tenant.id, annotationKey).map((item) => ({
       ...item,
       candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
   }));
-  const klineChart = buildWatchlistKlineSvg(data.kline || [], {
-    candleLabel: `${data.name || '标的'} 日K线${data.kline_contains_intraday ? '（含盘中）' : ''}`,
+  const klineChart = buildWatchlistKlineSvg(overviewKlineSeries, {
+    candleLabel: `${data.name || '标的'} 日K线（近90个交易日）${data.kline_contains_intraday ? '（含盘中）' : ''}`,
     annotations,
   });
   const intradayChart = buildWatchlistIntradaySvg(
@@ -10157,9 +10345,6 @@ function renderWatchlistDetail(data, section) {
     data.intraday_source || '',
     String(data.intraday_trade_date || '').trim(),
   );
-  const analysisSeries = data.history_kline && Array.isArray(data.history_kline.candles)
-    ? data.history_kline.candles
-    : (data.kline || []);
   const computedMetricCards = buildWatchlistComputedMetrics(analysisSeries, 90);
   const overviewSection = `
     <div class="watch-section-card">
@@ -10216,7 +10401,7 @@ function renderWatchlistDetail(data, section) {
     </div>
   `;
   const showKlineAnalysis = String(data.asset_type || '').toLowerCase() === 'stock';
-  const analysisSection = showKlineAnalysis ? renderWatchlistKlineAnalysis(data.kline_analysis || {}) : '';
+  const analysisSection = showKlineAnalysis ? renderWatchlistKlineAnalysis(data.kline_analysis || {}, data.kline_forecast || {}) : '';
   const sectionMap = {
     overview: overviewSection,
     intraday: intradaySection,
@@ -11248,9 +11433,12 @@ function selectFundNewsAnalysisWindow(windowKey) {
   });
   renderFundNewsAnalysisCharts();
 }
-function renderFundNewsAnalysisCharts() {
+function renderFundNewsAnalysisCharts(attempt = 0) {
   const host = document.getElementById('fund-news-analysis');
-  if (!host || !window.echarts) return;
+  if (!host || !window.echarts) {
+    if (host && !window.echarts && attempt < 20) window.setTimeout(() => renderFundNewsAnalysisCharts(attempt + 1), 150);
+    return;
+  }
   let analysis = {};
   try { analysis = JSON.parse(host.dataset.analysis || '{}'); } catch (error) { analysis = {}; }
   const selected = (analysis.windows && analysis.windows[fundNewsAnalysisWindow]) || analysis;
@@ -11273,16 +11461,36 @@ function renderFundNewsAnalysisCharts() {
   const positive = Number(counts.positive || 0);
   const negative = Number(counts.negative || 0);
   fundNewsAnalysisCharts.forEach((chart) => chart?.dispose?.());
-  const pie = window.echarts.init(pieHost);
+  if (!pieHost || !barHost || pieHost.clientWidth < 2 || barHost.clientWidth < 2) {
+    if (attempt < 20) window.setTimeout(() => renderFundNewsAnalysisCharts(attempt + 1), 150);
+    return;
+  }
+  let pie;
+  let bar;
+  try {
+    pie = window.echarts.init(pieHost);
+  } catch (error) {
+    console.error('news impact chart init failed', error);
+    if (attempt < 20) window.setTimeout(() => renderFundNewsAnalysisCharts(attempt + 1), 300);
+    return;
+  }
   pie.setOption({ animation: false, tooltip: { trigger: 'item', formatter: '{b}: {c} 条 ({d}%)' }, legend: { bottom: 5, left: 'center', textStyle: { fontSize: 10 } }, series: [{ type: 'pie', radius: ['42%', '70%'], center: ['50%', '45%'], avoidLabelOverlap: true, label: { fontSize: 10, formatter: '{b} {d}%' }, data: [{ name: '利好', value: positive, itemStyle: { color: '#D64545' } }, { name: '利空', value: negative, itemStyle: { color: '#2E9B65' } }, { name: '中性/待确认', value: Number(counts.neutral || 0), itemStyle: { color: '#AAB4C0' } }, { name: '影响分化', value: Number(counts.mixed || 0), itemStyle: { color: '#D69E2E' } }] }]
   });
   const industries = Array.isArray(selected.industries) ? selected.industries.slice(0, 8) : [];
-  const bar = window.echarts.init(barHost);
+  try {
+    bar = window.echarts.init(barHost);
+  } catch (error) {
+    pie.dispose();
+    console.error('news industry chart init failed', error);
+    if (attempt < 20) window.setTimeout(() => renderFundNewsAnalysisCharts(attempt + 1), 300);
+    return;
+  }
   bar.setOption({ animation: false, grid: { left: 72, right: 12, top: 32, bottom: 24 }, tooltip: { trigger: 'axis', valueFormatter: value => `${value}%` }, legend: { top: 8, right: 8, textStyle: { fontSize: 9 } }, xAxis: { type: 'value', max: 100, axisLabel: { fontSize: 9, formatter: '{value}%' }, splitLine: { lineStyle: { color: '#EEF2F6' } } }, yAxis: { type: 'category', inverse: true, data: industries.map(item => item.industry), axisLabel: { fontSize: 9, width: 62, overflow: 'truncate' } }, series: [{ name: '利好', type: 'bar', stack: 'impact', data: industries.map(item => item.positive_pct), itemStyle: { color: '#D64545' }, barMaxWidth: 16 }, { name: '利空', type: 'bar', stack: 'impact', data: industries.map(item => item.negative_pct), itemStyle: { color: '#2E9B65' }, barMaxWidth: 16 }, { name: '中性/待确认', type: 'bar', stack: 'impact', data: industries.map(item => item.neutral_pct), itemStyle: { color: '#AAB4C0' }, barMaxWidth: 16 }, { name: '影响分化', type: 'bar', stack: 'impact', data: industries.map(item => item.mixed_pct), itemStyle: { color: '#D69E2E' }, barMaxWidth: 16 }] });
   fundNewsAnalysisCharts = [pie, bar];
   if (fundNewsAnalysisResizeHandler) window.removeEventListener('resize', fundNewsAnalysisResizeHandler);
   fundNewsAnalysisResizeHandler = () => fundNewsAnalysisCharts.forEach((chart) => chart.resize());
   window.addEventListener('resize', fundNewsAnalysisResizeHandler);
+  window.requestAnimationFrame(() => fundNewsAnalysisCharts.forEach((chart) => chart.resize()));
 }
 
 function getHermesSettings() {
@@ -15781,6 +15989,7 @@ function initH5SplashScreen() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  startPublishedReviewSync();
   removeLegacyWorkbenchDashboardMarkup();
   initH5SplashScreen();
   renderFundNewsHome();
@@ -15845,12 +16054,24 @@ document.addEventListener('visibilitychange', () => {
       refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});
     }
   }
+  if (!document.hidden) refreshPublishedReviewsIfVisible();
 });
 
 window.addEventListener('storage', (event) => {
   if (event.key === SITE_CONFIG_BROADCAST_KEY) {
     refreshH5SiteConfig({silent: true});
     refreshTenantDashboardRemoteState({force: true, rerenderFeed: true, rerenderWorkbench: true, rerenderReviews: true});
+  }
+  if (event.key === 'gangtise_published_review_update_v1' && event.newValue) {
+    let update = null;
+    try { update = JSON.parse(event.newValue); } catch (error) { update = null; }
+    const activeUser = getActiveDemoUser() || {};
+    const activeTenantSlug = String(((activeUser.tenant || {}).slug || (window.ACTIVE_TENANT || {}).slug || '')).trim().toLowerCase();
+    const updateTenantSlug = String((update || {}).tenant_slug || '').trim().toLowerCase();
+    if (activeTenantSlug && activeTenantSlug === updateTenantSlug) {
+      invalidateReviewDirectory(activeTenantSlug);
+      refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});
+    }
   }
 });
 

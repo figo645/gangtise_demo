@@ -1183,7 +1183,10 @@ def api_pin_tenant_review(tenant_slug, review_id):
         result = set_tenant_published_insight_pin(requested_tenant, review_id, payload["pinned"])
     except ValueError as exc:
         status = 404 if str(exc) in {"tenant_not_found", "review_not_found"} else 400
-        return jsonify({"ok": False, "error": str(exc)}), status
+        message = {
+            "review_pin_limit_reached": "最多只能同时置顶 5 篇洞见，请先取消一篇已有置顶内容。",
+        }.get(str(exc), str(exc))
+        return jsonify({"ok": False, "error": str(exc), "message": message}), status
     except Exception:
         app.logger.exception("Failed to update tenant review pin")
         return jsonify({"ok": False, "error": "review_pin_update_failed"}), 500

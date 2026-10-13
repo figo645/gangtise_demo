@@ -61,6 +61,15 @@ class PublishedInsightPinningBddTest(unittest.TestCase):
         self.assertIn("pinned_at TIMESTAMPTZ", sql)
         self.assertIn("is_pinned DESC", sql)
 
+    def test_pin_policy_is_seven_days_and_five_items(self):
+        self.assertEqual(core_services.PUBLISHED_INSIGHT_PIN_LIMIT, 5)
+        self.assertEqual(core_services.PUBLISHED_INSIGHT_PIN_DAYS, 7)
+        h5 = (PROJECT_ROOT / "templates/h5.html").read_text(encoding="utf-8")
+        workbench = (PROJECT_ROOT / "templates/kol_workbench.html").read_text(encoding="utf-8")
+        for html in (h5, workbench):
+            self.assertIn("置顶最多 5 篇，每篇默认保留 7 天", html)
+        self.assertIn("review_pin_limit_reached", (PROJECT_ROOT / "src/web/api_kol.py").read_text(encoding="utf-8"))
+
     def test_pin_service_changes_only_explicit_pin_state_and_keeps_published_date(self):
         db = _PinDb()
         tenant = {"slug": "dav", "advisor": "财经老王"}
@@ -71,8 +80,8 @@ class PublishedInsightPinningBddTest(unittest.TestCase):
 
         self.assertTrue(result["pinned"])
         self.assertEqual(result["snapshot"]["published_date"], "2025-11-01")
-        self.assertIn("SET is_pinned = ?", db.calls[0][0])
-        self.assertIn("published_date", db.calls[0][0])
+        update_sql = next(sql for sql, _ in db.calls if "SET is_pinned = ?" in sql)
+        self.assertIn("published_date", update_sql)
 
     def test_pin_endpoint_requires_dav_and_has_one_shared_h5_web_route(self):
         client = app_entry.app.test_client()

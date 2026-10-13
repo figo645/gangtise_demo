@@ -2083,7 +2083,9 @@ def fetch_gangtise_intraday_series(security_code, token="", trade_date="", limit
         "startTime": f"{effective_date} 09:30:00",
         "endTime": f"{effective_date} 15:00:00",
         "Limit": max(60, min(int(limit or 600), 600)),
-        "fieldList": ["securityCode", "securityName", "tradeTime", "open", "high", "low", "close", "volume"],
+        # Gangtise minute quote does not accept securityName. The returned
+        # securityCode is sufficient to identify the instrument.
+        "fieldList": ["securityCode", "tradeTime", "open", "high", "low", "close", "volume"],
     }
     status, response, duration = post_gangtise_openapi_json(
         "/application/open-quote/kline/minute",

@@ -78,7 +78,27 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn('id="review-active-jobs-overview-host"', html)
         self.assertIn("function renderReviewExperience()", html)
         self.assertIn("function publishReviewDraft()", html)
+
+    def test_given_published_insight_when_editing_then_same_id_and_revision_label_are_supported(self):
+        h5 = (PROJECT_ROOT / "static/js/h5-app.js").read_text(encoding="utf-8")
+        h5_template = (PROJECT_ROOT / "templates/h5.html").read_text(encoding="utf-8")
+        workbench = (PROJECT_ROOT / "templates/kol_workbench.html").read_text(encoding="utf-8")
+        html = h5
+        self.assertIn("insight_id: reviewTriggerDraft.editingPublishedInsightId || ''", h5)
+        self.assertIn("function editPublishedReviewArticle(articleId)", h5)
+        self.assertIn("第 ${article.revisionCount} 次修改", h5)
+        self.assertIn("revision_count: matched.revision_count", h5)
+        self.assertIn("article.revisionLabel || `第 ${article.revisionCount} 次修改`", h5)
+        self.assertIn("function editPublishedReviewArticle(articleId)", h5_template)
+        self.assertIn("revision_count: matched.revision_count", h5_template)
+        self.assertIn("article.revisionLabel || `第 ${article.revisionCount} 次修改`", h5_template)
+        self.assertIn("function kwEditPublishedReview(reviewId)", workbench)
+        self.assertIn("insight_id: kwReviewDraft.editingPublishedInsightId || ''", workbench)
+        self.assertIn("revision_count", (PROJECT_ROOT / "src/domain/ai_services.py").read_text(encoding="utf-8"))
         self.assertIn("function syncPublishedReviewStateToH5(tenantSlug, result)", html)
+        self.assertIn("invalidateReviewDirectory(normalizedSlug);", html)
+        self.assertIn("gangtise_published_review_update_v1", html)
+        self.assertIn("refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});", html)
         self.assertIn("const localMessageState = (activeUser && activeUser.tenant && activeUser.tenant.message_center_state)", html)
         self.assertIn("dmConversationsCache = isDavDmMode() ? localThreads : [getInvestorDmConversation()]", html)
 
@@ -425,6 +445,19 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("这是发布前的最终预览。当前阅读态会尽量贴近普通用户和大V最终看到的详情展示。", html)
         self.assertIn("reviewTriggerDraft.flowStage !== 'preview'", html)
         self.assertIn("renderReviewArticleDetailContent(article, { previewMode: true })", html)
+
+    def test_given_review_polish_result_when_rendered_then_h5_and_web_keep_rich_text_structure(self):
+        h5 = self.client.get(f"/h5?tenant={self.tenant_slug}")
+        web = self.client.get(f"/web?tenant={self.tenant_slug}")
+        self.assertEqual(h5.status_code, 200)
+        self.assertEqual(web.status_code, 200)
+        for response in (h5, web):
+            html = response.get_data(as_text=True)
+            self.assertIn("return renderGangtiseMarkdown(normalized);", html)
+            self.assertIn(".replace(/==([^=]+)==/g, '<mark>$1</mark>')", html)
+            self.assertIn(".replace(/__([^_]+)__/g, '<u>$1</u>')", html)
+            self.assertIn("reviewTriggerDraft.draftReviewHtml = buildReviewGeneratedHtml(reviewTriggerDraft.draftReviewText, reviewTriggerDraft.manualHtml);", html)
+            self.assertIn("content_html: getReviewPreviewHtml()", html)
 
     def test_given_h5_when_review_file_or_url_is_processed_then_editor_handoff_logic_exists(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")

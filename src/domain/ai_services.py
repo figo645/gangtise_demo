@@ -11696,6 +11696,7 @@ def persist_review_publish_snapshot(
     external_id="",
     dav_id="",
     notify_followers=True,
+    insight_id="",
 ):
     tenant = get_tenant_by_slug(tenant_slug)
     if not tenant or tenant.get("slug") != tenant_slug:
@@ -11751,8 +11752,21 @@ def persist_review_publish_snapshot(
         except (TypeError, ValueError):
             raise ValueError("published_date_invalid")
         published_timestamp = f"{normalized_published_date} 00:00:00"
+    normalized_insight_id = str(insight_id or "").strip()
+    previous_snapshot = None
+    if normalized_insight_id:
+        try:
+            previous_snapshot = get_tenant_published_insight(tenant_slug, normalized_insight_id)
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+    try:
+        previous_revision_count = int((previous_snapshot or {}).get("revision_count") or 0)
+    except (TypeError, ValueError):
+        previous_revision_count = 0
+    revision_count = previous_revision_count + 1 if previous_snapshot else 0
     snapshot = {
-        "id": f"{tenant_slug}-review-{int(time.time() * 1000)}",
+        "id": normalized_insight_id or f"{tenant_slug}-review-{int(time.time() * 1000)}",
         "title": title[:80],
         "period": period_label,
         "period_key": period_key,
@@ -11764,9 +11778,13 @@ def persist_review_publish_snapshot(
         "summary": summary or title[:80],
         "content_text": cleaned_text,
         "content_html": cleaned_html,
+        "revision_count": revision_count,
+        "revision_label": f"第 {revision_count} 次修改" if revision_count else "首次发布",
+        "is_pinned": bool((previous_snapshot or {}).get("is_pinned")),
+        "pinned_at": str((previous_snapshot or {}).get("pinned_at") or "").strip(),
+        "view_count": max(0, int((previous_snapshot or {}).get("view_count") or 0)) if previous_snapshot else 0,
         "access_mode": normalized_access_mode,
         "access_label": "订阅专享" if normalized_access_mode == "subscriber" else "常规笔记",
-        "view_count": 0,
         "source_mode": str(source_mode or "manual").strip().lower() or "manual",
         "external_id": str(external_id or "").strip()[:160],
         "dav_id": str(dav_id or "").strip()[:160],

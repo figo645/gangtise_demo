@@ -504,6 +504,7 @@ def api_review_publish_embed():
             "user_input_section": body.get("user_input_section") if isinstance(body.get("user_input_section"), dict) else {},
             "watchlist_analysis_section": body.get("watchlist_analysis_section") if isinstance(body.get("watchlist_analysis_section"), dict) else {},
             "access_mode": str(body.get("access_mode") or "public").strip().lower() or "public",
+            "insight_id": str(body.get("insight_id") or "").strip(),
         }
         if not is_feature_enabled("knowledge"):
             payload["knowledge_attachments"] = []
@@ -537,6 +538,7 @@ def api_review_publish_embed():
             user_input_section=payload.get("user_input_section"),
             watchlist_analysis_section=payload.get("watchlist_analysis_section"),
             access_mode=payload.get("access_mode"),
+            insight_id=payload.get("insight_id"),
         )
         payload["snapshot_sync_applied"] = True
         payload["snapshot_id"] = str(((snapshot_result.get("snapshot") or {}).get("id")) or "").strip()
@@ -807,6 +809,20 @@ def api_watchlist_detail(stock_code):
         normalized["kline_analysis"] = build_watchlist_kline_analysis(
             analysis_candles or normalized.get("kline") or [],
         )
+        if is_feature_enabled("stock_forecast", site_config):
+            normalized["kline_forecast"] = build_watchlist_kline_forecast(
+                analysis_candles or normalized.get("kline") or [],
+                analysis=normalized["kline_analysis"],
+            )
+        else:
+            # Do not silently omit section 5. A persisted legacy site_config
+            # may disable the flag even after the code default is enabled;
+            # the client needs a diagnosable state instead of a missing tab.
+            normalized["kline_forecast"] = {
+                "available": False,
+                "reason": "stock_forecast_disabled",
+                "message": "预测模型未启用，请在 Admin 功能开关中启用股票 K 线预测。",
+            }
     else:
         normalized.pop("kline_analysis", None)
     app.logger.warning(
@@ -832,6 +848,8 @@ def api_watchlist_detail(stock_code):
                 viewer_role=viewer_role,
                 viewer_profile_id=viewer_profile_id,
             )
+            if isinstance(normalized.get("kline_forecast"), dict) and normalized["kline_forecast"].get("available"):
+                normalized["kline_forecast"]["annotations"] = normalized["annotations"]
         except Exception as exc:
             if not is_db_unavailable_error(exc):
                 raise
