@@ -1578,7 +1578,10 @@ def call_gangtise_stock_summaries(security_codes, timeout=60):
     )
     if not is_gangtise_openapi_success(status, response):
         message = str((response or {}).get("msg") or (response or {}).get("message") or "empty_response").strip()
-        raise RuntimeError(f"gangtise_stock_summary_failed:http_status={status or 0}:{message[:400]}")
+        raise RuntimeError(
+            f"gangtise_stock_summary_failed:http_status={status or 0}:"
+            f"security_codes={','.join(normalized_codes)}:{message[:400]}"
+        )
     data = (response or {}).get("data")
     items = (data or {}).get("list") if isinstance(data, dict) else []
     return {
@@ -1589,6 +1592,71 @@ def call_gangtise_stock_summaries(security_codes, timeout=60):
         "provider": "Gangtise 个股看点摘要",
         "endpoint": "/application/open-ai/stock-summary/getList",
         "limitation": "仅提供单只证券的精炼看点，不能替代完整观察报告。",
+    }
+
+
+def build_gangtise_stock_insight_grid(selected_items, timeout=60):
+    """Build up to nine real stock cards for a DAV Insight grid.
+
+    The function name is retained for API compatibility. New cards use the
+    selected security identity and quote only; recommendation reasons are
+    explicitly authored per card and are never generated implicitly.
+    """
+    items = [item for item in (selected_items or []) if isinstance(item, dict)]
+    if not items:
+        raise ValueError("stock_insight_grid_items_required")
+    if len(items) > 9:
+        raise ValueError("stock_insight_grid_max_nine")
+    codes = [str(item.get("security_code") or "").strip().upper() for item in items]
+    if any(not code for code in codes):
+        raise ValueError("stock_insight_grid_security_code_required")
+    # A newly authored grid starts with no reason.  The reason is deliberately
+    # written by the author in the card editor; do not silently call an
+    # upstream summarizer just because a card has no text.
+    summary_modes = [
+        "manual" if str(item.get("recommendation_reason") or "").strip() else "empty"
+        for item in items
+    ]
+    cards = []
+    for index, item in enumerate(items):
+        code = str(item.get("security_code") or "").strip().upper()
+        recommendation_reason = str(item.get("recommendation_reason") or "").strip()[:600]
+        summary = recommendation_reason if summary_modes[index] == "manual" else ""
+        quote = item
+        if quote.get("price") is None or quote.get("change_pct") is None:
+            try:
+                fetched = get_watchlist_detail_by_code(
+                    stock_code=str(item.get("code") or code).strip(),
+                    stock_name=str(item.get("name") or item.get("stock_name") or "").strip(),
+                    details_map={},
+                    enrich=True,
+                    allow_provider_fetch=True,
+                )
+                if isinstance(fetched, dict):
+                    quote = {**item, **{key: fetched.get(key) for key in ("price", "change", "change_pct") if fetched.get(key) is not None}}
+                    quote["quote_time"] = fetched.get("updated_at") or fetched.get("intraday_updated_at") or ""
+            except Exception as exc:
+                app.logger.warning("Stock grid quote unavailable code=%s error=%s", code, str(exc)[:240])
+        cards.append({
+            "stock_code": str(item.get("code") or code).strip().upper(),
+            "security_code": code,
+            "stock_name": str(item.get("name") or item.get("stock_name") or code).strip()[:80],
+            "market": str(item.get("market") or "").strip().upper()[:12],
+            "industry": str(item.get("industry") or item.get("focus") or "").strip()[:80],
+            "price": quote.get("price"),
+            "change": quote.get("change"),
+            "change_pct": quote.get("change_pct"),
+            "quote_time": str(quote.get("quote_time") or quote.get("updated_at") or item.get("updated_at") or "").strip()[:40],
+            "summary_mode": summary_modes[index],
+            "recommendation_reason": recommendation_reason,
+            "summary": summary[:600],
+        })
+    return {
+        "cards": cards,
+        "provider": "作者手写个股简述",
+        "endpoint": "",
+        "duration_ms": 0,
+        "security_codes": codes,
     }
 
 
@@ -9095,7 +9163,7 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name="", al
         return _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=stock_name)
     cached = _load_cached_watchlist_detail(normalized)
     if cached:
-        app.logger.warning(
+        app.logger.debug(
             "Watchlist detail cache hit security_code=%s code=%s kline_points=%s cache_source=%s",
             security_code,
             str(cached.get("code") or normalized.get("code") or "--").strip().upper(),
@@ -9110,7 +9178,7 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name="", al
     with fetch_lock:
         cached = _load_cached_watchlist_detail(normalized)
         if cached:
-            app.logger.warning(
+            app.logger.debug(
                 "Watchlist detail cache hit after wait security_code=%s code=%s kline_points=%s",
                 security_code,
                 str(cached.get("code") or normalized.get("code") or "--").strip().upper(),
@@ -9752,7 +9820,7 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
     detail = copy.deepcopy((details or {}).get(normalized_code) or {})
     if detail:
         if not enrich:
-            app.logger.warning(
+            app.logger.debug(
                 "Watchlist detail indicator result code=%s kline_points=%s data_unavailable=%s data_source=%s",
                 normalized_code,
                 len(detail.get("kline") or []) if isinstance(detail.get("kline"), list) else 0,
@@ -9762,7 +9830,7 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
             return detail
         data_source = str(detail.get("data_source") or "").strip().lower().replace("_", " ")
         if data_source not in {"gangtise openapi", "gangtise"} or detail.get("data_unavailable"):
-            app.logger.warning(
+            app.logger.debug(
                 "Watchlist detail seed result code=%s kline_points=%s data_unavailable=%s data_source=%s",
                 normalized_code,
                 len(detail.get("kline") or []) if isinstance(detail.get("kline"), list) else 0,
@@ -9783,7 +9851,7 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
             stock_name=stock_name or detail.get("name") or normalized_code,
         ) if realtime_detail else _build_watchlist_unavailable_detail(detail, stock_code=normalized_code, stock_name=stock_name or detail.get("name") or normalized_code)
         result = copy.deepcopy((_enrich_watchlist_details({normalized_code: merged}).get(normalized_code)) or merged)
-        app.logger.warning(
+        app.logger.debug(
             "Watchlist detail merged result code=%s kline_points=%s data_unavailable=%s data_source=%s message=%s",
             normalized_code,
             len(result.get("kline") or []) if isinstance(result.get("kline"), list) else 0,
@@ -9803,7 +9871,7 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
     result = copy.deepcopy((_enrich_watchlist_details({normalized_code: fallback}).get(normalized_code)) or fallback)
     if normalized_code in WATCHLIST_DYNAMIC_DETAIL_PRESETS:
         result["name"] = WATCHLIST_DYNAMIC_DETAIL_PRESETS[normalized_code]["name"]
-    app.logger.warning(
+    app.logger.debug(
         "Watchlist detail fallback result code=%s kline_points=%s data_unavailable=%s data_source=%s message=%s",
         normalized_code,
         len(result.get("kline") or []) if isinstance(result.get("kline"), list) else 0,

@@ -11691,6 +11691,9 @@ def persist_review_publish_snapshot(
     review_summary="",
     user_input_section=None,
     watchlist_analysis_section=None,
+    stock_grid_cards=None,
+    stock_grid_provider="",
+    stock_grid_endpoint="",
     access_mode="public",
     published_date=None,
     external_id="",
@@ -11712,6 +11715,7 @@ def persist_review_publish_snapshot(
         raise ValueError("invalid_review_access_mode")
     normalized_user_input_section = copy.deepcopy(user_input_section if isinstance(user_input_section, dict) else {})
     normalized_watchlist_analysis = copy.deepcopy(watchlist_analysis_section if isinstance(watchlist_analysis_section, dict) else {})
+    normalized_stock_grid_cards = copy.deepcopy(stock_grid_cards if isinstance(stock_grid_cards, list) else [])[:9]
     explicit_title = str(review_title or "").strip()
     title_source_text = str(
         normalized_user_input_section.get("display_text")
@@ -11775,6 +11779,10 @@ def persist_review_publish_snapshot(
         "published_date": normalized_published_date,
         "tags": [str(tag).strip() for tag in (prompt_tags if isinstance(prompt_tags, list) else []) if str(tag).strip()][:6] or (["自定义文案"] if paragraph_mode == "manual" else ["智能文案"]),
         "watchlist": [],
+        "content_kind": "stock_grid" if str(source_mode or "").strip().lower() == "stock_grid" else "insight",
+        "stock_grid_cards": normalized_stock_grid_cards,
+        "stock_grid_provider": str(stock_grid_provider or "").strip()[:120],
+        "stock_grid_endpoint": str(stock_grid_endpoint or "").strip()[:240],
         "summary": summary or title[:80],
         "content_text": cleaned_text,
         "content_html": cleaned_html,

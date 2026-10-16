@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>洞见智研生产系统性能测试报告</title>
+  <style>
+    :root { --ink:#17202a; --muted:#667085; --line:#d9e0e7; --blue:#1769aa; --red:#b42318; --amber:#b54708; --green:#027a48; --bg:#f5f7fa; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:1120px; margin:32px auto; padding:0 20px 48px; }
+    header, section { background:#fff; border:1px solid var(--line); border-radius:8px; padding:24px 28px; margin-bottom:18px; }
+    h1 { margin:0 0 6px; font-size:28px; } h2 { margin:0 0 14px; font-size:20px; } h3 { margin:18px 0 6px; font-size:16px; }
+    .meta { color:var(--muted); } .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:20px; }
+    .metric { border:1px solid var(--line); border-radius:6px; padding:14px; background:#fbfcfe; } .metric strong { display:block; font-size:23px; }
+    table { border-collapse:collapse; width:100%; margin:8px 0 4px; } th,td { border-bottom:1px solid var(--line); padding:10px 8px; text-align:left; vertical-align:top; } th { background:#f7f9fb; }
+    .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; } .high { background:#fee4e2; color:var(--red); } .medium { background:#fef0c7; color:var(--amber); } .good { background:#dcfae6; color:var(--green); }
+    code { background:#f1f3f5; padding:2px 5px; border-radius:4px; } .note { color:var(--muted); font-size:13px; }
+    ul { margin:8px 0 0 22px; padding:0; } footer { color:var(--muted); font-size:13px; text-align:center; padding-top:8px; }
+    @media (max-width:760px) { main { margin:12px auto; padding:0 10px 28px; } header,section { padding:18px; } .summary { grid-template-columns:repeat(2,1fr); } table { display:block; overflow-x:auto; white-space:nowrap; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>洞见智研生产系统性能测试报告</h1>
+    <div class="meta">目标地址：<code>http://47.105.48.193:5001/</code>　测试日期：2026-10-12　测试类型：生产只读基线与低风险采样</div>
+    <div class="summary">
+      <div class="metric"><strong>200</strong>首页 HTTP 状态</div>
+      <div class="metric"><strong>1.73s</strong>浏览器首页导航</div>
+      <div class="metric"><strong>5.48MB</strong>首页未压缩体积</div>
+      <div class="metric"><strong>0.09s</strong>运行环境接口响应</div>
+    </div>
+  </header>
+
+  <section>
+    <h2>执行摘要</h2>
+    <p>首页、登录页和公开接口可以访问；未登录的 H5、Web、工作台按预期重定向到登录页。首页响应存在明显波动，且页面体积较大。最需要立即处理的是生产地址仍返回“本地开发”环境标识。</p>
+    <p><span class="tag high">高优先级</span> 生产环境标识错误；<span class="tag high">高优先级</span> 首页体积过大；<span class="tag medium">中优先级</span> 首页响应时间波动。</p>
+  </section>
+
+  <section>
+    <h2>实测结果</h2>
+    <table>
+      <thead><tr><th>路由</th><th>状态</th><th>响应时间</th><th>大小/备注</th></tr></thead>
+      <tbody>
+        <tr><td><code>/</code></td><td>200</td><td>浏览器约 1.73s；命令行单次 7.41s</td><td>原始约 5.48MB；gzip 后约 1.20MB</td></tr>
+        <tr><td><code>/login</code></td><td>200</td><td>约 0.29s</td><td>登录页可用</td></tr>
+        <tr><td><code>/prd</code></td><td>302</td><td>约 0.12s</td><td>未登录重定向</td></tr>
+        <tr><td><code>/api/runtime-environment</code></td><td>200</td><td>约 0.09s</td><td>返回 <code>is_production:false</code></td></tr>
+        <tr><td><code>/api/public/registration-options</code></td><td>401</td><td>约 0.13s</td><td>鉴权拦截快速</td></tr>
+        <tr><td><code>/h5</code>、<code>/web</code>、<code>/kol-workbench</code></td><td>302</td><td>约 0.6–0.8s</td><td>未登录重定向登录</td></tr>
+      </tbody>
+    </table>
+    <p class="note">说明：本次未执行登录、POST、写库、AI 调用或高并发压力测试；因此不对业务接口 P95/P99 和最大承载量做推断。</p>
+  </section>
+
+  <section>
+    <h2>关键发现</h2>
+    <h3><span class="tag high">高</span> 1. 生产环境配置标识不正确</h3>
+    <p><code>/api/runtime-environment</code> 返回：</p>
+    <pre>{"is_production":false,"label":"本地开发","target":"local"}</pre>
+    <p>这可能影响日志级别、功能开关、第三方回调、错误展示、数据保护和发布流程。</p>
+    <h3><span class="tag high">高</span> 2. 首页资源体积过大</h3>
+    <p>首页 HTML 原始约 5.48MB，启用 gzip 后仍约 1.20MB。代码中首页内嵌了较大的站点配置和长页面内容，可能造成移动端首屏慢、渲染耗时和并发带宽压力。</p>
+    <h3><span class="tag medium">中</span> 3. 首页响应时间波动</h3>
+    <p>浏览器导航约 1.73s，而命令行单次采样为 7.41s，后续低频采样达到约 9–11s。需结合服务端日志、Gunicorn worker、数据库慢查询和上游依赖进一步定位。</p>
+  </section>
+
+  <section>
+    <h2>整改建议</h2>
+    <ol>
+      <li>立即修正生产环境变量、运行标识和回调配置，并增加启动时环境校验。</li>
+      <li>拆分首页内嵌 <code>SITE_CONFIG</code> 与非首屏内容，采用接口加载、懒加载和分页；静态 CSS/JS 独立缓存。</li>
+      <li>检查 Gunicorn worker 数、超时、数据库连接池、模板渲染耗时及慢查询。</li>
+      <li>补充只读压测账号和固定测试数据，在业务低峰进行 10/25/50 并发阶梯测试，记录成功率、P50/P95/P99、吞吐量和错误类型。</li>
+      <li>为首页和核心 API 建立持续监控：首字节时间、完整响应时间、响应体大小、5xx、超时和数据库耗时。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>测试边界</h2>
+    <ul>
+      <li>测试仅覆盖公网可达性、页面导航和公开/鉴权 GET 接口。</li>
+      <li>命令行网络访问需要额外网络权限；浏览器直接打开 API 路径受客户端安全策略限制。</li>
+      <li>未提供测试账号，故未执行登录态业务链路。</li>
+      <li>为保护生产系统，未执行破坏性操作、写操作或持续高并发压测。</li>
+    </ul>
+  </section>
+  <footer>报告由 Codex 生成｜数据来源：2026-10-12 生产只读采样</footer>
+</main>
+</body>
+</html>

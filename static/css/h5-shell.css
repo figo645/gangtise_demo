@@ -2691,6 +2691,28 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-stock-price { font-size:18px; font-weight:700; color:var(--text-main); }
 .fund-stock-change { font-size:11px; margin-top:4px; }
 .fund-stock-signal { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:10px; }
+.review-stock-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
+.review-stock-grid-card { min-width:0; border:1px solid rgba(200,169,110,0.12); border-radius:10px; padding:12px; background:var(--navy-mid); color:var(--white); }
+.review-stock-grid-card-head { display:block; }
+.review-stock-grid-card-name { min-width:0; min-height:2.7em; font-size:13px; font-weight:700; line-height:1.35; white-space:normal; overflow-wrap:anywhere; overflow:visible; text-overflow:clip; }
+.review-stock-grid-card-meta { margin-top:5px; font-size:10px; line-height:1.4; color:#52677D; white-space:normal; overflow:visible; text-overflow:clip; }
+.review-stock-grid-card-code { color:#183A62; font-weight:750; }
+.review-stock-grid-card-quote { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px; margin-top:10px; text-align:left; }
+.review-stock-grid-card-price { font-size:16px; font-weight:700; }
+.review-stock-grid-card-change { font-size:11px; margin-top:0; font-weight:750; }
+.review-stock-grid-card-change.up { color:var(--red); }
+.review-stock-grid-card-change.down { color:var(--green); }
+.review-stock-grid-card-change.flat { color:var(--gray-400); }
+.review-stock-grid-card-info { display:block; margin-top:8px; font-size:10px; line-height:1.5; color:#52677D; }
+.review-stock-grid-card-info span { display:block; min-width:0; overflow:visible; text-overflow:clip; white-space:normal; }
+.review-stock-grid-card-summary { margin-top:10px; padding-top:9px; border-top:1px solid rgba(200,169,110,0.10); color:var(--gray-300); font-size:11px; line-height:1.65; }
+@media (max-width:520px) {
+  .review-stock-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+  .review-stock-grid-card { min-width:0; padding:10px 8px; border-radius:12px; }
+  .review-stock-grid-card-price { font-size:15px; line-height:1.25; font-variant-numeric:tabular-nums; color:#182132; }
+  .review-stock-grid-card-change { line-height:1.25; }
+  .review-stock-grid-card-summary { margin-top:8px; padding-top:8px; font-size:11px; line-height:1.55; color:#2F3E52; }
+}
 .fund-news-item { box-shadow:0 8px 22px rgba(31,73,125,0.06); }
 .fund-news-item.is-watchlist-sector {
   border-color:rgba(31,73,125,0.30);
@@ -3606,6 +3628,27 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-color:var(--gold);
   background:rgba(200,169,110,0.1);
 }
+.stock-grid-authoring-panel { padding:14px; border:1px solid #DCE8F5; border-radius:12px; background:#F8FBFF; }
+.stock-grid-authoring-panel .knowledge-modal-label { color:#183A62; font-weight:700; }
+.stock-grid-selected-card { aspect-ratio:1 / .92; min-height:0; display:flex; flex-direction:column; justify-content:space-between; padding:12px; border:1px solid rgba(47,116,192,.14); border-radius:12px; background:#FFFFFF; box-shadow:0 1px 2px rgba(31,73,125,.04); }
+.stock-grid-card-spacer { flex:1; min-height:12px; }
+.stock-grid-card-head { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+.stock-grid-card-meta { margin-top:3px; color:#718399; font-size:10px; }
+.stock-grid-card-quote { color:#52677D; font-size:11px; text-align:right; white-space:nowrap; }
+.stock-grid-reason-row { display:flex; align-items:center; gap:8px; margin-top:10px; }
+.stock-grid-reason-row .form-label { flex:0 0 auto; margin:0; color:#52677D; font-size:11px; }
+.stock-grid-reason-input { min-height:54px; margin-top:8px; resize:vertical; }
+.stock-grid-reason-input:disabled { background:#F3F6F9; color:#8A99A8; cursor:not-allowed; }
+.stock-grid-reason-tag { align-self:flex-start; border:1px solid rgba(47,116,192,.18); border-radius:999px; padding:5px 9px; background:#FFFFFF; color:#2F74C0; font-size:11px; cursor:pointer; }
+.stock-grid-reason-tag.is-filled { border-color:rgba(39,138,99,.28); background:rgba(39,138,99,.08); color:#278A63; }
+.stock-grid-reason-copy { margin-top:7px; color:#52677D; font-size:11px; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.stock-grid-card-actions { display:flex; justify-content:flex-end; margin-top:8px; }
+.stock-grid-selection-summary { display:flex; justify-content:space-between; gap:10px; margin-top:10px; color:#62758A; font-size:11px; }
+.stock-grid-error { margin:10px 0 0; font-size:12px; }
+.stock-grid-authoring-panel .knowledge-modal-input:focus { border-color:#2F74C0; box-shadow:0 0 0 .2rem rgba(47,116,192,.12); }
+.stock-grid-authoring-panel .review-input-button { white-space:nowrap; }
+.stock-grid-authoring-panel button:not(:disabled):active { transform:translateY(1px); }
+@media (max-width: 520px) { .stock-grid-authoring-panel .input-group { flex-wrap:wrap; } .stock-grid-authoring-panel .input-group .form-control { min-width:100%; } }
 .review-period-row {
   display:flex;
   gap:8px;

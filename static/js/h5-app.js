@@ -198,7 +198,10 @@ function syncPublishedReviewStateToH5(tenantSlug, result) {
       };
     }
   }
-  invalidateReviewDirectory(normalizedSlug);
+  invalidateReviewDirectory(normalizedSlug, {force: true});
+  if (document.getElementById('page-review')?.classList.contains('active')) {
+    loadReviewDirectoryPage({force: true});
+  }
   try {
     window.localStorage.setItem('gangtise_published_review_update_v1', JSON.stringify({
       tenant_slug: normalizedSlug,
@@ -399,6 +402,7 @@ const REVIEW_PERIOD_CONFIG = {
   day: { label: '洞见', shortLabel: '洞见', prompt: '', marketFocus: '', aiLabel: '自选股 + 市场行情' },
 };
 const REVIEW_SOURCE_OPTIONS = [
+  { value: 'stock_grid', icon: '▦', label: '九宫格个股展示', desc: '任意搜索并选择最多 9 支股票，生成卡片式个股洞见。' },
   { value: 'voice', icon: '🎙️', label: '语音口述', desc: '收盘后直接口述盘面、行业和个股判断。' },
   { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接写完整洞见正文，再统一发布为前台文章。' },
   { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
@@ -448,6 +452,11 @@ let reviewTriggerDraft = {
   optimizeRuleMode: 'default',
   useVoiceLlmEnhancement: true,
   selectedWatchlist: [],
+  stockGridCards: [],
+  stockGridProvider: '',
+  stockGridEndpoint: '',
+  stockGridLoading: false,
+  stockGridError: '',
   watchlistDecision: '',
   voiceTranscript: '',
   manualHtml: '',
@@ -476,6 +485,12 @@ const REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风�
 let reviewStructuredPreview = null;
 let reviewPreviewGenerating = false;
 let reviewPreviewJobState = null;
+let reviewStockGridSearchItems = [];
+let reviewStockGridSearchQuery = '';
+let reviewStockGridSearchLoading = false;
+let reviewStockGridSearchTimer = null;
+let reviewStockGridSearchRequest = 0;
+let reviewStockGridReasonEditingCode = '';
 
 function normalizeReviewStructuredPreview(payload) {
   const source = payload && typeof payload === 'object' ? payload : {};
@@ -2374,6 +2389,7 @@ function buildReviewArticleData(review) {
     avatar: review.avatar,
     periodLabel: review.periodLabel,
     watchlist: review.watchlist || [],
+    stockGridCards: Array.isArray(review.stockGridCards) ? review.stockGridCards : [],
     tags: review.tags || [],
     coverTitle: deriveReviewCoverTitle(review),
     coverDesc: review.access_mode === 'subscriber'
@@ -2399,6 +2415,34 @@ function renderReviewWatchlistAnalysisSection(article) {
   // Historical snapshots may still contain the legacy field, but new readers
   // must never expose the retired stock-analysis section.
   return '';
+}
+
+function renderReviewStockGridCard(card) {
+  const changePct = Number(card && card.change_pct);
+  const hasChangePct = Number.isFinite(changePct);
+  const changeClass = !hasChangePct || changePct === 0 ? 'flat' : (changePct > 0 ? 'up' : 'down');
+  const changeIcon = !hasChangePct || changePct === 0 ? '—' : (changePct > 0 ? '▲' : '▼');
+  const changeText = hasChangePct ? `${Math.abs(changePct).toFixed(2)}%` : '--';
+  const changeValue = Number(card && card.change);
+  const changeValueText = Number.isFinite(changeValue) && changeValue !== 0 ? `${changeValue > 0 ? '+' : ''}${changeValue.toFixed(2)}` : '';
+  const changeValueHtml = changeValueText ? `<span>涨跌额 ${escapeHtml(changeValueText)}</span>` : '';
+  const timestamp = String((card && (card.quote_time || card.updated_at || card.as_of)) || '--').trim();
+  const summary = String(card.summary || card.recommendation_reason || '').trim();
+  const infoHtml = changeValueHtml || timestamp !== '--' ? `<div class="review-stock-grid-card-info">${changeValueHtml}<span>${escapeHtml(timestamp)}</span></div>` : '';
+  return `<div class="review-stock-grid-card"><div class="review-stock-grid-card-head"><div style="min-width:0"><div class="review-stock-grid-card-name">${escapeHtml(card.stock_name || card.stock_code || '股票')}</div><div class="review-stock-grid-card-meta"><span class="review-stock-grid-card-code">${escapeHtml(card.stock_code || card.security_code || '')}</span> · ${escapeHtml(card.market || '个股')}</div></div><div class="review-stock-grid-card-quote"><div class="review-stock-grid-card-price">${card.price == null ? '--' : escapeHtml(String(card.price))}</div><div class="review-stock-grid-card-change ${changeClass}">${changeIcon} ${changeText}</div></div></div>${infoHtml}${summary ? `<div class="review-stock-grid-card-summary">${escapeHtml(summary)}</div>` : ''}</div>`;
+}
+
+function renderReviewStockGridSection(article) {
+  const cards = Array.isArray(article.stockGridCards) ? article.stockGridCards.slice(0, 9) : [];
+  if (!cards.length) return '';
+  return `
+    <div class="review-article-section">
+      <div class="review-article-section-title">今日个股点评</div>
+      <div class="review-stock-grid">
+        ${cards.map((card) => renderReviewStockGridCard(card)).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
@@ -2430,6 +2474,7 @@ function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
     content_text: matched.content_text || matched.summary || '',
     tags: matched.tags || [],
     watchlist,
+    stockGridCards: matched.stock_grid_cards || [],
     annotations: [],
     sourceMode: matched.source_mode || 'manual',
     selectedCards: matched.selected_cards || [],
@@ -2517,9 +2562,10 @@ function renderReviewArticleCards(articles) {
   return `
     <div class="review-article-list">
       ${articles.map(article => `
-        <div class="review-article-card ${article.contentKind === 'ai_broadcast' ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : ''}" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
+        <div class="review-article-card ${article.contentKind === 'ai_broadcast' ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : ''} ${article.contentKind === 'stock_grid' ? 'stock-grid' : ''}" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
           <div class="review-article-cover">
             ${article.contentKind === 'ai_broadcast' ? `<div class="review-article-broadcast-mark">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(article.broadcastLabel || '财经播报')}</div>` : ''}
+            ${article.contentKind === 'stock_grid' ? `<div class="review-article-broadcast-mark">九宫格个股洞见 · ${Math.min(9, Array.isArray(article.stockGridCards) ? article.stockGridCards.length : 0)} 支股票</div>` : ''}
             ${renderReviewArticleAccessBadge(article)}
             <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
             <div class="review-article-cover-title">${escapeHtml(article.title)}${article.isPinned ? '<span class="review-pin-badge" aria-label="已置顶">置顶</span>' : ''}${article.revisionCount ? `<span class="review-pin-badge">${escapeHtml(article.revisionLabel || `第 ${article.revisionCount} 次修改`)}</span>` : ''}</div>
@@ -3025,8 +3071,8 @@ function getReviewDirectorySnapshots() {
     : null;
 }
 
-function invalidateReviewDirectory(tenantSlug) {
-  if (String(tenantSlug || '').trim().toLowerCase() !== reviewDirectoryState.tenantSlug) return;
+function invalidateReviewDirectory(tenantSlug, options = {}) {
+  if (!options.force && String(tenantSlug || '').trim().toLowerCase() !== reviewDirectoryState.tenantSlug) return;
   reviewDirectoryState = {
     ...reviewDirectoryState,
     items: [], total: 0, offset: 0, hasMore: false, loaded: false, loading: false, error: '', requestSeq: reviewDirectoryState.requestSeq + 1,
@@ -3297,6 +3343,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
         </div>
       ` : '')}
       ${renderReviewWatchlistAnalysisSection(article)}
+      ${renderReviewStockGridSection(article)}
       ${false && article.knowledgeAttachments.length ? `
         <div class="review-article-section">
           <div class="review-article-section-title">附加材料</div>
@@ -3362,7 +3409,7 @@ function buildReviewPreviewArticle() {
   const structured = reviewStructuredPreview && typeof reviewStructuredPreview === 'object' ? reviewStructuredPreview : {};
   const periodMeta = getReviewPeriodMeta(reviewTriggerDraft.period || currentReviewPeriod || 'day');
   const focusNames = (reviewTriggerDraft.selectedWatchlist || []).length
-    ? reviewTriggerDraft.selectedWatchlist.slice(0)
+    ? reviewTriggerDraft.selectedWatchlist.map((item) => typeof item === 'object' ? (item.name || item.stock_name || item.code || '') : item).filter(Boolean)
     : [];
   const sourceCfg = REVIEW_SOURCE_OPTIONS.find(item => item.value === reviewTriggerDraft.sourceMode) || REVIEW_SOURCE_OPTIONS[0];
   const paragraphLabel = reviewTriggerDraft.paragraphMode === 'ai' ? '智能优化后草稿' : '用户原稿直出';
@@ -3390,6 +3437,7 @@ function buildReviewPreviewArticle() {
     summary: structured.review_summary || previewBody.slice(0, 150) || '当前预览还没有生成正文。',
     tags: ['洞见', sourceCfg.label, paragraphLabel],
     watchlist: focusNames,
+    stockGridCards: reviewTriggerDraft.stockGridCards || [],
     annotations: [],
     selectedCards: [],
     knowledgeAttachments: [],
@@ -3601,6 +3649,14 @@ function openReviewTriggerModal(sourceMode) {
   // A new insight starts clean. Existing drafts are opened from the draft list.
   reviewTriggerDraft.paragraphMode = 'manual';
   reviewTriggerDraft.selectedWatchlist = [];
+  reviewStockGridSearchItems = [];
+  reviewStockGridSearchQuery = '';
+  reviewStockGridSearchLoading = false;
+  reviewTriggerDraft.stockGridCards = [];
+  reviewTriggerDraft.stockGridProvider = '';
+  reviewTriggerDraft.stockGridEndpoint = '';
+  reviewTriggerDraft.stockGridLoading = false;
+  reviewTriggerDraft.stockGridError = '';
   reviewTriggerDraft.watchlistDecision = 'not_applicable';
   reviewTriggerDraft.voiceTranscript = '';
   reviewTriggerDraft.manualHtml = '';
@@ -3667,7 +3723,8 @@ function getReviewPreviewText() {
   }
   return String(reviewTriggerDraft.draftReviewText || '').trim()
     || String(reviewTriggerDraft.generatedPreviewText || '').trim()
-    || getReviewDraftContentText();
+    || getReviewDraftContentText()
+    || (reviewTriggerDraft.sourceMode === 'stock_grid' && (reviewTriggerDraft.stockGridCards || []).length ? '九宫格个股洞见' : '');
 }
 
 function getReviewUserInputDisplayText() {
@@ -4177,7 +4234,7 @@ async function embedManualReviewText(text) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      text,
+      text: String(text || '').trim() || (reviewTriggerDraft.sourceMode === 'stock_grid' ? '今日个股点评' : ''),
       content_html: getReviewPreviewHtml(),
       tenant_slug: ((user || {}).tenant || {}).slug || '',
       period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
@@ -4218,6 +4275,9 @@ async function publishReviewContent(text, transcriptionEngine, transcriptModel, 
       review_summary: payload.review_summary || '',
       user_input_section: payload.user_input_section || {},
       watchlist_analysis_section: payload.watchlist_analysis_section || {},
+      stock_grid_cards: payload.stock_grid_cards || reviewTriggerDraft.stockGridCards || [],
+      stock_grid_provider: payload.stock_grid_provider || reviewTriggerDraft.stockGridProvider || '',
+      stock_grid_endpoint: payload.stock_grid_endpoint || reviewTriggerDraft.stockGridEndpoint || '',
       llm_models: Array.isArray(payload.llm_models) ? payload.llm_models : [],
     }),
   });
@@ -4443,7 +4503,150 @@ function isReviewDraftProcessingStage() {
 }
 
 function renderReviewWatchlistSelectionPanel() {
-  return '';
+  if (reviewTriggerDraft.sourceMode !== 'stock_grid') return '';
+  const selectedItems = Array.isArray(reviewTriggerDraft.selectedWatchlist) ? reviewTriggerDraft.selectedWatchlist : [];
+  const selected = new Set(selectedItems.map((item) => typeof item === 'object' ? String(item.code || item.stock_code || '').trim() : String(item || '').trim()));
+  const rows = Array.isArray(reviewStockGridSearchItems) ? reviewStockGridSearchItems : [];
+  return `
+    <div class="knowledge-modal-block stock-grid-authoring-panel">
+      <label class="knowledge-modal-label" for="review-stock-grid-title">洞见主题</label>
+      <input id="review-stock-grid-title" class="knowledge-modal-input" style="margin:6px 0 12px" placeholder="例如：今日重点个股点评" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" oninput="reviewTriggerDraft.reviewTitle = this.value" />
+      <label class="knowledge-modal-label">选择今日点评个股</label>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">输入股票名称或代码搜索，任意合法证券均可选择，最多 9 支。每张卡片默认不填写理由，可按需补充。</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="review-stock-grid-search" class="knowledge-modal-input" style="margin:0;flex:1" placeholder="搜索名称或代码，如 贵州茅台 / 600519" value="${escapeAttr(reviewStockGridSearchQuery)}" oninput="queueReviewStockGridSearch(this.value)" />
+        <button type="button" class="review-input-button" onclick="searchReviewStockGridCandidates()" ${reviewStockGridSearchLoading ? 'disabled' : ''}>${reviewStockGridSearchLoading ? '搜索中...' : '搜索'}</button>
+      </div>
+      ${selectedItems.length ? `<div class="stock-grid-selected-list" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px">${selectedItems.map((item) => {
+        const code = String(item.code || item.stock_code || '').trim();
+        const reason = String(item.recommendation_reason || '').trim();
+        const editing = String(reviewStockGridReasonEditingCode || '') === code;
+        const price = item.price == null ? '--' : String(item.price);
+        const change = item.change_pct == null ? '--' : `${Number(item.change_pct) >= 0 ? '+' : ''}${item.change_pct}%`;
+        return `<div class="stock-grid-selected-card"><div class="stock-grid-card-head"><div><strong>${escapeHtml(item.name || item.stock_name || code)}</strong><div class="stock-grid-card-meta">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</div></div><div class="stock-grid-card-quote">${item.quote_loading ? '加载中...' : escapeHtml(price)}<br>${escapeHtml(change)}</div></div><div class="stock-grid-card-spacer"></div><button id="review-stock-grid-reason-tag-${escapeAttr(code)}" type="button" class="stock-grid-reason-tag ${reason ? 'is-filled' : ''}" aria-expanded="${editing}" onclick="toggleReviewStockGridReasonEditor('${escapeAttr(code)}')">${reason ? '已填写' : '填写理由'}</button><div id="review-stock-grid-reason-copy-${escapeAttr(code)}" class="stock-grid-reason-copy" style="${reason ? '' : 'display:none'}">${escapeHtml(reason)}</div>${editing ? `<textarea class="knowledge-modal-textarea stock-grid-reason-input" placeholder="填写这只股票的推荐理由" oninput="updateReviewStockGridReason('${escapeAttr(code)}', this.value)">${escapeHtml(item.recommendation_reason || '')}</textarea>` : ''}<div class="stock-grid-card-actions"><button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleReviewStockGridSelection('${escapeAttr(code)}')">移除</button></div></div>`;
+      }).join('')}</div>` : ''}
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+        ${rows.map((item) => { const code = String(item.code || item.stock_code || '').trim(); const name = String(item.name || item.stock_name || code).trim(); const active = selected.has(code); return `<button type="button" class="review-watchlist-chip selectable ${active ? 'active' : ''}" style="text-align:left;padding:10px;border-radius:10px" onclick="toggleReviewStockGridSelection('${escapeAttr(code)}')"><strong>${escapeHtml(name)}</strong><span style="display:block;font-size:10px;margin-top:3px;opacity:.72">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</span></button>`; }).join('') || '<div style="font-size:12px;color:var(--gray-400);grid-column:1/-1">请输入名称或代码搜索证券。</div>'}
+      </div>
+      <div class="stock-grid-selection-summary"><span>已选择 ${selected.size} / 9</span></div>
+      ${reviewTriggerDraft.stockGridError ? `<div class="alert alert-warning stock-grid-error" role="alert">${escapeHtml(reviewTriggerDraft.stockGridError)} <button type="button" class="btn btn-sm btn-link p-0 align-baseline" onclick="requestReviewStockGridPreview()">重试</button></div>` : ''}
+    </div>
+  `;
+}
+
+function queueReviewStockGridSearch(value) {
+  reviewStockGridSearchQuery = String(value || '').trim();
+  if (reviewStockGridSearchTimer) window.clearTimeout(reviewStockGridSearchTimer);
+  if (!reviewStockGridSearchQuery) { reviewStockGridSearchItems = []; renderReviewTriggerModal(getActiveDemoUser()); return; }
+  reviewStockGridSearchTimer = window.setTimeout(() => searchReviewStockGridCandidates(), 280);
+}
+
+async function searchReviewStockGridCandidates() {
+  const query = String(reviewStockGridSearchQuery || '').trim();
+  if (!query) return;
+  const requestId = ++reviewStockGridSearchRequest;
+  reviewStockGridSearchLoading = true;
+  renderReviewTriggerModal(getActiveDemoUser());
+  try {
+    const response = await fetch(`/api/watchlist/search?q=${encodeURIComponent(query)}&limit=12`);
+    const data = await response.json();
+    if (requestId !== reviewStockGridSearchRequest) return;
+    if (!response.ok || !data.ok) throw new Error(data.error || 'stock_search_failed');
+    reviewStockGridSearchItems = Array.isArray(data.items) ? data.items : [];
+  } catch (error) {
+    if (requestId === reviewStockGridSearchRequest) { reviewStockGridSearchItems = []; reviewTriggerDraft.stockGridError = error.message || '股票搜索失败'; }
+  } finally {
+    if (requestId === reviewStockGridSearchRequest) { reviewStockGridSearchLoading = false; renderReviewTriggerModal(getActiveDemoUser()); }
+  }
+}
+
+function toggleReviewStockGridSelection(value) {
+  const rows = Array.isArray(reviewStockGridSearchItems) ? reviewStockGridSearchItems : [];
+  const selectedItems = Array.isArray(reviewTriggerDraft.selectedWatchlist) ? reviewTriggerDraft.selectedWatchlist : [];
+  const item = rows.find((row) => String(row.code || row.stock_code || '').trim() === String(value || '').trim()) || selectedItems.find((row) => typeof row === 'object' && String(row.code || row.stock_code || '').trim() === String(value || '').trim());
+  if (!item) return;
+  const code = String(item.code || item.stock_code || '').trim();
+  const current = [...selectedItems];
+  const index = current.findIndex((row) => String(typeof row === 'object' ? (row.code || row.stock_code) : row).trim() === code);
+  if (index >= 0) current.splice(index, 1);
+  else if (current.length >= 9) { showToast('九宫格最多选择 9 支股票'); return; }
+  else {
+    current.push({...item, summary_mode: 'empty', recommendation_reason: item.recommendation_reason || '', quote_loading: item.price == null || item.change_pct == null});
+    reviewTriggerDraft.selectedWatchlist = current;
+    reviewTriggerDraft.stockGridCards = [];
+    reviewTriggerDraft.stockGridError = '';
+    reviewTriggerDraft.previewReady = false;
+    renderReviewTriggerModal(getActiveDemoUser());
+    hydrateReviewStockGridSelectionQuote(code);
+    return;
+  }
+  reviewTriggerDraft.selectedWatchlist = current;
+  reviewTriggerDraft.stockGridCards = [];
+  reviewTriggerDraft.stockGridError = '';
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+async function hydrateReviewStockGridSelectionQuote(code) {
+  const item = (reviewTriggerDraft.selectedWatchlist || []).find((row) => row && String(row.code || row.stock_code || '').trim() === String(code || '').trim());
+  if (!item) return;
+  try {
+    const response = await fetch(`/api/watchlist/${encodeURIComponent(item.code || item.stock_code || code)}`);
+    const data = await response.json();
+    if (!response.ok || !data || data.data_unavailable) throw new Error('quote_unavailable');
+    Object.assign(item, {name: data.name || item.name, market: data.market || item.market, price: data.price, change: data.change, change_pct: data.change_pct, quote_time: data.quote_time || data.updated_at || item.quote_time || '', quote_loading: false});
+  } catch (error) { item.quote_loading = false; }
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function updateReviewStockGridReason(code, value) {
+  const item = (reviewTriggerDraft.selectedWatchlist || []).find((row) => row && String(row.code || row.stock_code || '').trim() === String(code || '').trim());
+  if (!item) return;
+  item.recommendation_reason = String(value || '').slice(0, 600);
+  item.summary_mode = item.recommendation_reason.trim() ? 'manual' : 'empty';
+  const tag = document.getElementById(`review-stock-grid-reason-tag-${String(code || '').trim()}`);
+  if (tag) { tag.textContent = item.recommendation_reason.trim() ? '已填写' : '填写理由'; tag.classList.toggle('is-filled', Boolean(item.recommendation_reason.trim())); }
+  const copy = document.getElementById(`review-stock-grid-reason-copy-${String(code || '').trim()}`);
+  if (copy) { copy.textContent = item.recommendation_reason; copy.style.display = item.recommendation_reason.trim() ? '' : 'none'; }
+  reviewTriggerDraft.stockGridCards = [];
+  reviewTriggerDraft.previewReady = false;
+}
+
+function toggleReviewStockGridReasonEditor(code) {
+  reviewStockGridReasonEditingCode = String(reviewStockGridReasonEditingCode || '') === String(code || '') ? '' : String(code || '');
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+async function requestReviewStockGridPreview() {
+  const user = getActiveDemoUser();
+  const selected = Array.isArray(reviewTriggerDraft.selectedWatchlist) ? reviewTriggerDraft.selectedWatchlist : [];
+  if (!selected.length) { showToast('请先选择至少 1 支股票'); return; }
+  if (selected.length > 9) { showToast('九宫格最多选择 9 支股票'); return; }
+  reviewTriggerDraft.stockGridLoading = true;
+  reviewTriggerDraft.stockGridError = '';
+  renderReviewTriggerModal(user);
+  try {
+    const response = await fetch('/api/review/stock-grid-preview', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tenant_slug: ((user || {}).tenant || {}).slug || '', selected_watchlist: selected }) });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.message || reviewStockGridErrorMessage(data.error));
+    reviewTriggerDraft.stockGridCards = Array.isArray((data.grid || {}).cards) ? data.grid.cards.slice(0, 9) : [];
+    reviewTriggerDraft.stockGridProvider = String((data.grid || {}).provider || '');
+    reviewTriggerDraft.stockGridEndpoint = String((data.grid || {}).endpoint || '');
+    if (!reviewTriggerDraft.stockGridCards.length) throw new Error('stock_grid_empty_result');
+    reviewTriggerDraft.previewReady = true;
+    reviewTriggerDraft.flowStage = 'preview';
+    showToast('今日个股点评已生成');
+  } catch (error) { reviewTriggerDraft.stockGridError = error.message || '九宫格生成失败，请稍后重试。'; showToast(reviewTriggerDraft.stockGridError); }
+  finally { reviewTriggerDraft.stockGridLoading = false; renderReviewTriggerModal(user); }
+}
+
+function reviewStockGridErrorMessage(code) {
+  const messages = {
+    stock_grid_upstream_unavailable: '个股行情服务暂时不可用，请重试。',
+    stock_grid_generation_failed: '九宫格生成失败，请检查网络后重试。',
+    stock_grid_empty_result: '暂时没有生成可用的点评内容，请重试。',
+  };
+  return messages[String(code || '').trim()] || '九宫格生成失败，请稍后重试。';
 }
 
 function renderReviewPreviewPanel() {
@@ -4727,19 +4930,19 @@ function renderReviewTriggerModal(user) {
       ${isReviewSetupStage ? `
         <div class="knowledge-modal-block">
           <label class="knowledge-modal-label">供稿方式</label>
-          <div class="knowledge-source-selector" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+          <div class="knowledge-source-selector" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))" role="radiogroup" aria-label="选择供稿方式">
             ${getAvailableReviewSourceOptions().map(item => `
-              <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.sourceMode ? 'active' : ''}" onclick="setReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</div>
+              <button type="button" class="knowledge-source-pill ${item.value === reviewTriggerDraft.sourceMode ? 'active' : ''}" role="radio" aria-checked="${item.value === reviewTriggerDraft.sourceMode}" onclick="setReviewTriggerSourceMode('${item.value}')"><span>${item.icon} ${item.label}</span><small style="display:block;margin-top:4px;font-size:10px;line-height:1.45;opacity:.72">${item.desc || ''}</small></button>
             `).join('')}
           </div>
         </div>
-        ${isReviewInputStage() ? `
+        ${reviewTriggerDraft.sourceMode === 'stock_grid' ? renderReviewWatchlistSelectionPanel() : (isReviewInputStage() ? `
           <div class="knowledge-modal-block">
             <label class="knowledge-modal-label">输入内容</label>
             ${renderReviewInputPanel()}
           </div>
           ${renderReviewPromptPanel()}
-        ` : ''}
+        ` : '')}
       ` : ''}
       ${isReviewDraftProcessingStage() ? `
         <div class="knowledge-modal-block">
@@ -4907,6 +5110,9 @@ function renderReviewFlowActions() {
   }
   if (reviewTriggerDraft.flowStage === 'optimize_rule') {
     return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
+  }
+  if (reviewTriggerDraft.sourceMode === 'stock_grid' && reviewTriggerDraft.flowStage === 'intake') {
+    return '<button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="requestReviewStockGridPreview()">生成九宫格</button>';
   }
   if (reviewTriggerDraft.flowStage === 'draft_review') {
     return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">进入发布预览</button>';
@@ -5279,6 +5485,10 @@ async function saveReviewDraft() {
   if (!isDavCapableUser(user)) return;
   syncReviewDraftFromModal();
   const text = getReviewPreviewText() || getReviewDraftContentText();
+  if (reviewTriggerDraft.sourceMode === 'stock_grid' && !(reviewTriggerDraft.stockGridCards || []).length) {
+    showToast('请先选择股票并生成九宫格');
+    return;
+  }
   if (!String(text || '').trim()) {
     showToast('请先填写洞见内容');
     return;
@@ -5289,10 +5499,17 @@ async function saveReviewDraft() {
   const payload = {
     id: activeInsightDraftId || undefined,
     title: String(reviewTriggerDraft.reviewTitle || '').trim(),
-    content_text: String(text).trim(),
+    content_text: String(text || '').trim() || '今日个股点评',
     content_html: getReviewPreviewHtml(),
     source_mode: reviewTriggerDraft.sourceMode || 'manual',
     access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
+    metadata: {
+      content_kind: reviewTriggerDraft.sourceMode === 'stock_grid' ? 'stock_grid' : 'insight',
+      stock_grid_cards: reviewTriggerDraft.stockGridCards || [],
+      stock_grid_selection: reviewTriggerDraft.selectedWatchlist || [],
+      stock_grid_provider: reviewTriggerDraft.stockGridProvider || '',
+      stock_grid_endpoint: reviewTriggerDraft.stockGridEndpoint || '',
+    },
   };
   try {
     const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts`, {
@@ -5363,6 +5580,23 @@ function editInsightDraft(draftId) {
   reviewTriggerDraft.reviewTitle = String(draft.title || '').trim();
   reviewTriggerDraft.accessMode = draft.access_mode === 'subscriber' ? 'subscriber' : 'public';
   reviewTriggerDraft.sourceMode = String(draft.source_mode || 'manual').trim() || 'manual';
+  const draftMetadata = draft.metadata && typeof draft.metadata === 'object' ? draft.metadata : {};
+  reviewTriggerDraft.stockGridCards = Array.isArray(draftMetadata.stock_grid_cards) ? draftMetadata.stock_grid_cards.slice(0, 9) : [];
+  reviewTriggerDraft.stockGridProvider = String(draftMetadata.stock_grid_provider || '');
+  reviewTriggerDraft.stockGridEndpoint = String(draftMetadata.stock_grid_endpoint || '');
+  const savedStockGridSelection = Array.isArray(draftMetadata.stock_grid_selection) ? draftMetadata.stock_grid_selection : [];
+  reviewTriggerDraft.selectedWatchlist = (savedStockGridSelection.length ? savedStockGridSelection : reviewTriggerDraft.stockGridCards).map((item) => ({
+    code: item.stock_code || item.code || '',
+    name: item.stock_name || item.name || item.stock_code || item.code || '',
+    market: item.market || '',
+    security_code: item.security_code || '',
+    industry: item.industry || '',
+    price: item.price,
+    change: item.change,
+    change_pct: item.change_pct,
+    summary_mode: item.summary_mode || (item.summary ? 'manual' : 'empty'),
+    recommendation_reason: item.recommendation_reason || item.summary || '',
+  })).filter((item) => String(item.code).trim());
   reviewTriggerDraft.manualHtml = String(draft.content_html || '') || mergePlainTextIntoRichHtml('', String(draft.content_text || '').trim());
   reviewTriggerDraft.draftReviewHtml = String(draft.content_html || '');
   reviewTriggerDraft.draftReviewText = String(draft.content_text || '').trim();
@@ -5771,6 +6005,10 @@ function publishReviewDraft() {
   if (reviewPublishSubmitting) return;
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   syncReviewDraftFromModal();
+  if (reviewTriggerDraft.sourceMode === 'stock_grid' && !(reviewTriggerDraft.stockGridCards || []).length) {
+    showToast('请先选择股票并生成九宫格');
+    return;
+  }
   const finalText = getReviewPreviewText();
   const transcriptionEngine = reviewTriggerDraft.sourceMode === 'voice'
     ? ((reviewIngestResult && reviewIngestResult.transcript_engine) || 'local')
@@ -5807,6 +6045,9 @@ function publishReviewDraft() {
       summary_source: 'llm_user_input_only',
     },
     watchlist_analysis_section: previewPayload.watchlist_analysis_section || {},
+    stock_grid_cards: reviewTriggerDraft.stockGridCards || [],
+    stock_grid_provider: reviewTriggerDraft.stockGridProvider || '',
+    stock_grid_endpoint: reviewTriggerDraft.stockGridEndpoint || '',
     llm_models: llmModels,
   }).then((publishResult) => {
     reviewPublishSubmitting = false;

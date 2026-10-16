@@ -13,6 +13,7 @@ import csv
 import io
 import zipfile
 import logging
+import errno
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from html import escape as html_escape
@@ -195,6 +196,40 @@ class _BelowErrorFilter(logging.Filter):
         return record.levelno < logging.ERROR
 
 
+class _ResilientRotatingFileHandler(RotatingFileHandler):
+    """Back off unavailable file storage while console logging remains active."""
+
+    retry_seconds = 60
+
+    def __init__(self, *args, **kwargs):
+        self._retry_at = 0.0
+        super().__init__(*args, **kwargs)
+
+    def emit(self, record):
+        if time.monotonic() < self._retry_at:
+            return
+        super().emit(record)
+
+    def handleError(self, record):
+        error = sys.exc_info()[1]
+        if not isinstance(error, OSError) or error.errno not in {errno.ENOSPC, errno.EDQUOT, errno.EROFS, errno.EACCES}:
+            return super().handleError(record)
+        self._retry_at = time.monotonic() + self.retry_seconds
+        stream, self.stream = self.stream, None
+        if stream is not None:
+            try:
+                stream.close()
+            except OSError:
+                pass
+        try:
+            sys.stderr.write(
+                f"File logging unavailable ({self.baseFilename}): {error}. "
+                f"Console logging continues; file retry in {self.retry_seconds}s.\n"
+            )
+        except OSError:
+            pass
+
+
 def _configure_application_logging():
     """Create auditable app/Agent logs while retaining console visibility."""
     log_dir = Path(os.environ.get("APP_LOG_DIR") or PROJECT_ROOT / "logs")
@@ -223,11 +258,12 @@ def _configure_application_logging():
         ("agent.err.log", logging.ERROR, (_AgentLogFilter(),)),
     )
     for filename, level, route_filter in definitions:
-        handler = RotatingFileHandler(
+        handler = _ResilientRotatingFileHandler(
             log_dir / filename,
             maxBytes=20 * 1024 * 1024,
             backupCount=5,
             encoding="utf-8",
+            delay=True,
         )
         handler.setLevel(level)
         for item_filter in route_filter:

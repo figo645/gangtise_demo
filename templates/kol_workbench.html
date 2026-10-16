@@ -2778,6 +2778,40 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   color:#1F497D;
 }
 .kw-review-input-button { font-weight:700; }
+.stock-grid-authoring-panel { padding:14px; border:1px solid #DCE8F5; border-radius:12px; background:#F8FBFF; }
+.stock-grid-authoring-panel .kw-knowledge-modal-label { color:#183A62; font-weight:700; }
+.stock-grid-selected-card { aspect-ratio:1 / .92; min-height:0; display:flex; flex-direction:column; justify-content:space-between; padding:12px; border:1px solid rgba(47,116,192,.14); border-radius:12px; background:#FFFFFF; box-shadow:0 1px 2px rgba(31,73,125,.04); }
+.stock-grid-card-spacer { flex:1; min-height:12px; }
+.stock-grid-card-head { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+.stock-grid-card-meta { margin-top:3px; color:#718399; font-size:10px; }
+.stock-grid-card-quote { color:#52677D; font-size:11px; text-align:right; white-space:nowrap; }
+.stock-grid-reason-row { display:flex; align-items:center; gap:8px; margin-top:10px; }
+.stock-grid-reason-row .form-label { flex:0 0 auto; margin:0; color:#52677D; font-size:11px; }
+.stock-grid-reason-input { min-height:54px; margin-top:8px; resize:vertical; }
+.stock-grid-reason-input:disabled { background:#F3F6F9; color:#8A99A8; cursor:not-allowed; }
+.stock-grid-reason-tag { align-self:flex-start; border:1px solid rgba(47,116,192,.18); border-radius:999px; padding:5px 9px; background:#FFFFFF; color:#2F74C0; font-size:11px; cursor:pointer; }
+.stock-grid-reason-tag.is-filled { border-color:rgba(39,138,99,.28); background:rgba(39,138,99,.08); color:#278A63; }
+.stock-grid-reason-copy { margin-top:7px; color:#52677D; font-size:11px; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.stock-grid-card-actions { display:flex; justify-content:flex-end; margin-top:8px; }
+.stock-grid-selection-summary { display:flex; justify-content:space-between; gap:10px; margin-top:10px; color:#62758A; font-size:11px; }
+.stock-grid-error { font-size:12px; }
+.stock-grid-authoring-panel input:focus, .stock-grid-authoring-panel textarea:focus { border-color:#2F74C0; box-shadow:0 0 0 .2rem rgba(47,116,192,.12); }
+.stock-grid-authoring-panel button:not(:disabled):active { transform:translateY(1px); }
+.review-stock-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
+.review-stock-grid-card { min-width:0; border:1px solid rgba(200,169,110,0.12); border-radius:10px; padding:12px; background:var(--navy-mid); color:var(--white); }
+.review-stock-grid-card-head { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+.review-stock-grid-card-name { min-width:0; font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.review-stock-grid-card-meta { font-size:10px; color:var(--gray-400); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.review-stock-grid-card-quote { flex:0 0 auto; text-align:right; }
+.review-stock-grid-card-price { font-size:16px; font-weight:700; }
+.review-stock-grid-card-change { font-size:11px; margin-top:2px; }
+.review-stock-grid-card-change.up { color:var(--red); }
+.review-stock-grid-card-change.down { color:var(--green); }
+.review-stock-grid-card-change.flat { color:var(--gray-400); }
+.review-stock-grid-card-info { display:flex; justify-content:space-between; gap:8px; margin-top:9px; font-size:10px; color:var(--gray-400); }
+.review-stock-grid-card-info span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.review-stock-grid-card-summary { margin-top:10px; padding-top:9px; border-top:1px solid rgba(200,169,110,0.10); color:var(--gray-300); font-size:11px; line-height:1.65; }
+@media (max-width:520px) { .review-stock-grid { gap:8px; } .review-stock-grid-card { padding:10px 8px; } .review-stock-grid-card-name { font-size:12px; } .review-stock-grid-card-price { font-size:14px; } .review-stock-grid-card-info { display:block; line-height:1.6; } }
 .kw-review-intake-result {
   margin-top:10px;
   background:#FFFFFF;
@@ -3637,6 +3671,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <div class="admin-nav-item" data-section="lake-sectors" data-feature="analytics_module" onclick="showWorkbenchSection('lake-sectors', this)">
               <span class="admin-nav-icon">&#9638;</span> 行业板块
             </div>
+            <div class="admin-nav-item" data-section="lake-etf" data-feature="analytics_module" onclick="showWorkbenchSection('lake-etf', this)">
+              <span class="admin-nav-icon">&#128200;</span> ETF 数据源
+            </div>
             <div class="admin-nav-item" data-section="lake-news" data-feature="analytics_module" onclick="showWorkbenchSection('lake-news', this)">
               <span class="admin-nav-icon">&#128240;</span> 新闻
             </div>
@@ -4235,7 +4272,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               </div>
               <div class="kw-review-topbar-actions">
                 <div id="kw-review-top-period-row" class="kw-review-period-row"></div>
-                <button class="btn-gold" type="button" style="padding:8px 12px;font-size:12px" onclick="kwOpenReviewTriggerModal()">发布洞见</button>
+                <button class="btn-gold" type="button" style="padding:8px 12px;font-size:12px" onclick="kwOpenReviewTriggerModal()">发布新洞见</button>
                 <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="showWorkbenchSection('watchlist', document.querySelector('.admin-nav-item[data-section=&quot;watchlist&quot;]'))">查看自选股</button>
                 <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="showWorkbenchSection('published', document.querySelector('.admin-nav-item[data-section=&quot;published&quot;]'))">查看已发布</button>
               </div>
@@ -4873,6 +4910,21 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </tbody></table></div>
       </div>
 
+      <div id="workbench-section-lake-etf" style="display:none">
+        <div class="section-header">
+          <div><div class="section-title">ETF 数据源</div><div class="section-subtitle">与粉丝端 ETF 共用 Gangtise 真实日线行情；展示完整目录，不受已选择的前台展示项限制。</div></div>
+          <button id="kw-etf-source-refresh" class="btn-outline" type="button" onclick="kwLoadEtfDataSource()">刷新行情</button>
+        </div>
+        <div class="kw-indicator-page-meta">
+          <div id="kw-etf-source-status" class="kw-indicator-page-copy" role="status" aria-live="polite">进入页面后加载 ETF 行情。</div>
+          <div class="kw-indicator-page-tags"><span class="kw-indicator-page-tag">Gangtise OpenAPI</span><span class="kw-indicator-page-tag">真实日线</span><span class="kw-indicator-page-tag">完整目录</span></div>
+        </div>
+        <div class="table-wrap" style="overflow-x:auto">
+          <table><thead><tr><th>ETF</th><th>代码</th><th>分类</th><th>最新价</th><th>涨跌幅</th><th>行情日期</th><th>数据来源</th><th>状态</th></tr></thead>
+          <tbody id="kw-etf-source-rows"><tr><td colspan="8" style="text-align:center;padding:20px">尚未加载</td></tr></tbody></table>
+        </div>
+      </div>
+
       <div id="workbench-section-lake-news" style="display:none">
         <div class="section-header"><div><div class="section-title">新闻</div><div class="section-subtitle">从已清洗、已通过数量门槛的国内公开信息源入湖；此处展示当前租户按自选股行业归纳后的真实新闻。</div></div></div>
         <div class="kw-indicator-page-meta"><div class="kw-indicator-page-copy">当前入湖 {{ workbench.data_lake.news['items']|length }} 条。{{ workbench.data_lake.news.message }}</div><div class="kw-indicator-page-tags"><span class="kw-indicator-page-tag">真实公开信息</span><span class="kw-indicator-page-tag">清洗入湖</span><span class="kw-indicator-page-tag">行业关联归纳</span></div></div>
@@ -5158,6 +5210,7 @@ const workbenchSectionMeta = {
   'indicator-lake': { title: '数据湖 · 市场一览指标', summary: '查看后台入库的标准市场指数，和 H5 市场一览保持一致。' },
   'lake-market': { title: '数据湖 · 市场一览指标', summary: '查看后台入库的标准市场指数，和 H5 市场一览保持一致。' },
   'lake-sectors': { title: '数据湖 · 行业板块', summary: '查看后台入库的申万一级行业行情，与自选股行业和洞见主题共用。' },
+  'lake-etf': { title: '数据湖 · ETF 数据源', summary: '查看完整 ETF 目录的 Gangtise 真实日线行情及数据可用状态。' },
   'lake-news': { title: '数据湖 · 新闻', summary: '查看已清洗且通过来源数量门槛的真实新闻湖，并按当前租户自选股行业归纳。' },
   'indicator-anomalies': { title: '指标专区 · 异动报告', summary: '优先查看需要跟踪的波动与异常，帮助确定当天内容重点。' },
   published: { title: '已发布洞见', summary: '这里确认发布后的洞见，就是普通投资者在前台实际看到的内容。' },
@@ -7441,10 +7494,11 @@ const KW_REVIEW_PERIOD_CONFIG = {
   day: { label: '洞见', shortLabel: '洞见' },
 };
 const KW_REVIEW_SOURCE_OPTIONS = [
-  { value: 'voice', icon: '🎙️', label: '语音口述' },
-  { value: 'manual', icon: '✍️', label: '手写正文' },
-  { value: 'file', icon: '📎', label: '文件上传' },
-  { value: 'url', icon: '🔗', label: '网页 URL' },
+  { value: 'stock_grid', icon: '▦', label: '九宫格个股展示', desc: '任意搜索并选择最多 9 支股票，生成卡片式个股洞见。' },
+  { value: 'voice', icon: '🎙️', label: '语音口述', desc: '录入语音，整理为可编辑的洞见正文。' },
+  { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接输入本次洞见正文。' },
+  { value: 'file', icon: '📎', label: '文件上传', desc: '上传资料并提取洞见内容。' },
+  { value: 'url', icon: '🔗', label: '网页 URL', desc: '抓取公开网页资料作为洞见素材。' },
 ];
 function getAvailableKwReviewSourceOptions() {
   return KW_REVIEW_SOURCE_OPTIONS.filter((item) => (
@@ -7471,6 +7525,11 @@ let kwReviewDraft = {
   optimizeRuleMode: 'default',
   useVoiceLlmEnhancement: true,
   selectedWatchlist: [],
+  stockGridCards: [],
+  stockGridProvider: '',
+  stockGridEndpoint: '',
+  stockGridLoading: false,
+  stockGridError: '',
   watchlistDecision: '',
   selectedCardIds: [],
   selectedKnowledgeIds: [],
@@ -7493,6 +7552,12 @@ let kwReviewDraft = {
   finalDraftHtml: '',
   previewReady: false,
 };
+let kwStockGridSearchItems = [];
+let kwStockGridSearchQuery = '';
+let kwStockGridSearchLoading = false;
+let kwStockGridSearchTimer = null;
+let kwStockGridSearchRequest = 0;
+let kwStockGridReasonEditingCode = '';
 let kwInsightDrafts = [];
 let kwInsightDraftsLoading = false;
 let kwInsightDraftsLoaded = false;
@@ -9545,7 +9610,8 @@ function kwGetReviewPreviewText() {
   }
   return String(kwReviewDraft.draftReviewText || '').trim()
     || String(kwReviewDraft.generatedPreviewText || '').trim()
-    || kwGetReviewDraftContentText();
+    || kwGetReviewDraftContentText()
+    || (kwReviewDraft.sourceMode === 'stock_grid' ? '今日个股点评' : '');
 }
 
 function kwGetReviewPreviewHtml() {
@@ -10121,7 +10187,7 @@ async function kwEmbedManualReviewText(text) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      text,
+      text: String(text || '').trim() || (kwReviewDraft.sourceMode === 'stock_grid' ? '今日个股点评' : ''),
       content_html: kwGetReviewPreviewHtml(),
       tenant_slug: tenant.slug || '',
       period: kwReviewDraft.period || 'day',
@@ -10162,6 +10228,9 @@ async function kwPublishReviewContent(text, transcriptionEngine, transcriptModel
       review_summary: payload.review_summary || '',
       user_input_section: payload.user_input_section || {},
       watchlist_analysis_section: payload.watchlist_analysis_section || {},
+      stock_grid_cards: payload.stock_grid_cards || kwReviewDraft.stockGridCards || [],
+      stock_grid_provider: payload.stock_grid_provider || kwReviewDraft.stockGridProvider || '',
+      stock_grid_endpoint: payload.stock_grid_endpoint || kwReviewDraft.stockGridEndpoint || '',
       llm_models: Array.isArray(payload.llm_models) ? payload.llm_models : [],
     }),
   });
@@ -10453,6 +10522,9 @@ function kwConfirmReviewDraftToPreview() {
   kwReviewDraft.skipAiProcessing = false;
   kwReviewDraft.watchlistDecision = 'not_applicable';
   kwReviewDraft.selectedWatchlist = [];
+  kwStockGridSearchItems = [];
+  kwStockGridSearchQuery = '';
+  kwStockGridSearchLoading = false;
   kwReviewStructuredPreview = null;
   kwReviewDraft.finalDraftText = String(kwReviewDraft.draftReviewText || '').trim();
   kwReviewDraft.previewReady = true;
@@ -10824,6 +10896,33 @@ function kwRenderReviewInputPanel() {
       <div class="kw-review-runtime-desc" style="margin-top:6px">访问范围按每篇洞见单独生效，不会影响其他已发布笔记。</div>
     </div>
   `;
+  if (kwReviewDraft.sourceMode === 'stock_grid') {
+    const selectedItems = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist : [];
+    const selected = new Set(selectedItems.map((item) => typeof item === 'object' ? String(item.code || item.stock_code || '').trim() : String(item || '').trim()));
+    const rows = Array.isArray(kwStockGridSearchItems) ? kwStockGridSearchItems : [];
+    return `
+      <div class="kw-review-intake-panel stock-grid-authoring-panel">${titleField}${accessModeField}
+        <div class="kw-review-runtime-desc">输入股票名称或代码搜索，任意合法证券均可选择，最多 9 支，生成今日一句话点评九宫格。</div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input id="kw-stock-grid-search" type="text" value="${escapeAttr(kwStockGridSearchQuery)}" placeholder="搜索名称或代码，如 贵州茅台 / 600519" class="kw-review-final-editor" style="min-height:auto;height:40px;flex:1" oninput="kwQueueStockGridSearch(this.value)">
+          <button class="kw-review-input-button" type="button" onclick="kwSearchStockGridCandidates()" ${kwStockGridSearchLoading ? 'disabled' : ''}>${kwStockGridSearchLoading ? '搜索中...' : '搜索'}</button>
+        </div>
+        ${selectedItems.length ? `<div class="stock-grid-selected-list" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px">${selectedItems.map((item) => {
+          const code = String(item.code || item.stock_code || '').trim();
+          const reason = String(item.recommendation_reason || '').trim();
+          const editing = String(kwStockGridReasonEditingCode || '') === code;
+          const price = item.price == null ? '--' : String(item.price);
+          const change = item.change_pct == null ? '--' : `${Number(item.change_pct) >= 0 ? '+' : ''}${item.change_pct}%`;
+          return `<div class="stock-grid-selected-card"><div class="stock-grid-card-head"><div><strong>${escapeHtml(item.name || item.stock_name || code)}</strong><div class="stock-grid-card-meta">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</div></div><div class="stock-grid-card-quote">${item.quote_loading ? '加载中...' : `${escapeHtml(price)}<br>${escapeHtml(change)}`}</div></div><div class="stock-grid-card-spacer"></div><button id="kw-stock-grid-reason-tag-${escapeAttr(code)}" type="button" class="stock-grid-reason-tag ${reason ? 'is-filled' : ''}" aria-expanded="${editing}" onclick="kwToggleStockGridReasonEditor('${escapeAttr(code)}')">${reason ? '已填写' : '填写理由'}</button><div id="kw-stock-grid-reason-copy-${escapeAttr(code)}" class="stock-grid-reason-copy" style="${reason ? '' : 'display:none'}">${escapeHtml(reason)}</div>${editing ? `<textarea class="kw-review-final-editor stock-grid-reason-input" placeholder="填写这只股票的推荐理由" oninput="kwUpdateStockGridReason('${escapeAttr(code)}', this.value)">${escapeHtml(item.recommendation_reason || '')}</textarea>` : ''}<div class="stock-grid-card-actions"><button type="button" class="btn btn-sm btn-outline-secondary" onclick="kwToggleStockGridSelection('${escapeAttr(code)}')">移除</button></div></div>`;
+        }).join('')}</div>` : ''}
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px">
+          ${rows.map((item) => { const code = String(item.code || item.stock_code || '').trim(); const active = selected.has(code); return `<button type="button" class="kw-knowledge-source-pill ${active ? 'active' : ''}" style="text-align:left" onclick="kwToggleStockGridSelection('${escapeAttr(code)}')"><strong>${escapeHtml(item.name || item.stock_name || code)}</strong><span style="display:block;font-size:10px;margin-top:3px;opacity:.72">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</span></button>`; }).join('') || '<div class="kw-review-runtime-desc">请输入名称或代码搜索证券。</div>'}
+        </div>
+        <div class="kw-review-runtime-desc stock-grid-selection-summary" style="margin-top:10px"><span>已选择 ${selected.size} / 9</span><span>可继续搜索并添加其他股票</span></div>
+        ${kwReviewDraft.stockGridError ? `<div class="alert alert-warning stock-grid-error mt-3" role="alert">${escapeHtml(kwReviewDraft.stockGridError)} <button type="button" class="btn btn-sm btn-link p-0 align-baseline" onclick="kwRequestStockGridPreview()">重试</button></div>` : ''}
+      </div>
+    `;
+  }
   if (kwReviewDraft.sourceMode === 'voice') {
     return `
       <div class="kw-review-intake-panel">
@@ -10898,6 +10997,140 @@ function kwRenderReviewInputPanel() {
   `;
 }
 
+function kwQueueStockGridSearch(value) {
+  kwStockGridSearchQuery = String(value || '').trim();
+  if (kwStockGridSearchTimer) window.clearTimeout(kwStockGridSearchTimer);
+  if (!kwStockGridSearchQuery) {
+    kwStockGridSearchItems = [];
+    kwRenderReviewStudio();
+    return;
+  }
+  kwStockGridSearchTimer = window.setTimeout(() => kwSearchStockGridCandidates(), 280);
+}
+
+async function kwSearchStockGridCandidates() {
+  const query = String(kwStockGridSearchQuery || '').trim();
+  if (!query) return;
+  const requestId = ++kwStockGridSearchRequest;
+  kwStockGridSearchLoading = true;
+  kwRenderReviewStudio();
+  try {
+    const response = await fetch(`/api/watchlist/search?q=${encodeURIComponent(query)}&limit=12`);
+    const data = await response.json();
+    if (requestId !== kwStockGridSearchRequest) return;
+    if (!response.ok || !data.ok) throw new Error(data.error || 'stock_search_failed');
+    kwStockGridSearchItems = Array.isArray(data.items) ? data.items : [];
+  } catch (error) {
+    if (requestId === kwStockGridSearchRequest) {
+      kwStockGridSearchItems = [];
+      kwReviewDraft.stockGridError = error.message || '股票搜索失败';
+    }
+  } finally {
+    if (requestId === kwStockGridSearchRequest) {
+      kwStockGridSearchLoading = false;
+      kwRenderReviewStudio();
+    }
+  }
+}
+
+function kwToggleStockGridSelection(code) {
+  const value = String(code || '').trim();
+  if (!value) return;
+  const rows = Array.isArray(kwStockGridSearchItems) ? kwStockGridSearchItems : [];
+  const selectedItems = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist : [];
+  const item = rows.find((row) => String(row.code || row.stock_code || '').trim() === value)
+    || selectedItems.find((row) => typeof row === 'object' && String(row.code || row.stock_code || '').trim() === value);
+  if (!item) return;
+  const current = [...selectedItems];
+  const index = current.findIndex((row) => String(typeof row === 'object' ? (row.code || row.stock_code) : row).trim() === value);
+  if (index >= 0) current.splice(index, 1);
+  else if (current.length >= 9) { showToast('九宫格最多选择 9 支股票'); return; }
+  else {
+    current.push({...item, summary_mode: 'empty', recommendation_reason: item.recommendation_reason || '', quote_loading: item.price == null || item.change_pct == null});
+    kwReviewDraft.selectedWatchlist = current;
+    kwReviewDraft.stockGridCards = [];
+    kwReviewDraft.stockGridError = '';
+    kwReviewDraft.previewReady = false;
+    kwRenderReviewStudio();
+    kwHydrateStockGridSelectionQuote(value);
+    return;
+  }
+  kwReviewDraft.selectedWatchlist = current;
+  kwReviewDraft.stockGridCards = [];
+  kwReviewDraft.stockGridError = '';
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewStudio();
+}
+
+async function kwHydrateStockGridSelectionQuote(code) {
+  const item = (kwReviewDraft.selectedWatchlist || []).find((row) => row && String(row.code || row.stock_code || '').trim() === String(code || '').trim());
+  if (!item) return;
+  try {
+    const response = await fetch(`/api/watchlist/${encodeURIComponent(item.code || item.stock_code || code)}`);
+    const data = await response.json();
+    if (!response.ok || !data || data.data_unavailable) throw new Error('quote_unavailable');
+    Object.assign(item, {name: data.name || item.name, market: data.market || item.market, price: data.price, change: data.change, change_pct: data.change_pct, quote_time: data.quote_time || data.updated_at || item.quote_time || '', quote_loading: false});
+  } catch (error) {
+    item.quote_loading = false;
+  }
+  kwRenderReviewStudio();
+}
+
+function kwUpdateStockGridReason(code, value) {
+  const item = (kwReviewDraft.selectedWatchlist || []).find((row) => row && String(row.code || row.stock_code || '').trim() === String(code || '').trim());
+  if (!item) return;
+  item.recommendation_reason = String(value || '').slice(0, 600);
+  item.summary_mode = item.recommendation_reason.trim() ? 'manual' : 'empty';
+  const tag = document.getElementById(`kw-stock-grid-reason-tag-${String(code || '').trim()}`);
+  if (tag) { tag.textContent = item.recommendation_reason.trim() ? '已填写' : '填写理由'; tag.classList.toggle('is-filled', Boolean(item.recommendation_reason.trim())); }
+  const copy = document.getElementById(`kw-stock-grid-reason-copy-${String(code || '').trim()}`);
+  if (copy) { copy.textContent = item.recommendation_reason; copy.style.display = item.recommendation_reason.trim() ? '' : 'none'; }
+  kwReviewDraft.stockGridCards = [];
+  kwReviewDraft.previewReady = false;
+}
+
+function kwToggleStockGridReasonEditor(code) {
+  kwStockGridReasonEditingCode = String(kwStockGridReasonEditingCode || '') === String(code || '') ? '' : String(code || '');
+  kwRenderReviewStudio();
+}
+
+async function kwRequestStockGridPreview() {
+  const tenant = window.ACTIVE_TENANT || {};
+  const selected = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist : [];
+  if (!selected.length) { showToast('请先选择至少 1 支股票'); return; }
+  kwReviewDraft.stockGridLoading = true;
+  kwReviewDraft.stockGridError = '';
+  kwRenderReviewStudio();
+  try {
+    const response = await fetch('/api/review/stock-grid-preview', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tenant_slug: tenant.slug || '', selected_watchlist: selected }) });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.message || kwStockGridErrorMessage(data.error));
+    kwReviewDraft.stockGridCards = Array.isArray((data.grid || {}).cards) ? data.grid.cards.slice(0, 9) : [];
+    kwReviewDraft.stockGridProvider = String((data.grid || {}).provider || '');
+    kwReviewDraft.stockGridEndpoint = String((data.grid || {}).endpoint || '');
+    if (!kwReviewDraft.stockGridCards.length) throw new Error('stock_grid_empty_result');
+    kwReviewDraft.previewReady = true;
+    kwReviewDraft.flowStage = 'preview';
+    kwReviewWorkspacePanel = 'preview';
+    showToast('今日个股点评已生成');
+  } catch (error) {
+    kwReviewDraft.stockGridError = error.message || '九宫格生成失败，请稍后重试。';
+    showToast(kwReviewDraft.stockGridError);
+  } finally {
+    kwReviewDraft.stockGridLoading = false;
+    kwRenderReviewStudio();
+  }
+}
+
+function kwStockGridErrorMessage(code) {
+  const messages = {
+    stock_grid_upstream_unavailable: '个股行情服务暂时不可用，请重试。',
+    stock_grid_generation_failed: '九宫格生成失败，请检查网络后重试。',
+    stock_grid_empty_result: '暂时没有生成可用的点评内容，请重试。',
+  };
+  return messages[String(code || '').trim()] || '九宫格生成失败，请稍后重试。';
+}
+
 function kwRenderInsightDraftLibrary() {
   if (kwInsightDraftsLoading) {
     return '<div class="kw-knowledge-modal-block"><div class="kw-review-runtime-desc">正在加载洞见草稿...</div></div>';
@@ -10951,6 +11184,23 @@ function kwEditInsightDraft(draftId) {
   kwReviewDraft.reviewTitle = String(draft.title || '').trim();
   kwReviewDraft.accessMode = draft.access_mode === 'subscriber' ? 'subscriber' : 'public';
   kwReviewDraft.sourceMode = String(draft.source_mode || 'manual').trim() || 'manual';
+  const draftMetadata = draft.metadata && typeof draft.metadata === 'object' ? draft.metadata : {};
+  kwReviewDraft.stockGridCards = Array.isArray(draftMetadata.stock_grid_cards) ? draftMetadata.stock_grid_cards.slice(0, 9) : [];
+  kwReviewDraft.stockGridProvider = String(draftMetadata.stock_grid_provider || '');
+  kwReviewDraft.stockGridEndpoint = String(draftMetadata.stock_grid_endpoint || '');
+  const savedStockGridSelection = Array.isArray(draftMetadata.stock_grid_selection) ? draftMetadata.stock_grid_selection : [];
+  kwReviewDraft.selectedWatchlist = (savedStockGridSelection.length ? savedStockGridSelection : kwReviewDraft.stockGridCards).map((item) => ({
+    code: item.stock_code || item.code || '',
+    name: item.stock_name || item.name || item.stock_code || item.code || '',
+    market: item.market || '',
+    security_code: item.security_code || '',
+    industry: item.industry || '',
+    price: item.price,
+    change: item.change,
+    change_pct: item.change_pct,
+    summary_mode: item.summary_mode || (item.summary ? 'manual' : 'empty'),
+    recommendation_reason: item.recommendation_reason || item.summary || '',
+  })).filter((item) => String(item.code).trim());
   kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml('', String(draft.content_text || '').trim());
   kwReviewDraft.draftReviewText = String(draft.content_text || '').trim();
   kwReviewDraft.generatedPreviewText = '';
@@ -10969,6 +11219,10 @@ async function kwSaveReviewDraft() {
     showToast('请先填写洞见主题');
     return;
   }
+  if (kwReviewDraft.sourceMode === 'stock_grid' && !(kwReviewDraft.stockGridCards || []).length) {
+    showToast('请先选择股票并生成九宫格');
+    return;
+  }
   if (!String(text || '').trim()) {
     showToast('请先补充洞见内容');
     return;
@@ -10980,9 +11234,17 @@ async function kwSaveReviewDraft() {
       body: JSON.stringify({
         id: kwReviewDraft.insightDraftId || undefined,
         title: String(kwReviewDraft.reviewTitle || '').trim(),
-        content_text: String(text).trim(),
+        content_text: String(text || '').trim() || '今日个股点评',
+        content_html: kwGetReviewPreviewHtml(),
         source_mode: kwReviewDraft.sourceMode || 'manual',
         access_mode: kwReviewDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
+        metadata: {
+          content_kind: kwReviewDraft.sourceMode === 'stock_grid' ? 'stock_grid' : 'insight',
+          stock_grid_cards: kwReviewDraft.stockGridCards || [],
+          stock_grid_selection: kwReviewDraft.selectedWatchlist || [],
+          stock_grid_provider: kwReviewDraft.stockGridProvider || '',
+          stock_grid_endpoint: kwReviewDraft.stockGridEndpoint || '',
+        },
       }),
     });
     const data = await response.json();
@@ -11036,6 +11298,21 @@ function kwRenderReviewPromptPanel() {
   `;
 }
 
+function kwRenderReviewStockGridCard(card) {
+  const changePct = Number(card && card.change_pct);
+  const hasChangePct = Number.isFinite(changePct);
+  const changeClass = !hasChangePct || changePct === 0 ? 'flat' : (changePct > 0 ? 'up' : 'down');
+  const changeIcon = !hasChangePct || changePct === 0 ? '—' : (changePct > 0 ? '▲' : '▼');
+  const changeText = hasChangePct ? `${Math.abs(changePct).toFixed(2)}%` : '--';
+  const changeValue = Number(card && card.change);
+  const changeValueText = Number.isFinite(changeValue) && changeValue !== 0 ? `${changeValue > 0 ? '+' : ''}${changeValue.toFixed(2)}` : '';
+  const changeValueHtml = changeValueText ? `<span>涨跌额 ${escapeHtml(changeValueText)}</span>` : '';
+  const timestamp = String((card && (card.quote_time || card.updated_at || card.as_of)) || '--').trim();
+  const summary = String(card.summary || card.recommendation_reason || '').trim();
+  const infoHtml = changeValueHtml || timestamp !== '--' ? `<div class="review-stock-grid-card-info">${changeValueHtml}<span>${escapeHtml(timestamp)}</span></div>` : '';
+  return `<div class="review-stock-grid-card"><div class="review-stock-grid-card-head"><div style="min-width:0"><div class="review-stock-grid-card-name">${escapeHtml(card.stock_name || card.stock_code || '股票')}</div><div class="review-stock-grid-card-meta">${escapeHtml(card.stock_code || card.security_code || '')} · ${escapeHtml(card.market || '个股')}</div></div><div class="review-stock-grid-card-quote"><div class="review-stock-grid-card-price">${card.price == null ? '--' : escapeHtml(String(card.price))}</div><div class="review-stock-grid-card-change ${changeClass}">${changeIcon} ${changeText}</div></div></div>${infoHtml}${summary ? `<div class="review-stock-grid-card-summary">${escapeHtml(summary)}</div>` : ''}</div>`;
+}
+
 function kwRenderReviewPreviewPanel() {
   if (!kwReviewDraft.previewReady) return '';
   const periodMeta = getKwReviewPeriodMeta(kwReviewDraft.period || 'day');
@@ -11043,6 +11320,7 @@ function kwRenderReviewPreviewPanel() {
   const title = String(kwReviewDraft.reviewTitle || '').trim() || '洞见预览';
   const userInput = String((structured.user_input_section || {}).display_text || '').trim() || kwGetReviewUserInputDisplayText();
   const watchlistText = '';
+  const stockGridCards = Array.isArray(kwReviewDraft.stockGridCards) ? kwReviewDraft.stockGridCards.slice(0, 9) : [];
   return `
     <div class="kw-review-preview-panel">
       <div class="kw-review-preview-head">
@@ -11055,10 +11333,11 @@ function kwRenderReviewPreviewPanel() {
       <div class="kw-review-preview-copy" style="margin-top:14px">
         ${structured.review_summary ? `<div><strong>摘要</strong><div style="white-space:pre-wrap;margin-top:6px">${escapeHtml(structured.review_summary)}</div></div>` : ''}
         ${userInput ? `<div style="margin-top:${structured.review_summary ? '16px' : '0'}"><strong>用户洞见</strong><div style="white-space:pre-wrap;margin-top:6px">${escapeHtml(userInput)}</div></div>` : ''}
+        ${stockGridCards.length ? `<div style="margin-top:16px"><strong>今日个股点评</strong><div class="review-stock-grid">${stockGridCards.map((card) => kwRenderReviewStockGridCard(card)).join('')}</div></div>` : ''}
         ${watchlistText ? `<div style="margin-top:16px"><strong>历史附加内容</strong><div style="white-space:pre-wrap;margin-top:6px">${escapeHtml(watchlistText)}</div></div>` : ''}
         ${!structured.review_summary && !userInput && !watchlistText ? `<div style="white-space:pre-wrap">${escapeHtml(kwGetReviewPreviewText())}</div>` : ''}
       </div>
-      ${(kwReviewDraft.selectedWatchlist || []).length ? `<div class="kw-chip-row" style="margin-top:14px">${kwReviewDraft.selectedWatchlist.map((name) => `<span class="kw-chip">${escapeHtml(name)}</span>`).join('')}</div>` : ''}
+      ${(kwReviewDraft.selectedWatchlist || []).length ? `<div class="kw-chip-row" style="margin-top:14px">${kwReviewDraft.selectedWatchlist.map((item) => `<span class="kw-chip">${escapeHtml(typeof item === 'object' ? (item.name || item.stock_name || item.code || '') : item)}</span>`).join('')}</div>` : ''}
     </div>
   `;
 }
@@ -11254,12 +11533,20 @@ function kwRenderReviewWizardFooter() {
   let desc = step.desc || '';
   let actions = '';
   if (kwReviewWorkspacePanel === 'input') {
+    if (kwReviewDraft.sourceMode === 'stock_grid') {
+      desc = '搜索并选择任意证券后生成今日一句话点评九宫格。';
+      actions = `
+        <button class="btn-outline" type="button" ${isGenerating || !(kwReviewDraft.selectedWatchlist || []).length ? 'disabled' : ''} onclick="kwSaveReviewDraft()">保存草稿</button>
+        <button class="btn-gold" type="button" ${isGenerating || !(kwReviewDraft.selectedWatchlist || []).length ? 'disabled' : ''} onclick="kwRequestStockGridPreview()">${kwReviewDraft.stockGridLoading ? '生成中...' : '生成九宫格'}</button>
+      `;
+    } else {
       desc = '确认输入内容后，可以直接预览，也可以进入优化规则。';
-    actions = `
-      <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwSaveReviewDraft()">保存草稿</button>
-      <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">直接预览</button>
-      <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">优化成稿</button>
-    `;
+      actions = `
+        <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwSaveReviewDraft()">保存草稿</button>
+        <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">直接预览</button>
+        <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">优化成稿</button>
+      `;
+    }
   } else if (kwReviewWorkspacePanel === 'generation') {
     const stage = kwReviewDraft.flowStage || 'intake';
     if (stage === 'optimize_rule') {
@@ -11411,11 +11698,15 @@ function kwRenderReviewCardDetailList() {
 function kwRenderReviewInputModeRow() {
   const host = document.getElementById('kw-review-input-mode-row');
   if (!host) return;
-  host.innerHTML = getAvailableKwReviewSourceOptions().map((item) => `
-    <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.sourceMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerSourceMode('${item.value}')">
-      ${item.icon} ${escapeHtml(item.label)}
-    </button>
-  `).join('');
+  host.innerHTML = `
+    <div style="flex:0 0 100%;font-size:12px;font-weight:700;color:var(--text-main)">供稿方式</div>
+    ${getAvailableKwReviewSourceOptions().map((item) => `
+      <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.sourceMode ? 'active' : ''}" type="button" role="radio" aria-checked="${item.value === kwReviewDraft.sourceMode}" onclick="kwSetReviewTriggerSourceMode('${item.value}')">
+        <span>${item.icon} ${escapeHtml(item.label)}</span>
+        <span style="display:block;margin-top:4px;font-size:10px;line-height:1.45;opacity:.72">${escapeHtml(item.desc || '')}</span>
+      </button>
+    `).join('')}
+  `;
 }
 
 function kwRenderReviewStageActions() {
@@ -11510,6 +11801,11 @@ function kwOpenReviewTriggerModal(sourceMode) {
   kwReviewDraft.editingPublishedInsightId = '';
   kwReviewDraft.editingPublishedRevisionCount = 0;
   kwReviewDraft.selectedWatchlist = [];
+  kwReviewDraft.stockGridCards = [];
+  kwReviewDraft.stockGridProvider = '';
+  kwReviewDraft.stockGridEndpoint = '';
+  kwReviewDraft.stockGridLoading = false;
+  kwReviewDraft.stockGridError = '';
   kwReviewDraft.watchlistDecision = '';
   kwReviewDraft.paragraphMode = 'manual';
   kwReviewDraft.skipAiProcessing = true;
@@ -11566,6 +11862,10 @@ function kwSetReviewTriggerSourceMode(mode) {
     }
   }
   kwReviewDraft.sourceMode = mode;
+  if (mode !== 'stock_grid') {
+    kwStockGridSearchItems = [];
+    kwStockGridSearchQuery = '';
+  }
   kwReviewDraft.generatedPreviewText = '';
   kwReviewDraft.draftReviewText = '';
   kwReviewDraft.previewReady = false;
@@ -11751,6 +12051,10 @@ function kwPublishReviewDraft() {
   const runtime = ensureKwReviewRuntime();
   if (kwReviewPublishSubmitting) return;
   kwSyncReviewTextInputs();
+  if (kwReviewDraft.sourceMode === 'stock_grid' && !(kwReviewDraft.stockGridCards || []).length) {
+    showToast('请先选择股票并生成九宫格');
+    return;
+  }
   const item = kwBuildPublishedReviewFromDraft();
   const finalText = kwGetReviewPreviewText();
   const transcriptionEngine = kwReviewDraft.sourceMode === 'voice'
@@ -11798,6 +12102,7 @@ function kwPublishReviewDraft() {
     runtime.draftReady = false;
     kwSyncPublishedReviewState(publishResult);
     kwInvalidatePublishedInsightDirectory();
+    kwLoadPublishedReviewPage({force: true});
     if (window.WORKBENCH_DATA) {
       if (Array.isArray(publishResult.snapshots) && publishResult.snapshots.length) {
         window.WORKBENCH_DATA.published_reviews = publishResult.snapshots.slice(0, 20);
@@ -11926,6 +12231,7 @@ function kwRenderPublishedReviewList() {
         <span class="kw-tag">${escapeHtml(item.period || '')}</span>
         <span class="kw-tag">${escapeHtml(item.access_label || (item.access_mode === 'subscriber' ? '订阅专享' : '常规笔记'))}</span>
         ${item.is_pinned ? '<span class="kw-tag" style="color:#8E6A1E;border-color:rgba(200,169,110,.42);background:rgba(200,169,110,.10)">置顶</span>' : ''}
+        ${item.content_kind === 'stock_grid' ? `<span class="kw-tag">九宫格个股洞见 · ${Math.min(9, Array.isArray(item.stock_grid_cards) ? item.stock_grid_cards.length : 0)} 支股票</span>` : ''}
         ${item.revision_count ? `<span class="kw-tag">第 ${Number(item.revision_count)} 次修改</span>` : ''}
       </div>
       <div class="kw-broadcast-meta">${escapeHtml(item.time || '')} · ${escapeHtml(item.summary || '')}</div>
@@ -12655,7 +12961,7 @@ function collectWorkbenchForecastConfig() {
 
 async function loadWorkbenchForecastModel(forceReload) {
   if (kwForecastLoaded && !forceReload && kwForecastEditorBootstrapped) return;
-  const res = await fetch('/api/admin/forecast-config');
+  const res = await fetch('/api/kol/forecast-config');
   const data = await res.json();
   if (!res.ok || data.ok === false) throw new Error(data.error || 'forecast_config_failed');
   kwForecastConfig = data.config || {};
@@ -12673,7 +12979,7 @@ async function loadWorkbenchForecastModel(forceReload) {
 async function resetWorkbenchForecastGraph() {
   const statusNode = document.getElementById('kw-forecast-save-status');
   if (statusNode) statusNode.textContent = '正在恢复推荐模板...';
-  const res = await fetch('/api/admin/forecast-config', {
+  const res = await fetch('/api/kol/forecast-config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({reset_default: true}),
@@ -12698,7 +13004,7 @@ async function saveWorkbenchForecastConfigs() {
   collectWorkbenchForecastConfig();
   const statusNode = document.getElementById('kw-forecast-save-status');
   if (statusNode) statusNode.textContent = '保存中...';
-  const res = await fetch('/api/admin/forecast-config', {
+  const res = await fetch('/api/kol/forecast-config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({graph: {...kwForecastGraph, tuning: kwForecastConfig}, config: kwForecastConfig}),
@@ -13163,6 +13469,51 @@ async function kwSaveMarketDisplayConfig() {
 
 async function publishKwMarketDisplayDraft() { await kwSaveMarketDisplayConfig(); }
 
+let kwEtfSourceLoading = false;
+
+function kwRenderEtfDataSourceRows(items) {
+  return items.map((item) => {
+    const available = item.available === true && item.price != null && Number.isFinite(Number(item.price));
+    const hasChange = available && item.change_available === true && item.change_pct != null && Number.isFinite(Number(item.change_pct));
+    const change = hasChange ? Number(item.change_pct) : null;
+    const changeText = hasChange ? `${change > 0 ? '+' : ''}${change.toFixed(2)}%` : '--';
+    const changeColor = change > 0 ? 'var(--red)' : (change < 0 ? 'var(--green)' : 'inherit');
+    const state = available ? (hasChange ? '已获取' : '涨跌幅待补齐') : (item.message || '暂无真实行情');
+    return `<tr><td>${escapeHtml(item.name || '--')}</td><td>${escapeHtml(item.security_code || item.code || '--')}</td><td>${escapeHtml(item.category || '--')}</td><td>${available ? escapeHtml(String(item.price)) : '--'}</td><td style="color:${changeColor}">${changeText}</td><td>${escapeHtml(item.updated_at || '--')}</td><td>${escapeHtml(item.data_source || 'Gangtise OpenAPI')}</td><td>${escapeHtml(state)}</td></tr>`;
+  }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px">暂无 ETF 目录数据。</td></tr>';
+}
+
+async function kwLoadEtfDataSource() {
+  if (kwEtfSourceLoading) return;
+  const status = document.getElementById('kw-etf-source-status');
+  const rows = document.getElementById('kw-etf-source-rows');
+  const button = document.getElementById('kw-etf-source-refresh');
+  if (!status || !rows || !button) return;
+  kwEtfSourceLoading = true;
+  button.disabled = true;
+  button.textContent = '加载中...';
+  status.textContent = '正在读取 Gangtise ETF 真实日线行情...';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90000);
+  try {
+    const tenantSlug = String((window.ACTIVE_TENANT || {}).slug || '');
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/etf-data-source`, {credentials: 'same-origin', signal: controller.signal});
+    const data = await response.json();
+    if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
+    const items = Array.isArray(data.items) ? data.items : [];
+    rows.innerHTML = kwRenderEtfDataSourceRows(items);
+    const available = items.filter((item) => item.available === true && item.price != null && Number.isFinite(Number(item.price))).length;
+    status.textContent = `目录 ${items.length} 只 · 已获取行情 ${available} 只 · 暂无行情 ${items.length - available} 只 · 来源：${data.data_source || 'Gangtise OpenAPI'} · 最新行情日期：${data.updated_at || '--'}。日线数据不代表盘中实时行情。`;
+  } catch (error) {
+    status.textContent = error.name === 'AbortError' ? 'ETF 行情读取超时，请点击刷新重试。' : `ETF 数据源加载失败：${error.message}。请点击刷新重试。`;
+  } finally {
+    clearTimeout(timer);
+    kwEtfSourceLoading = false;
+    button.disabled = false;
+    button.textContent = '刷新行情';
+  }
+}
+
 function showWorkbenchSection(name, navEl) {
   if (name === 'dashboard') {
     name = 'overview';
@@ -13241,6 +13592,9 @@ function showWorkbenchSection(name, navEl) {
   if (name === 'shared-data-sync') {
     kwLoadSharedDataSyncPanel();
     kwLoadMarketDisplayConfig();
+  }
+  if (name === 'lake-etf') {
+    kwLoadEtfDataSource();
   }
   if (name === 'knowledge-overview') {
     loadWorkbenchKnowledgeAssets(false).then(() => {
@@ -15703,7 +16057,7 @@ document.addEventListener('DOMContentLoaded', () => {
     showWorkbenchSection('overview');
     return;
   }
-  if (['indicator-overview', 'indicator-smart', 'indicator-lake', 'lake-market', 'lake-sectors', 'lake-news', 'indicator-anomalies'].includes(section) && !isWorkbenchFeatureEnabled('analytics_module')) {
+  if (['indicator-overview', 'indicator-smart', 'indicator-lake', 'lake-market', 'lake-sectors', 'lake-etf', 'lake-news', 'indicator-anomalies'].includes(section) && !isWorkbenchFeatureEnabled('analytics_module')) {
     showWorkbenchSection('overview');
     return;
   }

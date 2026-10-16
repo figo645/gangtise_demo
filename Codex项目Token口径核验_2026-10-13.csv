@@ -1,0 +1,7 @@
+﻿核验项,数值,说明
+项目会话文件数,143,session_meta.cwd 精确匹配项目目录
+新版响应记录数,6948,按唯一 response_id 计数
+旧版累计增量记录数,4094,仅对没有新版记录的线程计算
+唯一响应ID数,6948,重复 response_id 未重复计入
+Token口径,provider_recorded,来自 token_usage_record 或旧版累计 token_count 增量，不是可见文本估算
+旧版与新版关系,mutually_exclusive,同一文件含新版记录时忽略旧版 token_count 快照

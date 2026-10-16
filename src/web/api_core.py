@@ -503,6 +503,9 @@ def api_review_publish_embed():
             "review_summary": body.get("review_summary"),
             "user_input_section": body.get("user_input_section") if isinstance(body.get("user_input_section"), dict) else {},
             "watchlist_analysis_section": body.get("watchlist_analysis_section") if isinstance(body.get("watchlist_analysis_section"), dict) else {},
+            "stock_grid_cards": body.get("stock_grid_cards") if isinstance(body.get("stock_grid_cards"), list) else [],
+            "stock_grid_provider": str(body.get("stock_grid_provider") or "").strip(),
+            "stock_grid_endpoint": str(body.get("stock_grid_endpoint") or "").strip(),
             "access_mode": str(body.get("access_mode") or "public").strip().lower() or "public",
             "insight_id": str(body.get("insight_id") or "").strip(),
         }
@@ -514,7 +517,10 @@ def api_review_publish_embed():
         if source_mode == "url" and not is_feature_enabled("review_url_input"):
             raise ValueError("review_url_input_disabled")
         if not str(payload.get("text") or "").strip():
-            raise ValueError("publish_text_required")
+            if source_mode == "stock_grid" and payload.get("stock_grid_cards"):
+                payload["text"] = "九宫格个股洞见"
+            else:
+                raise ValueError("publish_text_required")
         if not review_title:
             raise ValueError("review_title_required")
         snapshot_result = persist_review_publish_snapshot(
@@ -537,6 +543,9 @@ def api_review_publish_embed():
             review_summary=payload.get("review_summary"),
             user_input_section=payload.get("user_input_section"),
             watchlist_analysis_section=payload.get("watchlist_analysis_section"),
+            stock_grid_cards=payload.get("stock_grid_cards"),
+            stock_grid_provider=payload.get("stock_grid_provider"),
+            stock_grid_endpoint=payload.get("stock_grid_endpoint"),
             access_mode=payload.get("access_mode"),
             insight_id=payload.get("insight_id"),
         )
@@ -2857,8 +2866,20 @@ def api_admin_hermes_interception_audits():
     return jsonify({"ok": True, "items": items, "tenant_slug": tenant_slug, "action": action})
 
 
+def _forecast_config_access_guard():
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    if not (has_role_capability(role, "dav") or has_role_capability(role, "admin")):
+        return jsonify({"ok": False, "error": "dav_required"}), 403
+    return None
+
+
+@app.route("/api/kol/forecast-config")
 @app.route("/api/admin/forecast-config")
 def api_admin_forecast_config():
+    denied = _forecast_config_access_guard()
+    if denied:
+        return denied
     if not is_feature_enabled("stock_forecast"):
         return jsonify({"ok": False, "error": "stock_forecast_disabled"}), 403
     graph = load_forecast_workflow_graph()
@@ -2871,8 +2892,12 @@ def api_admin_forecast_config():
     )
 
 
+@app.route("/api/kol/forecast-config", methods=["POST"])
 @app.route("/api/admin/forecast-config", methods=["POST"])
 def api_save_admin_forecast_config():
+    denied = _forecast_config_access_guard()
+    if denied:
+        return denied
     if not is_feature_enabled("stock_forecast"):
         return jsonify({"ok": False, "error": "stock_forecast_disabled"}), 403
     body = request.get_json(silent=True) or {}

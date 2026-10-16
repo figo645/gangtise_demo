@@ -9,7 +9,13 @@ from src.domain.core_services import (
     restart_admin_task,
     set_tenant_published_insight_pin,
 )
-from src.domain.market_services import ETF_PRESENTATION_CATALOG, request_market_snapshot_selection_refresh
+from src.domain.market_services import (
+    ETF_PRESENTATION_CATALOG,
+    build_etf_overview_payload,
+    build_gangtise_stock_insight_grid,
+    resolve_watchlist_candidate,
+    request_market_snapshot_selection_refresh,
+)
 
 
 def _knowledge_feature_disabled_response():
@@ -24,7 +30,7 @@ def _validate_review_source_mode(source_mode):
         raise ValueError("review_voice_input_disabled")
     if normalized == "url" and not is_feature_enabled("review_url_input"):
         raise ValueError("review_url_input_disabled")
-    if normalized not in {"manual", "file", "voice", "url"}:
+    if normalized not in {"manual", "file", "voice", "url", "stock_grid"}:
         raise ValueError("review_source_mode_invalid")
     return normalized
 
@@ -56,6 +62,19 @@ def _insight_draft_guard(tenant_slug):
 
 def _daily_broadcast_guard(tenant_slug):
     return _insight_draft_guard(tenant_slug)
+
+
+@app.route("/api/tenant/<tenant_slug>/etf-data-source")
+def api_tenant_etf_data_source(tenant_slug):
+    denied = _insight_draft_guard(tenant_slug)
+    if denied:
+        return denied
+    try:
+        # Source governance shows the whole catalog, independent of fan-page selection.
+        return jsonify(build_etf_overview_payload())
+    except Exception:
+        app.logger.exception("Failed to load ETF data source for DaV workbench")
+        return jsonify({"ok": False, "error": "etf_data_source_failed"}), 502
 
 
 _DAV_SHARED_DATA_TASK_CODES = (
@@ -287,6 +306,7 @@ def api_tenant_insight_drafts(tenant_slug):
             "content_html": body.get("content_html"),
             "source_mode": body.get("source_mode"),
             "access_mode": body.get("access_mode"),
+            "metadata": body.get("metadata") if isinstance(body.get("metadata"), dict) else {},
         })
         return jsonify({"ok": True, "draft": draft, "drafts": drafts})
     except ValueError as exc:
@@ -294,6 +314,119 @@ def api_tenant_insight_drafts(tenant_slug):
     except Exception:
         app.logger.exception("Failed to persist insight draft")
         return jsonify({"ok": False, "error": "insight_draft_storage_failed"}), 500
+
+
+@app.route("/api/review/stock-grid-preview", methods=["POST"])
+def api_review_stock_grid_preview():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    denied = _insight_draft_guard(tenant_slug)
+    if denied:
+        return denied
+    selected = body.get("selected_watchlist")
+    if not isinstance(selected, list) or not selected:
+        return jsonify({"ok": False, "error": "stock_grid_selection_required"}), 400
+    if len(selected) > 9:
+        return jsonify({"ok": False, "error": "stock_grid_max_nine"}), 400
+    try:
+        def normalized_identity(value):
+            return str(value or "").strip().upper().replace(" ", "")
+
+        def candidate_matches(item, value):
+            requested = normalized_identity(value)
+            if not requested:
+                return False
+            values = {
+                normalized_identity(item.get("code")),
+                normalized_identity(item.get("stock_code")),
+                normalized_identity(item.get("security_code")),
+                normalized_identity(item.get("name")),
+                normalized_identity(item.get("stock_name")),
+            }
+            if requested in values:
+                return True
+            requested_code = requested.split(".", 1)[0]
+            return requested_code and requested_code in {
+                normalized_identity(item.get("code")),
+                normalized_identity(item.get("stock_code")),
+            }
+
+        resolved = []
+        for selection in selected:
+            if isinstance(selection, dict):
+                candidates = (
+                    selection.get("security_code"), selection.get("code"),
+                    selection.get("stock_code"), selection.get("name"),
+                    selection.get("stock_name"),
+                )
+            else:
+                candidates = (selection,)
+            item = None
+            for candidate in candidates:
+                if str(candidate or "").strip():
+                    candidate_item = resolve_watchlist_candidate(stock_code=str(candidate).strip())
+                    if candidate_item and candidate_matches(candidate_item, candidate):
+                        item = candidate_item
+                        break
+            if not item:
+                return jsonify({"ok": False, "error": "stock_grid_security_not_found"}), 400
+            canonical_code = str(item.get("security_code") or item.get("code") or "").strip().upper()
+            if not any(str(row.get("security_code") or row.get("code") or "").strip().upper() == canonical_code for row in resolved):
+                # Keep the canonical identity from security search, while
+                # retaining any quote snapshot supplied by the client.
+                if isinstance(selection, dict):
+                    item = {**item, **{key: selection[key] for key in ("price", "value", "change", "change_pct", "summary", "recommendation_reason", "summary_mode") if selection.get(key) is not None}}
+                resolved.append(item)
+        if len(resolved) > 9:
+            return jsonify({"ok": False, "error": "stock_grid_max_nine"}), 400
+        grid_items = []
+        for item in resolved:
+            code = str(item.get("code") or item.get("stock_code") or "").strip().upper()
+            security_code = str(item.get("security_code") or "").strip().upper()
+            if not security_code:
+                market = str(item.get("market") or "SH").strip().upper()
+                suffix = {"SH": ".SH", "SZ": ".SZ", "HK": ".HK"}.get(market, f".{market}" if market else ".SH")
+                security_code = f"{code}{suffix}"
+            grid_items.append({
+                "code": code,
+                "name": item.get("name") or item.get("stock_name") or code,
+                "market": item.get("market"),
+                "industry": item.get("industry") or item.get("focus"),
+                "price": item.get("price") if item.get("price") is not None else item.get("value"),
+                "change_pct": item.get("change_pct"),
+                "security_code": security_code,
+                "summary_mode": "manual" if str(item.get("recommendation_reason") or "").strip() else "empty",
+                "recommendation_reason": item.get("recommendation_reason") or "",
+            })
+        grid = build_gangtise_stock_insight_grid(grid_items)
+        return jsonify({"ok": True, "grid": grid})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        # Keep upstream failures actionable for the clients. The raw detail is
+        # deliberately limited and contains no credentials; operators can use
+        # the server log for the complete exception context.
+        detail = str(exc).strip()
+        app.logger.warning("Stock insight grid upstream unavailable: %s", detail[:400])
+        if "证券代码无效" in detail or "格式/市场" in detail:
+            message = "所选证券暂时无法获取行情，请稍后重试。"
+        else:
+            message = "行情服务暂时不可用，请稍后重试。"
+        return jsonify({
+            "ok": False,
+            "error": "stock_grid_upstream_unavailable",
+            "message": message,
+            "retryable": True,
+            "detail": detail[:240],
+        }), 503
+    except Exception:
+        app.logger.exception("Failed to generate stock insight grid")
+        return jsonify({
+            "ok": False,
+            "error": "stock_grid_generation_failed",
+            "message": "九宫格生成失败，请稍后重试。",
+            "retryable": True,
+        }), 502
 
 
 @app.route("/api/tenant/<tenant_slug>/insight-drafts/<draft_id>", methods=["DELETE"])

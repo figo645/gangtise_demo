@@ -97,7 +97,7 @@ def test_given_h5_and_web_shells_when_rendered_then_both_load_forecast_capable_s
     for response in (h5, web):
         html = response.get_data(as_text=True)
         if '/static/js/h5-app.js' in html:
-            assert '/static/js/h5-app.js?v=20261013-2' in html
+            assert '/static/js/h5-app.js?v=20261014-2' in html
             assert 'data.kline_forecast || {}' not in html
         else:
             assert 'function renderWatchlistForecastChart(forecast)' in html

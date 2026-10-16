@@ -96,7 +96,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("insight_id: kwReviewDraft.editingPublishedInsightId || ''", workbench)
         self.assertIn("revision_count", (PROJECT_ROOT / "src/domain/ai_services.py").read_text(encoding="utf-8"))
         self.assertIn("function syncPublishedReviewStateToH5(tenantSlug, result)", html)
-        self.assertIn("invalidateReviewDirectory(normalizedSlug);", html)
+        self.assertIn("invalidateReviewDirectory(normalizedSlug, {force: true});", html)
         self.assertIn("gangtise_published_review_update_v1", html)
         self.assertIn("refreshTenantDashboardRemoteState({force: true, rerenderReviews: true});", html)
         self.assertIn("const localMessageState = (activeUser && activeUser.tenant && activeUser.tenant.message_center_state)", html)
@@ -2869,6 +2869,30 @@ class ReviewModuleBddTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"], "publish_text_required")
+
+    def test_given_stock_grid_cards_without_text_when_publishing_then_cards_are_content(self):
+        snapshot_result = {
+            "snapshot": {"id": "grid-1", "title": "今日个股点评"},
+            "snapshots": [{"id": "grid-1", "title": "今日个股点评"}],
+            "message_center_state": {"summary": "ok", "threads": [], "broadcasts": []},
+        }
+        with mock.patch(
+            "src.web.api_core.persist_review_publish_snapshot",
+            return_value=snapshot_result,
+        ) as persist_snapshot:
+            response = self.client.post(
+                "/api/review/publish-embed",
+                json={
+                    "tenant_slug": self.tenant_slug,
+                    "period": "day",
+                    "review_title": "今日个股点评",
+                    "source_mode": "stock_grid",
+                    "text": "",
+                    "stock_grid_cards": [{"stock_code": "600519", "stock_name": "贵州茅台"}],
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(persist_snapshot.call_args.kwargs["text"], "九宫格个股洞见")
 
     def test_given_missing_review_title_when_publishing_review_then_reject(self):
         response = self.client.post(

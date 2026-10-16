@@ -1191,6 +1191,27 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             broadcast_kind = "noon"
     source_mode = str(raw.get("source_mode") or fallback.get("source_mode") or "manual").strip().lower() or "manual"
     content_kind = str(raw.get("content_kind") or "insight").strip().lower()[:40] or "insight"
+    stock_grid_cards = []
+    for card in raw.get("stock_grid_cards") if isinstance(raw.get("stock_grid_cards"), list) else []:
+        if not isinstance(card, dict):
+            continue
+        stock_grid_cards.append({
+            "stock_code": str(card.get("stock_code") or card.get("code") or "").strip()[:40],
+            "security_code": str(card.get("security_code") or "").strip()[:48],
+            "stock_name": str(card.get("stock_name") or card.get("name") or "").strip()[:80],
+            "market": str(card.get("market") or "").strip()[:12],
+            "industry": str(card.get("industry") or card.get("focus") or "").strip()[:80],
+            "price": card.get("price"),
+            "change": card.get("change"),
+            "change_pct": card.get("change_pct"),
+            "quote_time": str(card.get("quote_time") or card.get("updated_at") or "").strip()[:40],
+            "summary_mode": str(card.get("summary_mode") or ("manual" if str(card.get("summary") or "").strip() else "empty")).strip().lower()[:20] or "empty",
+            "recommendation_reason": str(card.get("recommendation_reason") or "").strip()[:600],
+            "summary": str(card.get("summary") or "").strip()[:600],
+        })
+    stock_grid_cards = stock_grid_cards[:9]
+    if source_mode == "stock_grid" or stock_grid_cards:
+        content_kind = "stock_grid"
     if broadcast_kind in {"morning", "noon", "night"} or source_mode == "gangtise_daily_broadcast":
         content_kind = "ai_broadcast"
     if broadcast_kind in {"morning", "noon", "night"}:
@@ -1373,6 +1394,9 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "publisher": str(raw.get("publisher") or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
         "snapshot_type": str(raw.get("snapshot_type") or "published_review").strip() or "published_review",
         "content_kind": content_kind,
+        "stock_grid_cards": stock_grid_cards,
+        "stock_grid_provider": str(raw.get("stock_grid_provider") or "").strip()[:120],
+        "stock_grid_endpoint": str(raw.get("stock_grid_endpoint") or "").strip()[:240],
         "broadcast_kind": broadcast_kind[:40],
         "broadcast_label": broadcast_label,
         "visual_theme": visual_theme[:40],
@@ -2390,8 +2414,13 @@ def _normalize_insight_draft_item(item, tenant, index=0):
     title = str(raw.get("title") or "未命名洞见草稿").strip()[:120] or "未命名洞见草稿"
     content_text = str(raw.get("content_text") or raw.get("text") or "").strip()[:20000]
     content_html = sanitize_portal_html(str(raw.get("content_html") or "").strip())
-    if not content_text:
+    metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+    stock_grid_cards = metadata.get("stock_grid_cards") if isinstance(metadata.get("stock_grid_cards"), list) else []
+    source_mode = str(raw.get("source_mode") or "manual").strip().lower()[:40] or "manual"
+    if not content_text and not (source_mode == "stock_grid" and stock_grid_cards):
         raise ValueError("insight_draft_content_required")
+    if not content_text and source_mode == "stock_grid":
+        content_text = "九宫格个股洞见"
     draft_id = str(raw.get("id") or "").strip()
     if not draft_id:
         digest = hashlib.sha1(f"{tenant['slug']}:{title}:{content_text}:{now_ts()}".encode("utf-8")).hexdigest()[:16]
@@ -2401,7 +2430,13 @@ def _normalize_insight_draft_item(item, tenant, index=0):
         "title": title,
         "content_text": content_text,
         "content_html": content_html,
-        "source_mode": str(raw.get("source_mode") or "manual").strip().lower()[:40] or "manual",
+        "metadata": {
+            "content_kind": str(metadata.get("content_kind") or "insight").strip().lower()[:40] or "insight",
+            "stock_grid_cards": copy.deepcopy(stock_grid_cards[:9]),
+            "stock_grid_provider": str(metadata.get("stock_grid_provider") or "").strip()[:120],
+            "stock_grid_endpoint": str(metadata.get("stock_grid_endpoint") or "").strip()[:240],
+        },
+        "source_mode": source_mode,
         "access_mode": "subscriber" if str(raw.get("access_mode") or "public").strip().lower() == "subscriber" else "public",
         "updated_at": normalize_datetime_text(raw.get("updated_at") or now_ts()) or now_ts(),
         "created_at": normalize_datetime_text(raw.get("created_at") or raw.get("updated_at") or now_ts()) or now_ts(),
@@ -2414,7 +2449,7 @@ def list_tenant_insight_drafts(tenant_slug):
         raise ValueError("tenant_not_found")
     rows = get_db().execute(
         """
-        SELECT draft_id, title, content_text, content_html, source_mode, access_mode, created_at, updated_at
+        SELECT draft_id, title, content_text, content_html, source_mode, access_mode, metadata_json, created_at, updated_at
         FROM tenant_insight_drafts
         WHERE tenant_slug = ?
         ORDER BY updated_at DESC, id DESC
@@ -2430,6 +2465,7 @@ def list_tenant_insight_drafts(tenant_slug):
             "content_html": str(row["content_html"] or ""),
             "source_mode": str(row["source_mode"] or "manual"),
             "access_mode": "subscriber" if str(row["access_mode"] or "") == "subscriber" else "public",
+            "metadata": row.get("metadata_json") if isinstance(row.get("metadata_json"), dict) else _decode_published_insight_payload(row.get("metadata_json")),
             "created_at": normalize_datetime_text(row["created_at"]) or now_ts(),
             "updated_at": normalize_datetime_text(row["updated_at"]) or now_ts(),
         }
@@ -2453,18 +2489,19 @@ def save_tenant_insight_draft(tenant_slug, draft):
     db.execute(
         """
         INSERT INTO tenant_insight_drafts
-          (tenant_slug, draft_id, title, content_text, content_html, source_mode, access_mode, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (tenant_slug, draft_id, title, content_text, content_html, source_mode, access_mode, metadata_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (tenant_slug, draft_id) DO UPDATE SET
           title = EXCLUDED.title,
           content_text = EXCLUDED.content_text,
           content_html = EXCLUDED.content_html,
           source_mode = EXCLUDED.source_mode,
           access_mode = EXCLUDED.access_mode,
+          metadata_json = EXCLUDED.metadata_json,
           updated_at = EXCLUDED.updated_at
         """,
         (normalized_tenant_slug, normalized["id"], normalized["title"], normalized["content_text"], normalized["content_html"],
-         normalized["source_mode"], normalized["access_mode"], created_at, now),
+         normalized["source_mode"], normalized["access_mode"], Json(normalized["metadata"]), created_at, now),
     )
     db.commit()
     normalized["created_at"] = normalize_datetime_text(created_at) or created_at
@@ -9499,6 +9536,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "144_message_domain_user_identity.sql")
         execute_sql_file(conn, sql_dir / "145_reconcile_tenant_registry_references.sql")
         execute_sql_file(conn, sql_dir / "146_tenant_published_insight_pinning.sql")
+        execute_sql_file(conn, sql_dir / "148_tenant_insight_grid_metadata.sql")
 
 
 def init_db_safe():
