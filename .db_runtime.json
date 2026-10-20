@@ -1,5 +1,5 @@
 {
-  "target": "staging",
-  "use_staging": true,
-  "updated_at": "2026-10-17 02:30:00"
+  "target": "local",
+  "use_staging": false,
+  "updated_at": "2026-10-21 00:00:00"
 }

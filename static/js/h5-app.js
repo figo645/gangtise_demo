@@ -2880,37 +2880,59 @@ function renderFundamentalWatchlistChart() {
 async function loadFeedMarketEconomy() {
   const host = document.getElementById('feed-market-economy');
   if (!host) return;
-  try {
-    const query = marketSnapshotTenantQuery();
-    const [sectorResponse, overviewResponse] = await Promise.all([
-      fetch(`/api/market-sectors${query}`, {cache: 'no-store'}),
-      fetch(`/api/market-overview${query}`, {cache: 'no-store'}),
-    ]);
-    if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
-    const sectors = await sectorResponse.json().catch(() => ({}));
-    const overview = await overviewResponse.json().catch(() => ({}));
-    window.feedMarketRetryCount = 0;
-    renderFeedMarketEconomyPanel(overview, sectors);
-    const retryAfterMs = Math.max(Number(sectors.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
-    if (retryAfterMs && !window.feedMarketOnDemandRetryPending) {
-      window.feedMarketOnDemandRetryPending = true;
-      window.setTimeout(() => {
-        window.feedMarketOnDemandRetryPending = false;
-        loadFeedMarketEconomy();
-      }, retryAfterMs);
+  const query = marketSnapshotTenantQuery();
+  const requestKey = query;
+  if (window.feedMarketRequest && window.feedMarketRequestKey === requestKey) return window.feedMarketRequest;
+  const requestSeq = Number(window.feedMarketRequestSeq || 0) + 1;
+  window.feedMarketRequestSeq = requestSeq;
+  window.feedMarketRequestKey = requestKey;
+  window.feedMarketRequest = (async () => {
+    try {
+      const [sectorResponse, overviewResponse] = await Promise.all([
+        fetch(`/api/market-sectors${query}`, {cache: 'no-store'}),
+        fetch(`/api/market-overview${query}`, {cache: 'no-store'}),
+      ]);
+      if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
+      const sectors = await sectorResponse.json().catch(() => ({}));
+      const overview = await overviewResponse.json().catch(() => ({}));
+      if (requestSeq !== window.feedMarketRequestSeq) return;
+      const hasItems = (payload) => Array.isArray(payload && payload.items) && payload.items.length > 0;
+      const previous = window.feedMarketLastPayloadKey === requestKey
+        ? (window.feedMarketLastPayload || {})
+        : {};
+      const nextOverview = hasItems(overview) ? overview : (previous.overview || overview);
+      const nextSectors = hasItems(sectors) ? sectors : (previous.sectors || sectors);
+      window.feedMarketLastPayload = {overview: nextOverview, sectors: nextSectors};
+      window.feedMarketLastPayloadKey = requestKey;
+      window.feedMarketRetryCount = 0;
+      renderFeedMarketEconomyPanel(nextOverview, nextSectors);
+      const retryAfterMs = Math.max(Number(sectors.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
+      if (retryAfterMs && !window.feedMarketOnDemandRetryPending) {
+        window.feedMarketOnDemandRetryPending = true;
+        window.setTimeout(() => {
+          window.feedMarketOnDemandRetryPending = false;
+          loadFeedMarketEconomy();
+        }, retryAfterMs);
+      }
+    } catch (error) {
+      if (requestSeq === window.feedMarketRequestSeq
+        && window.feedMarketLastPayloadKey !== requestKey) {
+        renderFeedMarketEconomyPanel({}, {});
+      }
+      const retryCount = Number(window.feedMarketRetryCount || 0);
+      if (retryCount < 5 && !window.feedMarketRetryPending) {
+        window.feedMarketRetryCount = retryCount + 1;
+        window.feedMarketRetryPending = true;
+        window.setTimeout(() => {
+          window.feedMarketRetryPending = false;
+          loadFeedMarketEconomy();
+        }, Math.min(30000, 1500 * (retryCount + 1)));
+      }
+    } finally {
+      if (requestSeq === window.feedMarketRequestSeq) window.feedMarketRequest = null;
     }
-  } catch (error) {
-    renderFeedMarketEconomyPanel({}, {});
-    const retryCount = Number(window.feedMarketRetryCount || 0);
-    if (retryCount < 5 && !window.feedMarketRetryPending) {
-      window.feedMarketRetryCount = retryCount + 1;
-      window.feedMarketRetryPending = true;
-      window.setTimeout(() => {
-        window.feedMarketRetryPending = false;
-        loadFeedMarketEconomy();
-      }, Math.min(30000, 1500 * (retryCount + 1)));
-    }
-  }
+  })();
+  return window.feedMarketRequest;
 }
 
 function renderCoreIndicatorVisibility() {
@@ -9900,6 +9922,15 @@ let marketOverviewRetryCount = 0;
 let marketSectorRetryCount = 0;
 let marketMacroRetryCount = 0;
 let marketEconomyRetryCount = 0;
+let marketOverviewRequest = null;
+let marketSectorRequest = null;
+let marketMacroRequest = null;
+let marketOverviewRequestSeq = 0;
+let marketSectorRequestSeq = 0;
+let marketMacroRequestSeq = 0;
+let marketOverviewItems = [];
+let marketSectorItems = [];
+let marketMacroItems = [];
 
 function switchMarketView(view) {
   const overview = view === 'overview';
@@ -10042,21 +10073,38 @@ function renderMarketOverview(items) {
 async function loadMarketOverview() {
   const host = document.getElementById('market-overview-list');
   if (!host) return;
-  try {
-    const response = await fetch(`/api/market-overview${marketSnapshotTenantQuery()}`);
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_overview_failed');
-    const items = Array.isArray(payload.items) ? payload.items : [];
-    marketOverviewLoaded = items.some((item) => item && item.available);
-    if (marketOverviewLoaded) marketOverviewRetryCount = 0;
-    renderMarketOverview(items);
-    if (!marketOverviewLoaded && marketOverviewRetryCount < 10) {
-      marketOverviewRetryCount += 1;
-      window.setTimeout(loadMarketOverview, 2500);
+  if (marketOverviewRequest) return marketOverviewRequest;
+  const requestSeq = ++marketOverviewRequestSeq;
+  marketOverviewRequest = (async () => {
+    try {
+      const response = await fetch(`/api/market-overview${marketSnapshotTenantQuery()}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_overview_failed');
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      if (requestSeq !== marketOverviewRequestSeq) return;
+      const hasAvailable = items.some((item) => item && item.available);
+      if (hasAvailable) {
+        marketOverviewItems = items;
+        marketOverviewLoaded = true;
+        marketOverviewRetryCount = 0;
+        renderMarketOverview(items);
+      } else if (!marketOverviewItems.length) {
+        marketOverviewLoaded = false;
+        renderMarketOverview(items);
+      }
+      if (!hasAvailable && marketOverviewRetryCount < 10) {
+        marketOverviewRetryCount += 1;
+        window.setTimeout(loadMarketOverview, 2500);
+      }
+    } catch (error) {
+      if (requestSeq === marketOverviewRequestSeq && !marketOverviewItems.length) {
+        host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行情暂时不可用，请稍后重试</div>';
+      }
+    } finally {
+      if (requestSeq === marketOverviewRequestSeq) marketOverviewRequest = null;
     }
-  } catch (error) {
-    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行情暂时不可用，请稍后重试</div>';
-  }
+  })();
+  return marketOverviewRequest;
 }
 
 function renderMarketMacro(items) {
@@ -10093,21 +10141,38 @@ function renderMarketMacro(items) {
 async function loadMarketMacro() {
   const host = document.getElementById('market-macro-list');
   if (!host) return;
-  try {
-    const response = await fetch(`/api/macro-overview${marketSnapshotTenantQuery()}`);
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'macro_overview_failed');
-    const items = Array.isArray(payload.items) ? payload.items : [];
-    marketMacroLoaded = items.length > 0 || Boolean((payload.tenant_display_config || {}).configured);
-    if (marketMacroLoaded) marketMacroRetryCount = 0;
-    renderMarketMacro(items);
-    if (!marketMacroLoaded && marketMacroRetryCount < 10) {
-      marketMacroRetryCount += 1;
-      window.setTimeout(loadMarketMacro, 2500);
+  if (marketMacroRequest) return marketMacroRequest;
+  const requestSeq = ++marketMacroRequestSeq;
+  marketMacroRequest = (async () => {
+    try {
+      const response = await fetch(`/api/macro-overview${marketSnapshotTenantQuery()}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || 'macro_overview_failed');
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      if (requestSeq !== marketMacroRequestSeq) return;
+      const configured = Boolean((payload.tenant_display_config || {}).configured);
+      if (items.length || configured) {
+        marketMacroItems = items;
+        marketMacroLoaded = true;
+        marketMacroRetryCount = 0;
+        renderMarketMacro(items);
+      } else if (!marketMacroItems.length) {
+        marketMacroLoaded = false;
+        renderMarketMacro(items);
+      }
+      if (!items.length && !configured && marketMacroRetryCount < 10) {
+        marketMacroRetryCount += 1;
+        window.setTimeout(loadMarketMacro, 2500);
+      }
+    } catch (error) {
+      if (requestSeq === marketMacroRequestSeq && !marketMacroItems.length) {
+        host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实宏观数据暂时不可用，请稍后重试</div>';
+      }
+    } finally {
+      if (requestSeq === marketMacroRequestSeq) marketMacroRequest = null;
     }
-  } catch (error) {
-    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实宏观数据暂时不可用，请稍后重试</div>';
-  }
+  })();
+  return marketMacroRequest;
 }
 
 async function refreshMarketSnapshot() {
@@ -10160,19 +10225,36 @@ function renderMarketSectors(items) {
 async function loadMarketSectors() {
   const host = document.getElementById('market-sector-list');
   if (!host) return;
-  try {
-    const response = await fetch(`/api/market-sectors${marketSnapshotTenantQuery()}`);
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_sector_overview_failed');
-    const items = Array.isArray(payload.items) ? payload.items : [];
-    marketSectorLoaded = items.length > 0;
-    if (marketSectorLoaded) marketSectorRetryCount = 0;
-    renderMarketSectors(items);
-    // Industry data is a PostgreSQL snapshot. Do not poll the provider from
-    // the page; an Admin must run the market snapshot task manually.
-  } catch (error) {
-    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行业行情暂时不可用，请稍后重试</div>';
-  }
+  if (marketSectorRequest) return marketSectorRequest;
+  const requestSeq = ++marketSectorRequestSeq;
+  marketSectorRequest = (async () => {
+    try {
+      const response = await fetch(`/api/market-sectors${marketSnapshotTenantQuery()}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_sector_overview_failed');
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      if (requestSeq !== marketSectorRequestSeq) return;
+      const hasAvailable = items.some((item) => item && item.available !== false);
+      if (hasAvailable) {
+        marketSectorItems = items;
+        marketSectorLoaded = true;
+        marketSectorRetryCount = 0;
+        renderMarketSectors(items);
+      } else if (!marketSectorItems.length) {
+        marketSectorLoaded = false;
+        renderMarketSectors(items);
+      }
+      // Industry data is a PostgreSQL snapshot. Do not poll the provider from
+      // the page; an Admin must run the market snapshot task manually.
+    } catch (error) {
+      if (requestSeq === marketSectorRequestSeq && !marketSectorItems.length) {
+        host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行业行情暂时不可用，请稍后重试</div>';
+      }
+    } finally {
+      if (requestSeq === marketSectorRequestSeq) marketSectorRequest = null;
+    }
+  })();
+  return marketSectorRequest;
 }
 
 function calcMovingAverage(series, windowSize) {
