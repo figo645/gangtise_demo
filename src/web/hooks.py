@@ -176,15 +176,29 @@ def log_access(response):
 
 @app.after_request
 def compress_browser_payload(response):
-    """Compress large rendered shells when the proxy has not already done so."""
+    """Compress large text responses when the proxy has not already done so."""
     if response.status_code < 200 or response.status_code in {204, 304}:
         return response
-    if response.is_streamed or response.headers.get("Content-Encoding"):
+    if response.headers.get("Content-Encoding"):
         return response
+    # Flask serves static files through a streamed send_file response. Text
+    # assets are still safe to materialize here and compress; leave all other
+    # streamed responses untouched to preserve their streaming semantics.
+    if response.is_streamed and not request.path.startswith("/static/"):
+        return response
+    if response.is_streamed:
+        response.direct_passthrough = False
     if "gzip" not in str(request.headers.get("Accept-Encoding") or "").lower():
         return response
     content_type = str(response.headers.get("Content-Type") or "").lower()
-    if not (content_type.startswith("text/html") or content_type.startswith("application/json")):
+    compressible_types = (
+        "text/",
+        "application/json",
+        "application/javascript",
+        "application/xml",
+        "image/svg+xml",
+    )
+    if not any(content_type.startswith(prefix) for prefix in compressible_types):
         return response
     payload = response.get_data()
     if len(payload) < 2048:
@@ -193,4 +207,5 @@ def compress_browser_payload(response):
     response.headers["Content-Encoding"] = "gzip"
     response.headers["Content-Length"] = str(len(response.get_data()))
     response.vary.add("Accept-Encoding")
+    response.headers.pop("ETag", None)
     return response

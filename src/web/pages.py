@@ -233,7 +233,10 @@ def h5():
         # first paint wait for unrelated workbench data. The client already
         # refreshes an empty dashboard state through that API after the shell
         # becomes interactive, so defer it for the desktop route.
-        tenant_dashboard_payload = {} if desktop_mode else build_tenant_dashboard_payload(tenant, viewer=current_authenticated_user)
+        # Dashboard state is fetched from the tenant API after the shell is
+        # interactive. Keeping it out of the H5 bootstrap avoids serializing
+        # operational analytics and makes H5/Web use the same loading path.
+        tenant_dashboard_payload = {}
         auth_settings = get_auth_settings(site_config)
         demo_profiles = get_h5_login_users(site_config) if auth_settings.get("quick_select_enabled") else []
     except Exception as exc:
@@ -253,7 +256,7 @@ def h5():
         indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False)
         fundamental_column = build_fundamental_column_payload_from_hub(tenant, indicator_hub)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8)
-        tenant_dashboard_payload = {} if desktop_mode else build_tenant_dashboard_payload_fallback(tenant)
+        tenant_dashboard_payload = {}
     # H5 uses the persisted owner-scoped watchlist. An explicit empty map is
     # intentional: it prevents the legacy demo catalog from reappearing after
     # the user removes their last stock.

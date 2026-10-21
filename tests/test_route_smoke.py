@@ -123,6 +123,15 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("/api/site-config?surface=${encodeURIComponent(window.USER_APP_SURFACE || 'h5')}", html)
         self.assertIn("refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true, rerenderReviews: true });", html)
 
+    def test_h5_dashboard_is_deferred_to_tenant_api(self):
+        with patch("src.web.pages.build_tenant_dashboard_payload", side_effect=AssertionError("H5 dashboard must be deferred")):
+            response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("initialTenantDashboard: {}", html)
+        self.assertIn("tenantDashboardLoading", html)
+        self.assertIn("正在加载当前租户已发布的指标", html)
+
     def test_web_user_app_compresses_large_shell_when_browser_supports_gzip(self):
         response = self.client.get(
             f"/web?tenant={self.tenant_slugs[0]}",
@@ -147,7 +156,9 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("window.SITE_CONFIG = {{ workbench_site_config | tojson }};", (project_root / "templates" / "kol_workbench.html").read_text(encoding="utf-8"))
         self.assertNotIn('"intent_tree"', h5_html.split("window.SITE_CONFIG = ", 1)[1].split(";\n", 1)[0])
         self.assertNotIn('"intent_tree"', workbench_html.split("window.SITE_CONFIG = ", 1)[1].split(";\n", 1)[0])
-        self.assertIn('defer src="/static/echarts.min.js"', h5_html)
+        self.assertNotIn('defer src="/static/echarts.min.js"', h5_html)
+        self.assertIn("function ensureEchartsAssets()", h5_html)
+        self.assertIn("/static/echarts.min.js", h5_html)
         self.assertIn('defer src="/static/echarts.min.js"', workbench_html)
         self.assertIn("refreshWorkbenchSiteConfig({silent: true, refreshWorkbench: false});", workbench_html)
 
@@ -1231,6 +1242,15 @@ class RouteSmokeTest(unittest.TestCase):
         response = self.client.get("/static/echarts.min.js")
         self.assertEqual(response.status_code, 200)
         self.assertIn("max-age=604800", response.headers.get("Cache-Control", ""))
+
+    def test_static_text_assets_support_gzip_negotiation(self):
+        for path in ("/static/js/h5-app.js", "/static/js/echarts_helpers.js", "/static/css/h5-shell.css"):
+            with self.subTest(path=path):
+                response = self.client.get(path, headers={"Accept-Encoding": "gzip"})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers.get("Content-Encoding"), "gzip")
+                self.assertIn("Accept-Encoding", response.headers.get("Vary", ""))
+                self.assertTrue(gzip.decompress(response.get_data()))
 
     def test_release_notes_version_center_is_available_across_all_product_surfaces(self):
         index_html = self.client.get("/").get_data(as_text=True)

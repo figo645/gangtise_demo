@@ -1,5 +1,39 @@
 // ===== TAB SWITCHING =====
 const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
+let echartsAssetsPromise = null;
+
+function ensureEchartsAssets() {
+  if (window.echarts && window.GangtiseEcharts) return Promise.resolve(window.GangtiseEcharts);
+  if (echartsAssetsPromise) return echartsAssetsPromise;
+  echartsAssetsPromise = new Promise((resolve, reject) => {
+    const loadHelpers = () => {
+      if (window.GangtiseEcharts) {
+        resolve(window.GangtiseEcharts);
+        return;
+      }
+      const helpers = document.createElement('script');
+      helpers.src = '/static/js/echarts_helpers.js?v=20260828-2';
+      helpers.async = true;
+      helpers.onload = () => window.GangtiseEcharts
+        ? resolve(window.GangtiseEcharts)
+        : reject(new Error('echarts_helpers_load_failed'));
+      helpers.onerror = () => reject(new Error('echarts_helpers_load_failed'));
+      document.head.appendChild(helpers);
+    };
+    if (window.echarts) {
+      loadHelpers();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = '/static/echarts.min.js';
+    script.async = true;
+    script.onload = loadHelpers;
+    script.onerror = () => reject(new Error('echarts_load_failed'));
+    document.head.appendChild(script);
+  });
+  echartsAssetsPromise.catch(() => { echartsAssetsPromise = null; });
+  return echartsAssetsPromise;
+}
 const KNOWLEDGE_INGESTION_CONFIG = (window.SITE_CONFIG && window.SITE_CONFIG.knowledge_ingestion) || {};
 const KNOWLEDGE_USER_PREVIEW_ENABLED = KNOWLEDGE_INGESTION_CONFIG.user_preview_enabled === true;
 const FUND_NEWS_TABS = window.H5_BOOTSTRAP.fundNewsTabs;
@@ -659,6 +693,8 @@ let knowledgeEntryStore = [
 // fallback fact source because it can drift across devices and tabs.
 let tenantFundDashboardState = {};
 let tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(INITIAL_TENANT_DASHBOARD);
+let tenantDashboardLoaded = false;
+let tenantDashboardLoading = false;
 
 function loadTenantFundDashboardState() {
   return {};
@@ -681,19 +717,23 @@ async function refreshTenantDashboardRemoteState(options) {
   if (!tenantSlug) return null;
   const opts = options || {};
   const loadedTenantSlug = String(((currentTenantDashboardPayload || {}).tenant || {}).slug || '').trim();
-  // The full dashboard is already serialized into the first H5 response.
-  // Re-fetch only after a tenant change or an explicit caller request.
-  if (!opts.force && loadedTenantSlug === String(tenantSlug).trim()) {
+  if (tenantDashboardLoading) return null;
+  // Once loaded, avoid a duplicate request unless a caller explicitly asks
+  // for fresh tenant state (focus, visibility, or a cross-tab update).
+  if (!opts.force && tenantDashboardLoaded && loadedTenantSlug === String(tenantSlug).trim()) {
     if (opts.rerenderFeed) renderFundMacroDashboard();
     if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
     if (opts.rerenderReviews) renderReviewExperience();
     return { dashboard: currentTenantDashboardPayload, cached: true };
   }
+  tenantDashboardLoading = true;
+  if (!tenantDashboardLoaded && opts.rerenderFeed) renderFundMacroDashboard({loading: true});
   try {
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`);
     const payload = await resp.json();
     if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_fetch_failed');
     currentTenantDashboardPayload = payload.dashboard || {};
+    tenantDashboardLoaded = true;
     tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
     const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
     tenantState.published = tenantFundDashboardRemoteState.published;
@@ -705,7 +745,10 @@ async function refreshTenantDashboardRemoteState(options) {
     renderFanStockSectorChart();
     return payload;
   } catch (error) {
+    if (!tenantDashboardLoaded && opts.rerenderFeed) renderFundMacroDashboard({error: true});
     return null;
+  } finally {
+    tenantDashboardLoading = false;
   }
 }
 
@@ -2642,65 +2685,16 @@ function renderFeedMarketEconomy(items, title, chartId, limit = 10, description 
     label: item.code && item.name ? `${item.name}\n${item.code}` : (item.sector || item.name || item.code || '--'),
     value: Number(item.change_pct || 0),
   }));
+  const maxAbs = Math.max(...chartRows.map((item) => Math.abs(item.value)), 1);
   const safeChartId = chartId || `feed-market-chart-${Math.random().toString(36).slice(2, 8)}`;
-  window.setTimeout(() => renderFeedMarketEconomyChart(safeChartId, chartRows, 0), 0);
-  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(quoteLabel)} · ${escapeHtml(syncLabel)}</div></div>`;
-}
-
-function renderFeedMarketEconomyChart(chartId, rows, attempt = 0) {
-  const host = document.getElementById(chartId);
-  if (!host || !window.GangtiseEcharts) {
-    if (attempt < 20) window.setTimeout(() => renderFeedMarketEconomyChart(chartId, rows, attempt + 1), 100);
-    return;
-  }
-  const labels = rows.map((item) => item.label);
-  const values = rows.map((item) => Number.isFinite(item.value) ? item.value : 0);
-  const maxAbs = Math.max(...values.map((value) => Math.abs(value)), 1);
-  const option = {
-    animation: true,
-    animationDuration: 280,
-    grid: { top: 24, right: 8, bottom: 54, left: 38 },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' },
-      formatter(params) {
-        const item = Array.isArray(params) ? params.find((entry) => entry.value !== null && entry.value !== '-') : params;
-        const value = item ? Number(item.value || 0) : 0;
-        return `<strong>${escapeHtml(item ? item.axisValue : '--')}</strong><br>${value >= 0 ? '上涨' : '下跌'} ${Math.abs(value).toFixed(2)}%`;
-      },
-    },
-    xAxis: {
-      type: 'category',
-      data: labels,
-      axisTick: { show: false },
-      axisLine: { lineStyle: { color: 'rgba(200,169,110,.28)' } },
-      axisLabel: { color: '#A9B4C0', fontSize: 9, interval: 0, rotate: labels.length > 7 ? 32 : 0, margin: 12 },
-    },
-    yAxis: {
-      type: 'value',
-      min: -maxAbs,
-      max: maxAbs,
-      axisLabel: { color: '#A9B4C0', fontSize: 9, formatter: (value) => `${value}%` },
-      axisLine: { show: false },
-      axisTick: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(200,169,110,.10)' } },
-    },
-    series: [
-      {
-        name: '上涨', type: 'bar', barMaxWidth: 24, barGap: '-100%',
-        data: values.map((value) => value >= 0 ? value : null),
-        itemStyle: { color: '#E74C3C', borderRadius: [4, 4, 0, 0] },
-        label: { show: true, position: 'top', color: '#E74C3C', fontSize: 9, formatter: (params) => params.value == null ? '' : `+${Number(params.value).toFixed(2)}%` },
-      },
-      {
-        name: '下跌', type: 'bar', barMaxWidth: 24, barGap: '-100%',
-        data: values.map((value) => value < 0 ? value : null),
-        itemStyle: { color: '#2ECC71', borderRadius: [0, 0, 4, 4] },
-        label: { show: true, position: 'bottom', color: '#2ECC71', fontSize: 9, formatter: (params) => params.value == null ? '' : `${Number(params.value).toFixed(2)}%` },
-      },
-    ],
-  };
-  window.GangtiseEcharts.render(host, option);
+  const bars = chartRows.map((item) => {
+    const value = Number.isFinite(item.value) ? item.value : 0;
+    const height = Math.max(4, Math.round(Math.abs(value) / maxAbs * 50));
+    const direction = value >= 0 ? 'up' : 'down';
+    const label = String(item.label || '--').split('\n');
+    return `<div class="feed-market-bar-item" title="${escapeAttr(`${label.join(' · ')}：${value >= 0 ? '+' : ''}${value.toFixed(2)}%`)}"><div class="feed-market-bar-area"><span class="feed-market-bar-value ${direction}">${value >= 0 ? '+' : ''}${value.toFixed(2)}%</span><span class="feed-market-bar ${direction}" style="height:${height}%"></span></div><span class="feed-market-bar-label">${escapeHtml(label[0])}<br><small>${escapeHtml(label[1] || '')}</small></span></div>`;
+  }).join('');
+  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-bars" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图" style="grid-template-columns:repeat(${Math.max(chartRows.length, 1)},minmax(0,1fr))">${bars}</div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(quoteLabel)} · ${escapeHtml(syncLabel)}</div></div>`;
 }
 
 function renderFeedMarketEconomyPanel(overviewPayload, sectorPayload) {
@@ -3776,6 +3770,37 @@ let knowledgeVoiceUploading = false;
 const pendingAsyncJobs = {};
 let knowledgeEditors = { body: null };
 let reviewEditors = { manual: null };
+let quillAssetsPromise = null;
+
+function ensureQuillAssets() {
+  if (typeof window.Quill !== 'undefined') return Promise.resolve(window.Quill);
+  if (quillAssetsPromise) return quillAssetsPromise;
+  quillAssetsPromise = new Promise((resolve, reject) => {
+    if (!document.querySelector('link[data-gangtise-quill-css]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css';
+      link.dataset.gangtiseQuillCss = 'true';
+      document.head.appendChild(link);
+    }
+    const existing = document.querySelector('script[data-gangtise-quill]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.Quill), {once: true});
+      existing.addEventListener('error', () => reject(new Error('quill_load_failed')), {once: true});
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js';
+    script.async = true;
+    script.dataset.gangtiseQuill = 'true';
+    script.onload = () => typeof window.Quill !== 'undefined'
+      ? resolve(window.Quill)
+      : reject(new Error('quill_load_failed'));
+    script.onerror = () => reject(new Error('quill_load_failed'));
+    document.head.appendChild(script);
+  });
+  return quillAssetsPromise;
+}
 
 async function generateReviewDraftWithLlm() {
   const user = getActiveDemoUser();
@@ -4157,17 +4182,23 @@ function syncKnowledgeDraftFromEditors() {
 function ensureKnowledgeEditors() {
   destroyKnowledgeEditors();
   if (knowledgeIntakeType !== 'manual') return;
-  if (typeof window.Quill === 'undefined') {
-    const host = document.getElementById('knowledge-body-editor');
-    if (host) host.innerHTML = '<div class="knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+  const mount = () => {
+    knowledgeEditors.body = createSharedQuill(
+      'knowledge-body-editor',
+      '直接输入正文，可写观点、证据、验证节点和风险边界。',
+      knowledgeDraft.bodyHtml || (knowledgeDraft.body ? `<p>${escapeHtml(knowledgeDraft.body).replace(/\n/g, '<br>')}</p>` : ''),
+      () => syncKnowledgeDraftFromEditors(),
+    );
+  };
+  if (typeof window.Quill !== 'undefined') {
+    mount();
     return;
   }
-  knowledgeEditors.body = createSharedQuill(
-    'knowledge-body-editor',
-    '直接输入正文，可写观点、证据、验证节点和风险边界。',
-    knowledgeDraft.bodyHtml || (knowledgeDraft.body ? `<p>${escapeHtml(knowledgeDraft.body).replace(/\n/g, '<br>')}</p>` : ''),
-    () => syncKnowledgeDraftFromEditors(),
-  );
+  const host = document.getElementById('knowledge-body-editor');
+  if (host) host.innerHTML = '<div class="knowledge-editor-loading">正在加载编辑器...</div>';
+  ensureQuillAssets().then(mount).catch(() => {
+    if (host) host.innerHTML = '<div class="knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+  });
 }
 
 function destroyReviewEditors() {
@@ -4183,17 +4214,23 @@ function syncReviewDraftFromEditors() {
 function ensureReviewEditors() {
   destroyReviewEditors();
   if (reviewTriggerDraft.sourceMode !== 'manual') return;
-  if (typeof window.Quill === 'undefined') {
-    const host = document.getElementById('review-manual-editor');
-    if (host) host.innerHTML = '<div class="knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+  const mount = () => {
+    reviewEditors.manual = createSharedQuill(
+      'review-manual-editor',
+      '在这里直接完善完整洞见正文，发布后会按文章形式展示给前台用户。',
+      reviewTriggerDraft.manualHtml || '',
+      () => syncReviewDraftFromEditors(),
+    );
+  };
+  if (typeof window.Quill !== 'undefined') {
+    mount();
     return;
   }
-  reviewEditors.manual = createSharedQuill(
-    'review-manual-editor',
-    '在这里直接完善完整洞见正文，发布后会按文章形式展示给前台用户。',
-    reviewTriggerDraft.manualHtml || '',
-    () => syncReviewDraftFromEditors(),
-  );
+  const host = document.getElementById('review-manual-editor');
+  if (host) host.innerHTML = '<div class="knowledge-editor-loading">正在加载编辑器...</div>';
+  ensureQuillAssets().then(mount).catch(() => {
+    if (host) host.innerHTML = '<div class="knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+  });
 }
 
 function getReviewVoiceButtonLabel() {
@@ -6754,6 +6791,12 @@ function buildInlineChartShell(prefix, height, mountFn) {
   const chartId = window.GangtiseEcharts ? window.GangtiseEcharts.nextId(prefix) : `${prefix}-${Date.now()}`;
   if (window.GangtiseEcharts && typeof mountFn === 'function') {
     window.GangtiseEcharts.enqueue(chartId, mountFn);
+  } else if (typeof ensureEchartsAssets === 'function' && typeof mountFn === 'function') {
+    ensureEchartsAssets().then(() => {
+      if (!window.GangtiseEcharts) return;
+      window.GangtiseEcharts.enqueue(chartId, mountFn);
+      window.GangtiseEcharts.flush(document.body);
+    }).catch(() => {});
   }
   return {
     chartId,
@@ -7173,9 +7216,13 @@ function saveDashboardCellPrompt() {
   generateFundDashboard();
 }
 
-function renderFundMacroDashboard() {
+function renderFundMacroDashboard(options = {}) {
   const host = document.getElementById('feed-macro-dashboard');
   if (!host) return;
+  if (options.loading) {
+    host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">今日核心指标面板</div><div class="fund-column-subtitle">正在加载当前租户已发布的指标...</div></div><span class="tag tag-gold">加载中</span></div></div>';
+    return;
+  }
   const published = getPublishedFundDashboard();
   if (!published || !Array.isArray(published.cards) || !published.cards.length) {
     host.innerHTML = `
@@ -8867,7 +8914,14 @@ function closeWorkbenchOpsModal() {
 function renderWorkbenchOpsBarChart(hostId, items, valueLabel = '数量') {
   const host = document.getElementById(hostId);
   const list = Array.isArray(items) ? items : [];
-  if (!host || !window.GangtiseEcharts || !list.length) return;
+  if (!host || !list.length) return;
+  if (!window.GangtiseEcharts || typeof window.GangtiseEcharts.render !== 'function') {
+    host.innerHTML = buildWorkbenchBarChartFallbackMarkup(list, valueLabel);
+    ensureEchartsAssets().then(() => {
+      if (document.getElementById(hostId)) renderWorkbenchOpsBarChart(hostId, items, valueLabel);
+    }).catch(() => {});
+    return;
+  }
   window.GangtiseEcharts.render(host, {
     color: ['#2F74C0'],
     tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>${escapeHtml(valueLabel)}：${params.value}`),
@@ -8992,6 +9046,9 @@ function renderH5ActivityBarChart(hostId, items, kind) {
   }
   if (!window.GangtiseEcharts || typeof window.GangtiseEcharts.render !== 'function') {
     host.innerHTML = buildWorkbenchBarChartFallbackMarkup(list.map((item) => ({ label: item.label, value: Number(item.comments || 0) + Number(item.annotations || 0) })), '用户活动');
+    ensureEchartsAssets().then(() => {
+      if (document.getElementById(hostId)) renderH5ActivityBarChart(hostId, items, kind);
+    }).catch(() => {});
     return;
   }
   window.GangtiseEcharts.render(host, {
@@ -11759,7 +11816,7 @@ function selectFundNewsAnalysisWindow(windowKey) {
 function renderFundNewsAnalysisCharts(attempt = 0) {
   const host = document.getElementById('fund-news-analysis');
   if (!host || !window.echarts) {
-    if (host && !window.echarts && attempt < 20) window.setTimeout(() => renderFundNewsAnalysisCharts(attempt + 1), 150);
+    if (host && !window.echarts) ensureEchartsAssets().then(() => renderFundNewsAnalysisCharts()).catch(() => {});
     return;
   }
   let analysis = {};
@@ -16062,9 +16119,17 @@ async function deleteWorkbenchSmartIndicator(indicatorCode, confirmed = false) {
   }
 }
 
-function renderFundMacroDashboard() {
+function renderFundMacroDashboard(options = {}) {
   const host = document.getElementById('feed-macro-dashboard');
   if (!host) return;
+  if (options.loading) {
+    host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">今日核心指标面板</div><div class="fund-column-subtitle">正在加载当前租户已发布的指标...</div></div><span class="tag tag-gold">加载中</span></div></div>';
+    return;
+  }
+  if (options.error) {
+    host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">今日核心指标面板</div><div class="fund-column-subtitle">指标加载失败，请稍后重试。</div></div><button type="button" class="btn-outline" style="padding:6px 10px;font-size:11px" onclick="refreshTenantDashboardRemoteState({force:true,rerenderFeed:true,rerenderWorkbench:true})">重试</button></div></div>';
+    return;
+  }
   const published = getPublishedFundDashboard();
   const publishedCards = published && Array.isArray(published.cards)
     ? buildWorkbenchSmartSlotCards(published.layout || '2x2', published.cards)
