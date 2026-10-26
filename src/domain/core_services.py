@@ -1209,9 +1209,14 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             "recommendation_reason": str(card.get("recommendation_reason") or "").strip()[:600],
             "summary": str(card.get("summary") or "").strip()[:600],
         })
+    stock_grid_enabled_value = raw.get("stock_grid_enabled")
+    if stock_grid_enabled_value is False:
+        stock_grid_cards = []
     stock_grid_cards = stock_grid_cards[:9]
-    if source_mode == "stock_grid" or stock_grid_cards:
-        content_kind = "stock_grid"
+    # New notes are always Insight documents. Keep stock-grid metadata as an
+    # optional presentation block; legacy stock_grid snapshots remain readable.
+    if source_mode != "gangtise_daily_broadcast" and content_kind != "ai_broadcast":
+        content_kind = "insight"
     if broadcast_kind in {"morning", "noon", "night"} or source_mode == "gangtise_daily_broadcast":
         content_kind = "ai_broadcast"
     if broadcast_kind in {"morning", "noon", "night"}:
@@ -1394,6 +1399,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "publisher": str(raw.get("publisher") or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
         "snapshot_type": str(raw.get("snapshot_type") or "published_review").strip() or "published_review",
         "content_kind": content_kind,
+        "stock_grid_enabled": bool(stock_grid_enabled_value if stock_grid_enabled_value is not None else stock_grid_cards),
         "stock_grid_cards": stock_grid_cards,
         "stock_grid_provider": str(raw.get("stock_grid_provider") or "").strip()[:120],
         "stock_grid_endpoint": str(raw.get("stock_grid_endpoint") or "").strip()[:240],
@@ -2416,11 +2422,12 @@ def _normalize_insight_draft_item(item, tenant, index=0):
     content_html = sanitize_portal_html(str(raw.get("content_html") or "").strip())
     metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
     stock_grid_cards = metadata.get("stock_grid_cards") if isinstance(metadata.get("stock_grid_cards"), list) else []
+    stock_grid_enabled_value = metadata.get("stock_grid_enabled")
+    if stock_grid_enabled_value is False:
+        stock_grid_cards = []
     source_mode = str(raw.get("source_mode") or "manual").strip().lower()[:40] or "manual"
-    if not content_text and not (source_mode == "stock_grid" and stock_grid_cards):
+    if not content_text:
         raise ValueError("insight_draft_content_required")
-    if not content_text and source_mode == "stock_grid":
-        content_text = "九宫格个股洞见"
     draft_id = str(raw.get("id") or "").strip()
     if not draft_id:
         digest = hashlib.sha1(f"{tenant['slug']}:{title}:{content_text}:{now_ts()}".encode("utf-8")).hexdigest()[:16]
@@ -2431,8 +2438,14 @@ def _normalize_insight_draft_item(item, tenant, index=0):
         "content_text": content_text,
         "content_html": content_html,
         "metadata": {
-            "content_kind": str(metadata.get("content_kind") or "insight").strip().lower()[:40] or "insight",
+            "content_kind": "insight",
+            "stock_grid_enabled": bool(stock_grid_enabled_value if stock_grid_enabled_value is not None else stock_grid_cards),
             "stock_grid_cards": copy.deepcopy(stock_grid_cards[:9]),
+            "stock_grid_selection": copy.deepcopy(
+                metadata.get("stock_grid_selection")[:9]
+                if isinstance(metadata.get("stock_grid_selection"), list)
+                else []
+            ),
             "stock_grid_provider": str(metadata.get("stock_grid_provider") or "").strip()[:120],
             "stock_grid_endpoint": str(metadata.get("stock_grid_endpoint") or "").strip()[:240],
         },
@@ -3616,10 +3629,10 @@ def build_dashboard_base_indicator_options(tenant=None):
                 "unit": "",
                 "source_type": "market_index",
                 "source_type_label": (detail.get("source_type_label") if isinstance(detail, dict) else None) or "大盘指数",
-                "provider": "AKShare",
+                "provider": "Gangtise OpenAPI",
                 "source_defs": [],
-                "algorithm_detail": "由后台 AKShare 市场快照统一采集，用于市场一览展示。",
-                "interpretation": f"已读取 {indicator_name} AKShare 市场快照。",
+                "algorithm_detail": "由后台 Gangtise OpenAPI 市场快照统一采集，用于市场一览展示。",
+                "interpretation": f"已读取 {indicator_name} Gangtise 市场快照。",
                 "prompt_text": indicator_name,
                 "updated_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
                 "data_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
@@ -3641,7 +3654,7 @@ def build_dashboard_base_indicator_options(tenant=None):
             continue
         entry = (getattr(market, "GANGTISE_INDICATOR_REGISTRY", {}) or {}).get(indicator_code) or {}
         indicator_name = macro_item.get("name") or entry.get("indicator_name") or indicator_code
-        data_source = str(macro_item.get("data_source") or "AKShare").strip() or "AKShare"
+        data_source = str(macro_item.get("data_source") or "Gangtise OpenAPI").strip() or "Gangtise OpenAPI"
         hub_item = hub_item_map.get(indicator_code) or {}
         source_defs = copy.deepcopy(hub_item.get("source_defs") or [])
         if not source_defs:
@@ -3657,10 +3670,10 @@ def build_dashboard_base_indicator_options(tenant=None):
                 "unit": macro_item.get("unit") or entry.get("unit") or "",
                 "source_type": "macro_economic",
                 "source_type_label": "宏观经济指标",
-                "provider": "AKShare",
+                "provider": "Gangtise OpenAPI",
                 "source_defs": source_defs,
-                "algorithm_detail": "由后台 AKShare 公开宏观数据采集后入库，供宏观经济页面与智能指标统一读取。",
-                "interpretation": f"已读取 {indicator_name} AKShare 宏观快照。数据来源：{data_source}。",
+                "algorithm_detail": "由后台 Gangtise OpenAPI 采集宏观数据后入库，供宏观经济页面与智能指标统一读取。",
+                "interpretation": f"已读取 {indicator_name} Gangtise 宏观快照。数据来源：{data_source}。",
                 "prompt_text": indicator_name,
                 "updated_at": macro_item.get("updated_at") or "",
                 "data_at": macro_item.get("updated_at") or "",
@@ -3680,37 +3693,39 @@ def build_dashboard_base_indicator_options(tenant=None):
 
 
 def build_hot_industry_indicator_catalog():
-    """Project the existing Hot Industries snapshot into smart-indicator refs."""
+    """Project real Gangtise ETF industry-theme quotes into indicator refs."""
     market = _market_services_module()
-    sectors = tuple(getattr(market, "SHENWAN_LEVEL1_INDUSTRIES", ()) or ())
-    payload = market.build_market_sector_overview_payload()
-    rows = {
-        str(item.get("sector") or "").strip(): item
-        for item in (payload.get("items") or [])
-        if isinstance(item, dict) and str(item.get("sector") or "").strip()
-    }
+    payload = market.build_etf_overview_payload()
+    rows = [
+        item for item in (payload.get("items") or [])
+        if isinstance(item, dict)
+        and item.get("available") is True
+        and str(item.get("category") or "").strip() == "行业主题"
+        and market.parse_numeric_indicator_value(item.get("change_pct")) is not None
+    ]
+    rows.sort(key=lambda item: (-float(item.get("change_pct") or 0), str(item.get("name") or "")))
     options = []
-    for index, sector_name in enumerate(sectors, start=1):
-        row = rows.get(sector_name) or {}
-        indicator_code = f"source_sector_{index:02d}"
-        numeric_value = market.parse_numeric_indicator_value(row.get("value"))
+    for index, row in enumerate(rows, start=1):
+        sector_name = str(row.get("name") or row.get("security_code") or "").strip()
+        indicator_code = f"source_etf_industry_{index:02d}"
+        numeric_value = market.parse_numeric_indicator_value(row.get("change_pct"))
         options.append(
             {
                 "indicator_code": indicator_code,
-                "indicator_name": f"申万一级行业指数:{sector_name}",
+                "indicator_name": f"ETF行业主题:{sector_name}",
                 "sector_name": sector_name,
                 "category": "热门行业",
                 "value": round(float(numeric_value), 2) if numeric_value is not None else "--",
                 "numeric_value": numeric_value,
-                "unit": "",
-                "source_type": "market_sector",
-                "source_type_label": "热门行业",
-                "provider": row.get("data_source") or "AKShare",
+                "unit": "%",
+                "source_type": "etf_industry_theme",
+                "source_type_label": "ETF行业主题",
+                "provider": row.get("data_source") or "Gangtise OpenAPI",
                 "source_defs": [],
-                "algorithm_detail": "与热门行业页面使用同一份 AKShare 申万一级行业快照。",
-                "interpretation": f"已读取 {sector_name} 的热门行业快照。" if numeric_value is not None else f"{sector_name} 尚无可用的最新行业快照。",
+                "algorithm_detail": "按 Gangtise OpenAPI ETF 行业主题日线涨跌幅排序。",
+                "interpretation": f"已读取 {sector_name} 的 ETF 行业主题涨跌幅。" if numeric_value is not None else f"{sector_name} 尚无可用的 ETF 行业主题行情。",
                 "prompt_text": sector_name,
-                "selected_indicators": [{"indicator_code": indicator_code, "indicator_name": f"申万一级行业指数:{sector_name}"}],
+                "selected_indicators": [{"indicator_code": indicator_code, "indicator_name": f"ETF行业主题:{sector_name}"}],
                 "updated_at": row.get("updated_at") or "",
                 "data_at": row.get("updated_at") or "",
                 "data_status": "available" if numeric_value is not None else "unavailable",
@@ -5240,6 +5255,7 @@ def normalize_site_config(source=None):
     # Core indicators are intentionally archived until the product is ready;
     # an older database row must not reopen the surfaces by omission.
     feature_flags.setdefault("core_indicators", False)
+    feature_flags.setdefault("watchlist_hot_sectors", False)
     if feature_flags.get("knowledge_module_enabled") is not True:
         feature_flags["knowledge"] = False
     merged["feature_flags"] = feature_flags
@@ -9537,6 +9553,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "145_reconcile_tenant_registry_references.sql")
         execute_sql_file(conn, sql_dir / "146_tenant_published_insight_pinning.sql")
         execute_sql_file(conn, sql_dir / "148_tenant_insight_grid_metadata.sql")
+        execute_sql_file(conn, sql_dir / "149_content_moderation.sql")
 
 
 def init_db_safe():
@@ -10650,7 +10667,7 @@ def run_admin_task(task_code, trigger_mode="manual", force=False, tenant_slug=""
                     f"{details or 'provider_response_incomplete'}"
                 )
             summary = (
-                f"AKShare 市场、行业与宏观快照同步完成：市场 {overview_count}/{expected_overview_count}，"
+                f"Gangtise 市场、行业与宏观快照同步完成：市场 {overview_count}/{expected_overview_count}，"
                 f"行业 {sector_count}/{expected_sector_count}，宏观 {int((result or {}).get('macro_count') or 0)}/{int((result or {}).get('expected_macro_count') or 0)}"
             )
         elif task["task_type"] == "sync_daily_finance_broadcast":

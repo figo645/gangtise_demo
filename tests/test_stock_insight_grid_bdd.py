@@ -118,22 +118,22 @@ class StockInsightGridBddTest(unittest.TestCase):
         self.assertEqual(response.get_json()["error"], "stock_grid_upstream_unavailable")
         self.assertTrue(response.get_json()["retryable"])
 
-    def test_snapshot_normalization_keeps_grid_and_marks_content_kind(self):
+    def test_snapshot_normalization_keeps_grid_as_optional_insight_content(self):
         tenant = {"slug": "laowang", "advisor": "财经老王"}
-        normalized = core_services.normalize_review_snapshot_item({"source_mode": "stock_grid", "title": "今日点评", "content_text": "今日个股点评", "stock_grid_cards": [{"stock_code": "600519", "summary": "观察需求"}]}, tenant)
-        self.assertEqual(normalized["content_kind"], "stock_grid")
+        normalized = core_services.normalize_review_snapshot_item({"source_mode": "manual", "title": "今日点评", "content_text": "今日个股点评", "stock_grid_enabled": True, "stock_grid_cards": [{"stock_code": "600519", "summary": "观察需求"}]}, tenant)
+        self.assertEqual(normalized["content_kind"], "insight")
+        self.assertTrue(normalized["stock_grid_enabled"])
         self.assertEqual(normalized["stock_grid_cards"][0]["stock_code"], "600519")
 
-    def test_grid_draft_without_text_is_valid_because_cards_are_content(self):
+    def test_grid_draft_without_text_is_rejected_because_it_is_an_insight_addon(self):
         tenant = {"slug": "laowang", "advisor": "财经老王"}
-        normalized = core_services._normalize_insight_draft_item({
-            "source_mode": "stock_grid",
-            "title": "今日个股点评",
-            "content_text": "",
-            "metadata": {"stock_grid_cards": [{"stock_code": "600519", "stock_name": "贵州茅台"}]},
-        }, tenant)
-        self.assertEqual(normalized["content_text"], "九宫格个股洞见")
-        self.assertEqual(normalized["metadata"]["stock_grid_cards"][0]["stock_code"], "600519")
+        with self.assertRaisesRegex(ValueError, "insight_draft_content_required"):
+            core_services._normalize_insight_draft_item({
+                "source_mode": "manual",
+                "title": "今日个股点评",
+                "content_text": "",
+                "metadata": {"stock_grid_enabled": True, "stock_grid_cards": [{"stock_code": "600519", "stock_name": "贵州茅台"}]},
+            }, tenant)
 
     def test_published_directory_row_restores_grid_metadata_from_payload(self):
         tenant = {"slug": "laowang", "advisor": "财经老王"}
@@ -148,19 +148,22 @@ class StockInsightGridBddTest(unittest.TestCase):
             "published_at": "2026-10-14 09:00:00",
             "view_count": 0,
             "payload_json": {
-                "content_kind": "stock_grid",
+                "content_kind": "insight",
+                "stock_grid_enabled": True,
                 "stock_grid_cards": [{"stock_code": "600519", "stock_name": "贵州茅台", "summary": "观察需求。"}],
             },
         }, tenant)
-        self.assertEqual(normalized["content_kind"], "stock_grid")
+        self.assertEqual(normalized["content_kind"], "insight")
+        self.assertTrue(normalized["stock_grid_enabled"])
         self.assertEqual(normalized["stock_grid_cards"][0]["stock_name"], "贵州茅台")
 
-    def test_publish_contract_returns_one_published_grid_note_with_cards(self):
+    def test_publish_contract_returns_one_insight_with_optional_grid_cards(self):
         snapshot = {
             "id": "laowang-review-grid-1",
             "title": "今日个股点评",
-            "content_kind": "stock_grid",
-            "source_mode": "stock_grid",
+            "content_kind": "insight",
+            "stock_grid_enabled": True,
+            "source_mode": "manual",
             "stock_grid_cards": [{"stock_code": "600519", "stock_name": "贵州茅台", "summary": "观察需求修复。"}],
         }
         with patch.object(
@@ -174,7 +177,8 @@ class StockInsightGridBddTest(unittest.TestCase):
                     "tenant_slug": "laowang",
                     "review_title": "今日个股点评",
                     "text": "今日个股点评",
-                    "source_mode": "stock_grid",
+                    "source_mode": "manual",
+                    "stock_grid_enabled": True,
                     "stock_grid_cards": snapshot["stock_grid_cards"],
                 },
             )
@@ -182,22 +186,25 @@ class StockInsightGridBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertTrue(payload["success"])
-        self.assertEqual(payload["snapshot"]["content_kind"], "stock_grid")
+        self.assertEqual(payload["snapshot"]["content_kind"], "insight")
+        self.assertTrue(payload["snapshot"]["stock_grid_enabled"])
         self.assertEqual(payload["snapshots"][0]["stock_grid_cards"][0]["stock_code"], "600519")
-        self.assertEqual(persist.call_args.kwargs["source_mode"], "stock_grid")
+        self.assertEqual(persist.call_args.kwargs["source_mode"], "manual")
         self.assertEqual(persist.call_args.kwargs["stock_grid_cards"][0]["stock_code"], "600519")
 
     def test_normal_source_mode_contract_remains_unchanged(self):
         self.assertEqual(api_kol._validate_review_source_mode("manual"), "manual")
-        self.assertEqual(api_kol._validate_review_source_mode("stock_grid"), "stock_grid")
+        self.assertEqual(api_kol._validate_review_source_mode("stock_grid"), "manual")
 
     def test_h5_and_workbench_share_the_same_grid_authoring_contract(self):
         root = Path(__file__).resolve().parents[1]
         h5 = (root / "templates/h5.html").read_text(encoding="utf-8")
         workbench = (root / "templates/kol_workbench.html").read_text(encoding="utf-8")
         for source in (h5, workbench):
-            self.assertIn("value: 'stock_grid'", source)
-            self.assertIn('九宫格个股展示', source)
+            self.assertIn("stockGridEnabled", source)
+            if source is workbench:
+                self.assertIn("kwRenderStockGridAppendix", source)
+            self.assertIn('在这篇洞见末尾加入九宫格股票赏析', source)
             self.assertIn('供稿方式', source)
             self.assertIn("/api/watchlist/search", source)
             self.assertIn("summary_mode", source)
@@ -209,17 +216,17 @@ class StockInsightGridBddTest(unittest.TestCase):
             self.assertNotIn("stock-grid-mode-tags", source)
             self.assertNotIn("setReviewStockGridSummaryMode", source)
         h5_app = (root / "static/js/h5-app.js").read_text(encoding="utf-8")
-        self.assertIn("value: 'stock_grid'", h5_app)
-        self.assertIn('九宫格个股展示', h5_app)
+        self.assertIn('stockGridEnabled ? renderReviewStockGridSection(article)', h5_app)
+        self.assertIn('含九宫格个股赏析', h5_app)
         self.assertIn('function renderReviewWatchlistSelectionPanel()', h5_app)
         self.assertIn('/api/review/stock-grid-preview', h5_app)
         self.assertIn('stock_grid_selection: reviewTriggerDraft.selectedWatchlist || []', h5_app)
         self.assertIn('const draftMetadata = draft.metadata && typeof draft.metadata === \'object\' ? draft.metadata : {};', h5_app)
         self.assertIn('function renderReviewStockGridSection(article)', h5_app)
         self.assertIn('loadReviewDirectoryPage({force: true})', h5_app)
-        self.assertIn('九宫格个股洞见', h5_app)
+        self.assertIn('stock_grid_enabled: Boolean(reviewTriggerDraft.stockGridEnabled)', h5_app)
         self.assertIn('kwLoadPublishedReviewPage({force: true})', workbench)
-        self.assertIn('九宫格个股洞见', workbench)
+        self.assertIn('含九宫格个股赏析', workbench)
 
     def test_web_workbench_mounts_the_grid_authoring_surface(self):
         response = self.client.get('/kol-workbench?tenant=laowang')
@@ -227,7 +234,7 @@ class StockInsightGridBddTest(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('id="workbench-section-review"', html)
         self.assertIn('id="kw-review-input-mode-row"', html)
-        self.assertIn("value: 'stock_grid'", html)
+        self.assertIn('在这篇洞见末尾加入九宫格股票赏析', html)
         self.assertIn('function kwRenderReviewInputPanel()', html)
         self.assertIn('function kwRequestStockGridPreview()', html)
         self.assertIn('发布新洞见', html)

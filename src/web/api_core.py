@@ -8,6 +8,12 @@ from src.domain.core_services import (
     refresh_all_tenant_smart_indicator_snapshots,
     restart_admin_task,
 )
+from src.domain.content_moderation_services import (
+    delete_content_moderation_keyword,
+    get_content_moderation_audit_report,
+    list_content_moderation_keywords,
+    save_content_moderation_keyword,
+)
 
 H5_WECHAT_STATE_SESSION_KEY = "h5_wechat_login_state"
 H5_WECHAT_NEXT_SESSION_KEY = "h5_wechat_login_next"
@@ -504,6 +510,7 @@ def api_review_publish_embed():
             "user_input_section": body.get("user_input_section") if isinstance(body.get("user_input_section"), dict) else {},
             "watchlist_analysis_section": body.get("watchlist_analysis_section") if isinstance(body.get("watchlist_analysis_section"), dict) else {},
             "stock_grid_cards": body.get("stock_grid_cards") if isinstance(body.get("stock_grid_cards"), list) else [],
+            "stock_grid_enabled": bool(body.get("stock_grid_enabled", False)),
             "stock_grid_provider": str(body.get("stock_grid_provider") or "").strip(),
             "stock_grid_endpoint": str(body.get("stock_grid_endpoint") or "").strip(),
             "access_mode": str(body.get("access_mode") or "public").strip().lower() or "public",
@@ -517,10 +524,7 @@ def api_review_publish_embed():
         if source_mode == "url" and not is_feature_enabled("review_url_input"):
             raise ValueError("review_url_input_disabled")
         if not str(payload.get("text") or "").strip():
-            if source_mode == "stock_grid" and payload.get("stock_grid_cards"):
-                payload["text"] = "九宫格个股洞见"
-            else:
-                raise ValueError("publish_text_required")
+            raise ValueError("publish_text_required")
         if not review_title:
             raise ValueError("review_title_required")
         snapshot_result = persist_review_publish_snapshot(
@@ -544,6 +548,7 @@ def api_review_publish_embed():
             user_input_section=payload.get("user_input_section"),
             watchlist_analysis_section=payload.get("watchlist_analysis_section"),
             stock_grid_cards=payload.get("stock_grid_cards"),
+            stock_grid_enabled=payload.get("stock_grid_enabled"),
             stock_grid_provider=payload.get("stock_grid_provider"),
             stock_grid_endpoint=payload.get("stock_grid_endpoint"),
             access_mode=payload.get("access_mode"),
@@ -594,6 +599,18 @@ def api_etf_overview():
             return jsonify({"ok": False, "error": "database_unavailable"}), 503
         app.logger.exception("Failed to load ETF overview")
         return jsonify({"ok": False, "error": "etf_overview_failed"}), 502
+
+
+@app.route("/api/etf-industry-themes")
+def api_etf_industry_themes():
+    """Return the market-wide real ETF industry-theme ranking for fundamentals."""
+    try:
+        return jsonify(build_etf_industry_theme_overview_payload())
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load ETF industry-theme ranking")
+        return jsonify({"ok": False, "error": "etf_industry_themes_failed"}), 502
 
 
 @app.route("/api/etf-detail/<security_code>")
@@ -2653,6 +2670,75 @@ def api_admin_site_config():
             "db_runtime_restart_required": runtime_switched,
         }
     )
+
+
+@app.route("/api/admin/content-moderation", methods=["GET"])
+def api_admin_content_moderation():
+    current_user = get_current_authenticated_user() or {}
+    if str(current_user.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "admin_required"}), 403
+    source_type = str(request.args.get("source_type") or "").strip().lower()
+    result = str(request.args.get("result") or "").strip().lower()
+    try:
+        report = get_content_moderation_audit_report(
+            limit=request.args.get("limit", 100),
+            offset=request.args.get("offset", 0),
+            source_type=source_type,
+            result=result,
+            tenant_slug=request.args.get("tenant_slug", ""),
+        )
+        return jsonify({"ok": True, "report": report, "keywords": list_content_moderation_keywords()})
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load content moderation report")
+        return jsonify({"ok": False, "error": "content_moderation_load_failed"}), 500
+
+
+@app.route("/api/admin/content-moderation/keywords", methods=["POST"])
+def api_admin_save_content_moderation_keyword():
+    current_user = get_current_authenticated_user() or {}
+    if str(current_user.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "admin_required"}), 403
+    body = request.get_json(silent=True) or {}
+    actor = get_current_authenticated_user() or {}
+    try:
+        keyword = save_content_moderation_keyword(
+            keyword=body.get("keyword"),
+            category=body.get("category"),
+            risk_level=body.get("risk_level"),
+            enabled=body.get("enabled", True),
+            description=body.get("description"),
+            actor=actor.get("username") or actor.get("name") or "admin",
+            keyword_id=body.get("id"),
+        )
+        return jsonify({"ok": True, "keyword": keyword})
+    except (ValueError, TypeError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if getattr(exc, "pgcode", "") == "23505":
+            return jsonify({"ok": False, "error": "moderation_keyword_duplicate"}), 409
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to save content moderation keyword")
+        return jsonify({"ok": False, "error": "content_moderation_keyword_save_failed"}), 500
+
+
+@app.route("/api/admin/content-moderation/keywords/<int:keyword_id>", methods=["DELETE"])
+def api_admin_delete_content_moderation_keyword(keyword_id):
+    current_user = get_current_authenticated_user() or {}
+    if str(current_user.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "admin_required"}), 403
+    try:
+        delete_content_moderation_keyword(keyword_id)
+        return jsonify({"ok": True, "deleted": keyword_id})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to delete content moderation keyword")
+        return jsonify({"ok": False, "error": "content_moderation_keyword_delete_failed"}), 500
 
 
 @app.route("/api/admin/news-aggregation/preview", methods=["POST"])

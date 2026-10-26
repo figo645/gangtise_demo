@@ -1021,6 +1021,7 @@ DEFAULT_SITE_CONFIG = {
         "kol_module": True,
         "fundamental_analysis": True,
         "watchlist": True,
+        "watchlist_hot_sectors": False,
         "stock_forecast": True,
         "daily_review": True,
         "core_indicators": False,

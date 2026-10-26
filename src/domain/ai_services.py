@@ -11692,6 +11692,7 @@ def persist_review_publish_snapshot(
     user_input_section=None,
     watchlist_analysis_section=None,
     stock_grid_cards=None,
+    stock_grid_enabled=False,
     stock_grid_provider="",
     stock_grid_endpoint="",
     access_mode="public",
@@ -11715,7 +11716,7 @@ def persist_review_publish_snapshot(
         raise ValueError("invalid_review_access_mode")
     normalized_user_input_section = copy.deepcopy(user_input_section if isinstance(user_input_section, dict) else {})
     normalized_watchlist_analysis = copy.deepcopy(watchlist_analysis_section if isinstance(watchlist_analysis_section, dict) else {})
-    normalized_stock_grid_cards = copy.deepcopy(stock_grid_cards if isinstance(stock_grid_cards, list) else [])[:9]
+    normalized_stock_grid_cards = copy.deepcopy(stock_grid_cards if stock_grid_enabled and isinstance(stock_grid_cards, list) else [])[:9]
     explicit_title = str(review_title or "").strip()
     title_source_text = str(
         normalized_user_input_section.get("display_text")
@@ -11779,7 +11780,7 @@ def persist_review_publish_snapshot(
         "published_date": normalized_published_date,
         "tags": [str(tag).strip() for tag in (prompt_tags if isinstance(prompt_tags, list) else []) if str(tag).strip()][:6] or (["自定义文案"] if paragraph_mode == "manual" else ["智能文案"]),
         "watchlist": [],
-        "content_kind": "stock_grid" if str(source_mode or "").strip().lower() == "stock_grid" else "insight",
+        "content_kind": "insight",
         "stock_grid_cards": normalized_stock_grid_cards,
         "stock_grid_provider": str(stock_grid_provider or "").strip()[:120],
         "stock_grid_endpoint": str(stock_grid_endpoint or "").strip()[:240],
@@ -11811,6 +11812,25 @@ def persist_review_publish_snapshot(
         "is_simulated": False,
         "simulation_label": "",
     }
+    from src.domain.content_moderation_services import inspect_and_record_content
+
+    audit_text = "\n".join([
+        title,
+        cleaned_text,
+        re.sub(r"<[^>]+>", " ", cleaned_html),
+        " ".join(
+            str(card.get("recommendation_reason") or card.get("summary") or "")
+            for card in normalized_stock_grid_cards if isinstance(card, dict)
+        ),
+    ])
+    inspect_and_record_content(
+        audit_text,
+        "insight",
+        tenant_slug=tenant_slug,
+        entity_id=normalized_insight_id or str(external_id or "").strip() or snapshot["id"],
+        actor_user_id=dav_id,
+        actor_name=speaker_name or tenant.get("advisor") or "",
+    )
     snapshots = append_review_snapshot(tenant_slug, snapshot)
     # An external_id can make this call an idempotent retry. Return the stored
     # original instead of a newly generated in-memory ID in that case.

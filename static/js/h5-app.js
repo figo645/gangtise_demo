@@ -436,7 +436,6 @@ const REVIEW_PERIOD_CONFIG = {
   day: { label: '洞见', shortLabel: '洞见', prompt: '', marketFocus: '', aiLabel: '自选股 + 市场行情' },
 };
 const REVIEW_SOURCE_OPTIONS = [
-  { value: 'stock_grid', icon: '▦', label: '九宫格个股展示', desc: '任意搜索并选择最多 9 支股票，生成卡片式个股洞见。' },
   { value: 'voice', icon: '🎙️', label: '语音口述', desc: '收盘后直接口述盘面、行业和个股判断。' },
   { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接写完整洞见正文，再统一发布为前台文章。' },
   { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
@@ -491,6 +490,7 @@ let reviewTriggerDraft = {
   stockGridEndpoint: '',
   stockGridLoading: false,
   stockGridError: '',
+  stockGridEnabled: false,
   watchlistDecision: '',
   voiceTranscript: '',
   manualHtml: '',
@@ -2432,6 +2432,7 @@ function buildReviewArticleData(review) {
     avatar: review.avatar,
     periodLabel: review.periodLabel,
     watchlist: review.watchlist || [],
+    stockGridEnabled: Boolean(review.stock_grid_enabled !== undefined ? review.stock_grid_enabled : (review.stockGridCards || []).length),
     stockGridCards: Array.isArray(review.stockGridCards) ? review.stockGridCards : [],
     tags: review.tags || [],
     coverTitle: deriveReviewCoverTitle(review),
@@ -2517,6 +2518,7 @@ function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
     content_text: matched.content_text || matched.summary || '',
     tags: matched.tags || [],
     watchlist,
+    stockGridEnabled: Boolean(matched.stock_grid_enabled !== undefined ? matched.stock_grid_enabled : (matched.stock_grid_cards || []).length),
     stockGridCards: matched.stock_grid_cards || [],
     annotations: [],
     sourceMode: matched.source_mode || 'manual',
@@ -2605,10 +2607,10 @@ function renderReviewArticleCards(articles) {
   return `
     <div class="review-article-list">
       ${articles.map(article => `
-        <div class="review-article-card ${article.contentKind === 'ai_broadcast' ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : ''} ${article.contentKind === 'stock_grid' ? 'stock-grid' : ''}" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
+        <div class="review-article-card ${article.contentKind === 'ai_broadcast' ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : ''} ${article.stockGridEnabled ? 'stock-grid' : ''}" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
           <div class="review-article-cover">
             ${article.contentKind === 'ai_broadcast' ? `<div class="review-article-broadcast-mark">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(article.broadcastLabel || '财经播报')}</div>` : ''}
-            ${article.contentKind === 'stock_grid' ? `<div class="review-article-broadcast-mark">九宫格个股洞见 · ${Math.min(9, Array.isArray(article.stockGridCards) ? article.stockGridCards.length : 0)} 支股票</div>` : ''}
+            ${article.stockGridEnabled ? `<div class="review-article-broadcast-mark">含九宫格个股赏析 · ${Math.min(9, Array.isArray(article.stockGridCards) ? article.stockGridCards.length : 0)} 支股票</div>` : ''}
             ${renderReviewArticleAccessBadge(article)}
             <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
             <div class="review-article-cover-title">${escapeHtml(article.title)}${article.isPinned ? '<span class="review-pin-badge" aria-label="已置顶">置顶</span>' : ''}${article.revisionCount ? `<span class="review-pin-badge">${escapeHtml(article.revisionLabel || `第 ${article.revisionCount} 次修改`)}</span>` : ''}</div>
@@ -2672,7 +2674,7 @@ function renderFeaturedInsightCard() {
   `;
 }
 
-function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 共享快照', syncTime = '', stale = false) {
+function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 Gangtise OpenAPI 共享快照', syncTime = '', stale = false) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false);
   const syncLabel = syncTime ? `${stale ? '最近一次成功同步' : '数据同步时间'}：${syncTime}` : '数据同步时间：暂无同步记录';
   const quoteLabel = rows.some((item) => item.quote_mode === 'daily_close_fallback')
@@ -2697,12 +2699,13 @@ function renderFeedMarketEconomy(items, title, chartId, limit = 10, description 
   return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-bars" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图" style="grid-template-columns:repeat(${Math.max(chartRows.length, 1)},minmax(0,1fr))">${bars}</div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(quoteLabel)} · ${escapeHtml(syncLabel)}</div></div>`;
 }
 
-function renderFeedMarketEconomyPanel(overviewPayload, sectorPayload) {
+function renderFeedMarketEconomyPanel(overviewPayload, etfPayload) {
   const host = document.getElementById('feed-market-economy');
   if (!host) return;
   const overview = overviewPayload && typeof overviewPayload === 'object' ? overviewPayload : {};
-  const sectors = sectorPayload && typeof sectorPayload === 'object' ? sectorPayload : {};
-  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">本租户统一行情快照，展示大V发布的市场与行业指标。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectors.items, '热门行业涨跌', 'feed-sector-chart', 10, '申万一级行业指数行情，按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。', sectors.updated_at, sectors.stale)}${renderFeedMarketEconomy(overview.items, '市场一览涨跌', 'feed-overview-chart', 10, '标准市场指数按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。', overview.updated_at, overview.stale)}</div></div>`;
+  const etfs = etfPayload && typeof etfPayload === 'object' ? etfPayload : {};
+  const industryEtfs = (Array.isArray(etfs.items) ? etfs.items : []).filter((item) => item && item.available === true && String(item.category || '').trim() === '行业主题').sort((left, right) => Number(right.change_pct || 0) - Number(left.change_pct || 0));
+  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">行情数据来自 Gangtise OpenAPI 共享快照。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(industryEtfs, 'ETF行业主题涨跌', 'feed-sector-chart', 10, '仅展示有真实行情的行业主题 ETF，按涨跌幅从高到低排列。', etfs.updated_at, etfs.stale)}${renderFeedMarketEconomy(overview.items, '市场一览涨跌', 'feed-overview-chart', 10, '标准市场指数按涨跌幅从高到低排列。', overview.updated_at, overview.stale)}</div></div>`;
 }
 
 function renderMarketQuoteCards(items, type) {
@@ -2882,12 +2885,12 @@ async function loadFeedMarketEconomy() {
   window.feedMarketRequestKey = requestKey;
   window.feedMarketRequest = (async () => {
     try {
-      const [sectorResponse, overviewResponse] = await Promise.all([
-        fetch(`/api/market-sectors${query}`, {cache: 'no-store'}),
+      const [etfResponse, overviewResponse] = await Promise.all([
+        fetch('/api/etf-industry-themes', {cache: 'no-store'}),
         fetch(`/api/market-overview${query}`, {cache: 'no-store'}),
       ]);
-      if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
-      const sectors = await sectorResponse.json().catch(() => ({}));
+      if (!etfResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
+      const etfs = await etfResponse.json().catch(() => ({}));
       const overview = await overviewResponse.json().catch(() => ({}));
       if (requestSeq !== window.feedMarketRequestSeq) return;
       const hasItems = (payload) => Array.isArray(payload && payload.items) && payload.items.length > 0;
@@ -2895,12 +2898,12 @@ async function loadFeedMarketEconomy() {
         ? (window.feedMarketLastPayload || {})
         : {};
       const nextOverview = hasItems(overview) ? overview : (previous.overview || overview);
-      const nextSectors = hasItems(sectors) ? sectors : (previous.sectors || sectors);
-      window.feedMarketLastPayload = {overview: nextOverview, sectors: nextSectors};
+      const nextEtfs = hasItems(etfs) ? etfs : (previous.etfs || etfs);
+      window.feedMarketLastPayload = {overview: nextOverview, etfs: nextEtfs};
       window.feedMarketLastPayloadKey = requestKey;
       window.feedMarketRetryCount = 0;
-      renderFeedMarketEconomyPanel(nextOverview, nextSectors);
-      const retryAfterMs = Math.max(Number(sectors.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
+      renderFeedMarketEconomyPanel(nextOverview, nextEtfs);
+      const retryAfterMs = Math.max(Number(etfs.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
       if (retryAfterMs && !window.feedMarketOnDemandRetryPending) {
         window.feedMarketOnDemandRetryPending = true;
         window.setTimeout(() => {
@@ -3359,7 +3362,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
         </div>
       ` : '')}
       ${renderReviewWatchlistAnalysisSection(article)}
-      ${renderReviewStockGridSection(article)}
+      ${article.stockGridEnabled ? renderReviewStockGridSection(article) : ''}
       ${false && article.knowledgeAttachments.length ? `
         <div class="review-article-section">
           <div class="review-article-section-title">附加材料</div>
@@ -3739,8 +3742,7 @@ function getReviewPreviewText() {
   }
   return String(reviewTriggerDraft.draftReviewText || '').trim()
     || String(reviewTriggerDraft.generatedPreviewText || '').trim()
-    || getReviewDraftContentText()
-    || (reviewTriggerDraft.sourceMode === 'stock_grid' && (reviewTriggerDraft.stockGridCards || []).length ? '九宫格个股洞见' : '');
+    || getReviewDraftContentText();
 }
 
 function getReviewUserInputDisplayText() {
@@ -4293,7 +4295,7 @@ async function embedManualReviewText(text) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      text: String(text || '').trim() || (reviewTriggerDraft.sourceMode === 'stock_grid' ? '今日个股点评' : ''),
+      text: String(text || '').trim(),
       content_html: getReviewPreviewHtml(),
       tenant_slug: ((user || {}).tenant || {}).slug || '',
       period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
@@ -4334,6 +4336,11 @@ async function publishReviewContent(text, transcriptionEngine, transcriptModel, 
       review_summary: payload.review_summary || '',
       user_input_section: payload.user_input_section || {},
       watchlist_analysis_section: payload.watchlist_analysis_section || {},
+      stock_grid_enabled: Boolean(
+        payload.stock_grid_enabled !== undefined
+          ? payload.stock_grid_enabled
+          : reviewTriggerDraft.stockGridEnabled
+      ),
       stock_grid_cards: payload.stock_grid_cards || reviewTriggerDraft.stockGridCards || [],
       stock_grid_provider: payload.stock_grid_provider || reviewTriggerDraft.stockGridProvider || '',
       stock_grid_endpoint: payload.stock_grid_endpoint || reviewTriggerDraft.stockGridEndpoint || '',
@@ -4436,10 +4443,19 @@ function renderReviewInputPanel() {
       <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:6px">访问范围按每篇洞见单独生效，不会影响其他已发布笔记。</div>
     </div>
   ` : '';
+  const stockGridAppendix = `
+    <div class="knowledge-modal-block" style="margin-top:12px;padding:12px 14px;background:#F7FBFF;border:1px solid rgba(47,116,192,.12);border-radius:10px">
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:var(--text-main);font-size:12px;font-weight:700">
+        <input type="checkbox" ${reviewTriggerDraft.stockGridEnabled ? 'checked' : ''} onchange="toggleReviewStockGridEnabled(this.checked)" style="margin-top:2px">
+        <span>在这篇洞见末尾加入九宫格股票赏析<span style="display:block;margin-top:4px;color:var(--gray-400);font-size:11px;font-weight:400;line-height:1.6">可任意搜索并选择最多 9 支股票，卡片会作为本文最后一段发布。</span></span>
+      </label>
+      ${reviewTriggerDraft.stockGridEnabled ? renderReviewWatchlistSelectionPanel() : ''}
+    </div>
+  `;
   if (reviewTriggerDraft.sourceMode === 'voice') {
     return `
       <div class="review-intake-panel">
-        ${titleField}${accessModeField}
+        ${titleField}${accessModeField}${stockGridAppendix}
         <div class="review-intake-toolbar">
           <div class="knowledge-record-status">
             <span class="knowledge-live-dot" style="opacity:${reviewVoiceRecording ? '1' : '0.35'}"></span>
@@ -4467,7 +4483,7 @@ function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'file') {
     return `
       <div class="review-intake-panel">
-        ${titleField}${accessModeField}
+        ${titleField}${accessModeField}${stockGridAppendix}
         <div class="review-intake-toolbar">
           <div class="knowledge-record-status">${reviewFileUploading ? '正在解析文件...' : '支持 PDF、Word、Excel，解析后可继续编辑'}</div>
           <button class="review-input-button" ${reviewFileUploading ? 'disabled' : ''} onclick="captureReviewFileInput()">${reviewFileUploading ? '解析中...' : '点击上传文件'}</button>
@@ -4482,7 +4498,7 @@ function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'url') {
     return `
       <div class="review-intake-panel">
-        ${titleField}${accessModeField}
+        ${titleField}${accessModeField}${stockGridAppendix}
         <div class="review-intake-toolbar" style="align-items:flex-end">
           <div style="flex:1;display:grid;gap:10px">
             <input id="review-url-input" class="knowledge-modal-input" placeholder="输入网页 URL 作为本次洞见补充素材" value="${escapeAttr(reviewTriggerDraft.urlValue || '')}" />
@@ -4502,7 +4518,7 @@ function renderReviewInputPanel() {
   }
   return `
     <div class="review-intake-panel">
-      ${titleField}${accessModeField}
+      ${titleField}${accessModeField}${stockGridAppendix}
       <div class="knowledge-rich-shell">
         <div class="knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，适合作为大V洞见正文编辑。</div>
         <div id="review-manual-editor" class="review-rich-editor"></div>
@@ -4562,7 +4578,7 @@ function isReviewDraftProcessingStage() {
 }
 
 function renderReviewWatchlistSelectionPanel() {
-  if (reviewTriggerDraft.sourceMode !== 'stock_grid') return '';
+  if (!reviewTriggerDraft.stockGridEnabled) return '';
   const selectedItems = Array.isArray(reviewTriggerDraft.selectedWatchlist) ? reviewTriggerDraft.selectedWatchlist : [];
   const selected = new Set(selectedItems.map((item) => typeof item === 'object' ? String(item.code || item.stock_code || '').trim() : String(item || '').trim()));
   const rows = Array.isArray(reviewStockGridSearchItems) ? reviewStockGridSearchItems : [];
@@ -4995,7 +5011,7 @@ function renderReviewTriggerModal(user) {
             `).join('')}
           </div>
         </div>
-        ${reviewTriggerDraft.sourceMode === 'stock_grid' ? renderReviewWatchlistSelectionPanel() : (isReviewInputStage() ? `
+        ${isReviewInputStage() ? `
           <div class="knowledge-modal-block">
             <label class="knowledge-modal-label">输入内容</label>
             ${renderReviewInputPanel()}
@@ -5169,9 +5185,6 @@ function renderReviewFlowActions() {
   }
   if (reviewTriggerDraft.flowStage === 'optimize_rule') {
     return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
-  }
-  if (reviewTriggerDraft.sourceMode === 'stock_grid' && reviewTriggerDraft.flowStage === 'intake') {
-    return '<button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="requestReviewStockGridPreview()">生成九宫格</button>';
   }
   if (reviewTriggerDraft.flowStage === 'draft_review') {
     return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">进入发布预览</button>';
@@ -5544,7 +5557,7 @@ async function saveReviewDraft() {
   if (!isDavCapableUser(user)) return;
   syncReviewDraftFromModal();
   const text = getReviewPreviewText() || getReviewDraftContentText();
-  if (reviewTriggerDraft.sourceMode === 'stock_grid' && !(reviewTriggerDraft.stockGridCards || []).length) {
+  if (reviewTriggerDraft.stockGridEnabled && !(reviewTriggerDraft.stockGridCards || []).length) {
     showToast('请先选择股票并生成九宫格');
     return;
   }
@@ -5563,7 +5576,8 @@ async function saveReviewDraft() {
     source_mode: reviewTriggerDraft.sourceMode || 'manual',
     access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
     metadata: {
-      content_kind: reviewTriggerDraft.sourceMode === 'stock_grid' ? 'stock_grid' : 'insight',
+      content_kind: 'insight',
+      stock_grid_enabled: Boolean(reviewTriggerDraft.stockGridEnabled),
       stock_grid_cards: reviewTriggerDraft.stockGridCards || [],
       stock_grid_selection: reviewTriggerDraft.selectedWatchlist || [],
       stock_grid_provider: reviewTriggerDraft.stockGridProvider || '',
@@ -5641,6 +5655,7 @@ function editInsightDraft(draftId) {
   reviewTriggerDraft.sourceMode = String(draft.source_mode || 'manual').trim() || 'manual';
   const draftMetadata = draft.metadata && typeof draft.metadata === 'object' ? draft.metadata : {};
   reviewTriggerDraft.stockGridCards = Array.isArray(draftMetadata.stock_grid_cards) ? draftMetadata.stock_grid_cards.slice(0, 9) : [];
+  reviewTriggerDraft.stockGridEnabled = Boolean(draftMetadata.stock_grid_enabled || reviewTriggerDraft.stockGridCards.length);
   reviewTriggerDraft.stockGridProvider = String(draftMetadata.stock_grid_provider || '');
   reviewTriggerDraft.stockGridEndpoint = String(draftMetadata.stock_grid_endpoint || '');
   const savedStockGridSelection = Array.isArray(draftMetadata.stock_grid_selection) ? draftMetadata.stock_grid_selection : [];
@@ -6064,7 +6079,7 @@ function publishReviewDraft() {
   if (reviewPublishSubmitting) return;
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   syncReviewDraftFromModal();
-  if (reviewTriggerDraft.sourceMode === 'stock_grid' && !(reviewTriggerDraft.stockGridCards || []).length) {
+  if (reviewTriggerDraft.stockGridEnabled && !(reviewTriggerDraft.stockGridCards || []).length) {
     showToast('请先选择股票并生成九宫格');
     return;
   }
@@ -6104,6 +6119,7 @@ function publishReviewDraft() {
       summary_source: 'llm_user_input_only',
     },
     watchlist_analysis_section: previewPayload.watchlist_analysis_section || {},
+    stock_grid_enabled: Boolean(reviewTriggerDraft.stockGridEnabled),
     stock_grid_cards: reviewTriggerDraft.stockGridCards || [],
     stock_grid_provider: reviewTriggerDraft.stockGridProvider || '',
     stock_grid_endpoint: reviewTriggerDraft.stockGridEndpoint || '',
@@ -10109,7 +10125,7 @@ function renderMarketOverview(items) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available);
   const sourceNote = document.getElementById('market-overview-source-note');
   if (sourceNote && rows.some((item) => item && item.demo)) sourceNote.textContent = '当前为演示数据，仅用于页面演示；真实市场快照入库后自动替换。';
-  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = 'AKShare 市场快照正在同步，当前停止展示过期数据。';
+  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = 'Gangtise 市场快照正在同步，当前展示最近一次成功数据。';
   if (!rows.length && host.querySelector('[data-market-index-code]')) return;
   host.innerHTML = rows.map((item) => {
     const available = item && item.available;
@@ -10170,7 +10186,7 @@ function renderMarketMacro(items) {
   const hiddenMacroCodes = new Set(['source_urban_unemployment', 'source_real_estate_investment_yoy']);
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && !hiddenMacroCodes.has(String(item.indicator_code || '')));
   const sourceNote = document.getElementById('market-macro-source-note');
-  if (sourceNote && rows.some((item) => item && item.stale)) sourceNote.textContent = '宏观数据正在同步，当前展示最近一次 AKShare 真实快照。';
+  if (sourceNote && rows.some((item) => item && item.stale)) sourceNote.textContent = '宏观数据正在同步，当前展示最近一次 Gangtise 真实快照。';
   host.innerHTML = rows.map((item) => {
     const available = Boolean(item && item.available);
     const value = available && Number.isFinite(Number(item.value)) ? Number(item.value).toFixed(2) : '--';
@@ -10465,7 +10481,7 @@ function buildWatchlistIntradaySvg(series, unavailableMessage, source, tradeDate
         <div style="font-size:12px;font-weight:700;color:var(--text-main)">分时曲线</div>
         <div style="font-size:11px;color:var(--gray-400)">当前涨跌 ${changePct >= 0 ? '+' : ''}${Number(changePct || 0).toFixed(2)}%</div>
       </div>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${escapeHtml(tradeDate || String(rows[0].date || '').slice(0, 10))} · AKShare 分钟K · ${rows.length} 个分钟点</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${escapeHtml(tradeDate || String(rows[0].date || '').slice(0, 10))} · Gangtise 分钟K · ${rows.length} 个分钟点</div>
       ${shell.chartHtml}
     </div>
   `;

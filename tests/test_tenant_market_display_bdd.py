@@ -62,8 +62,8 @@ def test_given_dav_publishes_macro_choices_when_follower_reads_macro_snapshot_th
 
     snapshot = {
         "ok": True,
-        "snapshot_version": 1,
-        "source": "AKShare",
+        "snapshot_version": 12,
+        "source": "Gangtise OpenAPI",
         "items": [
             {"indicator_code": "source_cpi", "name": "CPI", "available": True},
             {"indicator_code": "source_ppi", "name": "PPI", "available": True},
@@ -109,7 +109,7 @@ def test_given_dav_posts_more_than_the_legacy_selection_limits_when_saving_then_
             "macro_economic_codes": [],
             "etf_codes": [code for code, _name, _category in market_services.ETF_PRESENTATION_CATALOG],
         }
-    ):
+    ), patch.object(api_kol, "request_market_snapshot_selection_refresh", return_value={"queued": False}):
         response = api_kol.api_tenant_market_display_config("laowang")
     assert _status(response) == 200
     payload = _json(response)
@@ -180,14 +180,14 @@ def test_given_dav_adds_panel_indicators_when_publishing_then_only_new_indicator
     refresh.assert_called_once_with(market_codes={"source_hsi"}, sector_names={"银行"})
 
 
-def test_given_shared_market_task_when_scheduled_then_it_is_akshare_and_runs_at_four_configured_times():
+def test_given_shared_market_task_when_scheduled_then_it_is_gangtise_and_runs_at_four_configured_times():
     from src.domain import market_services
 
     task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "market_snapshot_sync")
-    assert task["task_name"] == "AKShare 市场、行业与宏观指标同步"
+    assert task["task_name"] == "Gangtise 市场、行业与宏观指标同步"
     assert task["schedule_type"] == "daily"
     assert task["schedule_value"] == "09:30,12:00,14:00,15:30"
-    assert "AKShare" in task["description"]
+    assert "Gangtise OpenAPI" in task["description"]
 
 
 def test_given_four_daily_collection_slots_when_reading_between_slots_then_shared_snapshot_does_not_expire_in_six_minutes():
@@ -214,13 +214,18 @@ def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfac
     fundamental_panel = h5.split("function renderFeedMarketEconomyPanel", 1)[1].split("function renderMarketQuoteCards", 1)[0]
     assert "feed-sector-chart" in fundamental_panel
     assert "feed-overview-chart" in fundamental_panel
-    assert "renderFeedMarketEconomy(sectors.items" in fundamental_panel
+    assert "renderFeedMarketEconomy(industryEtfs, 'ETF行业主题涨跌'" in fundamental_panel
+    assert "String(item.category || '').trim() === '行业主题'" in fundamental_panel
+    assert ".sort((left, right) => Number(right.change_pct || 0) - Number(left.change_pct || 0))" in fundamental_panel
+    assert "fetch('/api/etf-industry-themes'" in h5
     assert "feed-watchlist-chart" in h5
     assert 'data-h5-market-picker="macro"' in h5
     assert 'data-h5-market-picker="etf"' in h5
     assert 'data-h5-market-picker-etf-categories="true"' in h5
     assert "etfRows.filter" in h5
-    assert 'toggleH5MarketDraftSelection' in h5 and '最多选择' not in h5
+    market_picker = h5.split("function renderH5MarketDisplayModal", 1)[1].split("function publishH5MarketDisplayDraft", 1)[0]
+    assert 'toggleH5MarketDraftSelection' in h5
+    assert '最多选择' not in market_picker
     assert "toggleH5MarketDisplaySummary" in h5
     assert 'id="kw-market-layout-modal"' in web
     assert 'data-kw-market-picker=' in web
@@ -229,10 +234,61 @@ def test_given_dav_on_h5_or_web_when_configuring_market_display_then_both_surfac
     assert 'data-kw-market-picker="etf"' in web
     assert 'data-kw-market-picker-etf-categories="true"' in web
     assert "etfRows.filter" in web
-    assert 'toggleKwMarketDraftSelection' in web and '最多选择' not in web
+    web_picker = web.split("function renderKwMarketDisplayModal", 1)[1].split("async function publishKwMarketDisplayDraft", 1)[0]
+    assert 'toggleKwMarketDraftSelection' in web
+    assert '最多选择' not in web_picker
     assert "toggleKwMarketDisplaySummary" in web
     assert "配置粉丝端行情版面" in web
     assert "已发布给本租户粉丝" in web
+
+
+def test_watchlist_hot_sector_tab_is_admin_controlled_and_closed_by_default():
+    from pathlib import Path
+    from src.domain.core_services import is_feature_enabled, normalize_site_config
+
+    config = normalize_site_config({})
+    assert config["feature_flags"]["watchlist_hot_sectors"] is False
+    assert is_feature_enabled("watchlist_hot_sectors", config) is False
+    enabled = normalize_site_config({"feature_flags": {"watchlist_hot_sectors": True}})
+    assert is_feature_enabled("watchlist_hot_sectors", enabled) is True
+
+    root = Path(__file__).resolve().parents[1]
+    h5 = (root / "templates" / "h5.html").read_text(encoding="utf-8")
+    admin = (root / "templates" / "admin.html").read_text(encoding="utf-8")
+    assert 'data-feature-flag="watchlist_hot_sectors"' in h5
+    assert 'id="feature-watchlist_hot_sectors"' in admin
+
+
+def test_fundamental_industry_ranking_uses_all_available_gangtise_theme_etfs_not_tenant_selection():
+    from src.domain import market_services
+    from src.web import api_core
+
+    provider_payload = {
+        "ok": True,
+        "data_source": "Gangtise OpenAPI ETF 日线",
+        "items": [
+            {"security_code": "512000.SH", "category": "行业主题", "available": True, "change_pct": 1.1},
+            {"security_code": "512800.SH", "category": "行业主题", "available": True, "change_pct": 2.4},
+            {"security_code": "510300.SH", "category": "宽基指数", "available": True, "change_pct": 9.9},
+            {"security_code": "512480.SH", "category": "行业主题", "available": False, "change_pct": 5.0},
+        ],
+    }
+    with patch.object(market_services, "build_etf_overview_payload", return_value=provider_payload) as build:
+        ranking = market_services.build_etf_industry_theme_overview_payload()
+    assert [item["security_code"] for item in ranking["items"]] == ["512800.SH", "512000.SH"]
+    assert ranking["ranking"] == "change_pct_desc"
+    build.assert_called_once_with()
+
+    with patch.object(api_core, "build_etf_industry_theme_overview_payload", return_value=ranking), patch(
+        "src.web.hooks.is_authenticated", return_value=True
+    ), patch(
+        "src.web.hooks.get_current_authenticated_user", return_value={"id": "admin-1", "role": "admin"}
+    ), patch.object(
+        api_core, "get_current_authenticated_user", return_value={"id": "admin-1", "role": "admin"}
+    ):
+        response = app.test_client().get("/api/etf-industry-themes")
+    assert response.status_code == 200
+    assert [item["security_code"] for item in response.get_json()["items"]] == ["512800.SH", "512000.SH"]
 
 
 def test_given_saved_watchlist_item_without_quote_when_rendering_h5_then_it_is_not_filtered_from_the_watchlist_board():

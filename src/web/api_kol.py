@@ -26,11 +26,13 @@ def _knowledge_feature_disabled_response():
 
 def _validate_review_source_mode(source_mode):
     normalized = str(source_mode or "manual").strip().lower() or "manual"
+    if normalized == "stock_grid":
+        normalized = "manual"
     if normalized == "voice" and not is_feature_enabled("review_voice_input"):
         raise ValueError("review_voice_input_disabled")
     if normalized == "url" and not is_feature_enabled("review_url_input"):
         raise ValueError("review_url_input_disabled")
-    if normalized not in {"manual", "file", "voice", "url", "stock_grid"}:
+    if normalized not in {"manual", "file", "voice", "url"}:
         raise ValueError("review_source_mode_invalid")
     return normalized
 

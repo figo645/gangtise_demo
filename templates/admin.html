@@ -2115,6 +2115,9 @@
         <div class="admin-nav-item" data-section="community" data-feature="community" onclick="showSection('community', this)">
           <span class="admin-nav-icon">&#9998;</span> 帖子审核
         </div>
+        <div class="admin-nav-item" data-section="content-moderation" onclick="showSection('content-moderation', this)">
+          <span class="admin-nav-icon">&#9888;</span> 内容审核
+        </div>
         <div class="admin-nav-item" data-section="events" data-feature="community" onclick="showSection('events', this)">
           <span class="admin-nav-icon">&#9728;</span> 活动管理
         </div>
@@ -2125,7 +2128,7 @@
           <span class="admin-nav-group-title">小金智能体管理</span>
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
-        <div class="admin-nav-group-body">
+      <div class="admin-nav-group-body">
         <div class="admin-nav-subgroup">
           <div class="admin-nav-subtitle">小金智能体</div>
           <div class="admin-nav-item active" data-section="hermes" data-hermes-subsection="overview" data-feature="hermes" onclick="showHermesSubsection('overview', this)">
@@ -4873,6 +4876,7 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">股票 K 线预测</div><div class="feature-toggle-desc">位置：自选股预测能力和大V工作台预测模型页。控制预测结果展示及预测工作流配置入口。</div></div><label class="toggle"><input id="feature-stock_forecast" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">每日洞见</div><div class="feature-toggle-desc">位置：H5 洞见、大V工作台洞见发布台和已发布洞见。控制洞见输入、优化成稿、摘要与发布浏览。</div></div><label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">核心指标</div><div class="feature-toggle-desc">封存开关。关闭后隐藏 H5 核心指标面板、大V智能 Dashboard 与智能指标入口；热门行业和市场一览不受影响。</div></div><label class="toggle"><input id="feature-core_indicators" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股热门行业</div><div class="feature-toggle-desc">控制 H5 自选股中的“热门行业”入口。默认关闭；基本面页的 ETF 行业主题涨跌不受此开关影响。</div></div><label class="toggle"><input id="feature-watchlist_hot_sectors" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">知识专区</div><div class="feature-toggle-desc">位置：H5、大V工作台和 Admin 知识专区。当前因知识库重构暂不开放；重新勾选并保存后，才会恢复知识入口和接口。</div></div><label class="toggle"><input id="feature-knowledge" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">洞见语音供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台洞见供稿方式。当前关闭，恢复后才允许录音和语音转写。</div></div><label class="toggle"><input id="feature-review_voice_input" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">洞见网页供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台洞见供稿方式。当前关闭，恢复后才允许抓取网页 URL。</div></div><label class="toggle"><input id="feature-review_url_input" type="checkbox"><span class="toggle-slider"></span></label></div>
@@ -5860,6 +5864,32 @@
         </div>
       </div><!-- end section-task-center -->
 
+      <!-- ===== CONTENT MODERATION ===== -->
+      <div id="section-content-moderation" style="display:none">
+        <div class="section-header">
+          <div><div class="section-title">内容审核 · 金融合规</div><div class="section-subtitle">对洞见笔记、用户评论和 K 线标注做关键词命中提醒。审核不自动拦截发布；日志仅保存命中词、来源、内容哈希和审计信息，不保存用户正文。</div></div>
+          <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminContentModeration(true)">刷新</button>
+        </div>
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card"><div class="stat-label">审核记录</div><div class="stat-value" id="moderation-total">--</div></div>
+          <div class="stat-card"><div class="stat-label">关键词命中</div><div class="stat-value" id="moderation-alerts">--</div></div>
+          <div class="stat-card"><div class="stat-label">高风险命中</div><div class="stat-value" id="moderation-high-risk">--</div></div>
+          <div class="stat-card"><div class="stat-label">命中率</div><div class="stat-value" id="moderation-hit-rate">--</div></div>
+        </div>
+        <div class="config-grid" style="margin-bottom:20px">
+          <div class="config-card"><div class="config-card-title">来源命中分布</div><div id="moderation-distribution" class="feature-note">正在加载审核分布...</div></div>
+          <div class="config-card"><div class="config-card-title">近 30 日审核趋势</div><div id="moderation-trend" class="feature-note">正在加载审核趋势...</div></div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px;padding:18px 20px">
+          <div class="table-header" style="padding:0;border:0"><div><div class="table-title">关键词规则</div><div style="font-size:12px;color:#8899aa;margin-top:6px">种子词用于发现收益承诺、内幕信息、无资质服务、操纵市场和高风险交易指令；命中只报警，需结合上下文人工判断。</div></div><button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="addAdminModerationKeyword()">新增关键词</button></div>
+          <div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>关键词</th><th>类别</th><th>风险级别</th><th>状态</th><th>说明</th><th>更新人 / 时间</th><th>操作</th></tr></thead><tbody id="moderation-keyword-rows"><tr><td colspan="7" style="text-align:center;color:#8899aa;padding:22px">正在加载关键词...</td></tr></tbody></table></div>
+        </div>
+        <div class="table-wrap" style="padding:18px 20px">
+          <div class="table-header" style="padding:0;border:0"><div><div class="table-title">内容审核日志</div><div style="font-size:12px;color:#8899aa;margin-top:6px">日志不包含正文；可查看租户、提交人、内容类型、命中词、风险级别与内容 SHA-256。</div></div><div style="display:flex;gap:8px;align-items:center"><select id="moderation-source-filter" class="admin-select" onchange="loadAdminContentModeration(false)"><option value="">全部来源</option><option value="insight">洞见笔记</option><option value="comment">用户评论</option><option value="kline_annotation">K 线标注</option></select><select id="moderation-result-filter" class="admin-select" onchange="loadAdminContentModeration(false)"><option value="">全部结果</option><option value="alert">关键词命中</option><option value="clear">未命中</option></select></div></div>
+          <div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>时间</th><th>租户</th><th>类型</th><th>提交人</th><th>结果</th><th>风险</th><th>命中关键词</th><th>内容哈希</th></tr></thead><tbody id="moderation-log-rows"><tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">正在加载审核日志...</td></tr></tbody></table></div>
+        </div>
+      </div><!-- end section-content-moderation -->
+
       <!-- ===== OPEN API ===== -->
       <div id="section-open-api" style="display:none">
           <div class="section-header">
@@ -6020,6 +6050,7 @@ const sectionTitles = {
   'task-center':'系统专区 · 定时任务专区',
   'open-api':'系统专区 · Open API',
   access:'访问审计',
+  'content-moderation':'内容审核 · 金融合规',
   'event-analytics':'数据分析 · 埋点分析'
 };
 const analyticsTitles = {
@@ -6614,6 +6645,115 @@ async function loadAdminPoints(showMessage) {
   }
 }
 
+function moderationSourceLabel(value) {
+  return ({insight: '洞见笔记', comment: '用户评论', kline_annotation: 'K 线标注'})[String(value || '')] || String(value || '--');
+}
+
+function moderationRiskLabel(value) {
+  return ({high: '高', medium: '中', low: '低', none: '无'})[String(value || '')] || String(value || '--');
+}
+
+function renderAdminModerationBars(targetId, rows, labelKey) {
+  const host = document.getElementById(targetId);
+  if (!host) return;
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  if (!sourceRows.length) { host.innerHTML = '<div class="feature-note">暂无审核记录。</div>'; return; }
+  const grouped = {};
+  sourceRows.forEach((row) => { const key = String(row[labelKey] || '--'); grouped[key] = (grouped[key] || 0) + Number(row.count || row.total || 0); });
+  const max = Math.max(...Object.values(grouped), 1);
+  host.innerHTML = Object.entries(grouped).map(([key, count]) => `<div style="display:grid;grid-template-columns:90px 1fr 44px;gap:8px;align-items:center;margin:9px 0;font-size:11px"><span>${escapeHtml(labelKey === 'source_type' ? moderationSourceLabel(key) : key)}</span><span style="height:8px;border-radius:4px;background:rgba(47,116,192,.10);overflow:hidden"><i style="display:block;height:100%;width:${Math.max(4, Math.round(count / max * 100))}%;background:var(--gold);border-radius:4px"></i></span><b style="text-align:right">${count}</b></div>`).join('');
+}
+
+function renderAdminModerationTrend(rows) {
+  const host = document.getElementById('moderation-trend');
+  if (!host) return;
+  const items = Array.isArray(rows) ? rows : [];
+  if (!items.length) { host.textContent = '暂无近 30 日审核记录。'; return; }
+  const max = Math.max(...items.map((item) => Number(item.total || 0)), 1);
+  host.innerHTML = `<div style="display:flex;align-items:flex-end;gap:4px;height:112px;padding:8px 0">${items.map((item) => { const total = Number(item.total || 0); const alerts = Number(item.alerts || 0); return `<div title="${escapeAttr(`${item.day || '--'}：${total} 条，命中 ${alerts} 条`)}" style="flex:1;min-width:4px;height:100%;display:flex;align-items:flex-end"><span style="display:block;width:100%;height:${Math.max(4, Math.round(total / max * 100))}%;background:${alerts ? 'var(--red)' : 'var(--gold)'};border-radius:3px 3px 0 0"></span></div>`; }).join('')}</div><div style="font-size:10px;color:#8899aa;display:flex;justify-content:space-between"><span>${escapeHtml(items[0].day || '--')}</span><span>${escapeHtml(items[items.length - 1].day || '--')}</span></div>`;
+}
+
+function renderAdminModerationKeywords(items) {
+  const host = document.getElementById('moderation-keyword-rows');
+  if (!host) return;
+  const rows = Array.isArray(items) ? items : [];
+  host.innerHTML = rows.length ? rows.map((item) => `<tr><td style="font-weight:700;color:#F8F6F0">${escapeHtml(item.keyword || '--')}</td><td>${escapeHtml(item.category || '--')}</td><td><span class="tag ${item.risk_level === 'high' ? 'tag-red' : item.risk_level === 'medium' ? 'tag-gold' : 'tag-blue'}">${moderationRiskLabel(item.risk_level)}</span></td><td>${item.enabled ? '<span class="tag tag-green">启用</span>' : '<span class="tag">停用</span>'}</td><td style="max-width:280px;color:#8899aa">${escapeHtml(item.description || '--')}</td><td>${escapeHtml(item.updated_by || item.created_by || '--')}<br><span style="font-size:10px;color:#8899aa">${escapeHtml(item.updated_at || item.created_at || '--')}</span></td><td><button class="btn-outline" type="button" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="editAdminModerationKeyword(${Number(item.id)})">编辑</button><button class="btn-outline" type="button" style="padding:4px 8px;font-size:11px" onclick="deleteAdminModerationKeyword(${Number(item.id)}, '${escapeAttr(item.keyword || '')}')">删除</button></td></tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:#8899aa;padding:22px">暂无关键词。</td></tr>';
+  window.adminModerationKeywords = rows;
+}
+
+function renderAdminModerationLogs(items) {
+  const host = document.getElementById('moderation-log-rows');
+  if (!host) return;
+  const rows = Array.isArray(items) ? items : [];
+  host.innerHTML = rows.length ? rows.map((item) => {
+    let matches = [];
+    try { matches = JSON.parse(item.matched_keywords_json || '[]'); } catch (_) { matches = []; }
+    return `<tr><td>${escapeHtml(item.created_at || '--')}</td><td>${escapeHtml(item.tenant_slug || '--')}</td><td>${escapeHtml(moderationSourceLabel(item.source_type))}</td><td>${escapeHtml(item.actor_name || item.actor_user_id || '--')}</td><td><span class="tag ${item.result === 'alert' ? 'tag-red' : 'tag-green'}">${item.result === 'alert' ? '命中' : '未命中'}</span></td><td>${escapeHtml(moderationRiskLabel(item.risk_level))}</td><td style="max-width:240px">${escapeHtml(matches.map((match) => match.keyword).join('、') || '--')}</td><td style="font-family:monospace;font-size:10px;color:#8899aa">${escapeHtml(item.content_sha256 || '--')}</td></tr>`;
+  }).join('') : '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">暂无审核日志。</td></tr>';
+}
+
+async function loadAdminContentModeration(showMessage = false) {
+  const source = document.getElementById('moderation-source-filter');
+  const result = document.getElementById('moderation-result-filter');
+  const params = new URLSearchParams({limit: '100'});
+  if (source && source.value) params.set('source_type', source.value);
+  if (result && result.value) params.set('result', result.value);
+  const response = await fetch(`/api/admin/content-moderation?${params.toString()}`, {cache: 'no-store'});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.error || 'content_moderation_load_failed');
+  const report = data.report || {};
+  const summary = report.summary || {};
+  const total = Number(summary.total || 0);
+  document.getElementById('moderation-total').textContent = total;
+  document.getElementById('moderation-alerts').textContent = Number(summary.alerts || 0);
+  document.getElementById('moderation-high-risk').textContent = Number(summary.high_risk || 0);
+  document.getElementById('moderation-hit-rate').textContent = `${total ? Math.round(Number(summary.alerts || 0) / total * 100) : 0}%`;
+  renderAdminModerationBars('moderation-distribution', report.distribution, 'source_type');
+  renderAdminModerationTrend(report.trend);
+  renderAdminModerationKeywords(data.keywords || []);
+  renderAdminModerationLogs(report.logs || []);
+  if (showMessage) showToast('内容审核数据已刷新');
+}
+
+function moderationPromptPayload(existing = {}) {
+  const keyword = window.prompt('关键词', existing.keyword || '');
+  if (!keyword || !keyword.trim()) return null;
+  const category = window.prompt('类别，例如：收益承诺、内幕信息、业务资质', existing.category || '金融合规');
+  const risk = window.prompt('风险级别：high / medium / low', existing.risk_level || 'medium');
+  const description = window.prompt('审核说明（可选）', existing.description || '') || '';
+  return {id: existing.id, keyword: keyword.trim(), category: (category || '金融合规').trim(), risk_level: (risk || 'medium').trim().toLowerCase(), enabled: existing.id ? Boolean(existing.enabled) : true, description};
+}
+
+async function addAdminModerationKeyword() {
+  const payload = moderationPromptPayload();
+  if (!payload) return;
+  await saveAdminModerationKeyword(payload);
+}
+
+async function editAdminModerationKeyword(id) {
+  const existing = (window.adminModerationKeywords || []).find((item) => Number(item.id) === Number(id));
+  const payload = moderationPromptPayload(existing || {});
+  if (!payload) return;
+  await saveAdminModerationKeyword(payload);
+}
+
+async function saveAdminModerationKeyword(payload) {
+  const response = await fetch('/api/admin/content-moderation/keywords', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.error || 'moderation_keyword_save_failed');
+  await loadAdminContentModeration(false);
+  showToast('关键词已保存');
+}
+
+async function deleteAdminModerationKeyword(id, keyword) {
+  if (!window.confirm(`确认删除关键词“${keyword}”吗？`)) return;
+  const response = await fetch(`/api/admin/content-moderation/keywords/${Number(id)}`, {method: 'DELETE'});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.error || 'moderation_keyword_delete_failed');
+  await loadAdminContentModeration(false);
+  showToast('关键词已删除');
+}
+
 function showSection(name, navEl) {
   const normalized = normalizeAdminSection(name);
   name = normalized.section || name;
@@ -6650,6 +6790,9 @@ function showSection(name, navEl) {
   }
   if (name === 'access') {
     renderAccessAudit();
+  }
+  if (name === 'content-moderation') {
+    loadAdminContentModeration(false).catch((error) => showToast(error.message || '内容审核加载失败'));
   }
   if (name === 'event-analytics') {
     loadEventAnalytics(false);
@@ -12512,7 +12655,7 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
   if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
   if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
-  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'core_indicators', 'knowledge', 'review_voice_input', 'review_url_input', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'fan_commerce', 'fan_qr_import', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'core_indicators', 'watchlist_hot_sectors', 'knowledge', 'review_voice_input', 'review_url_input', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'fan_commerce', 'fan_qr_import', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) {
       checkbox.checked = key === 'knowledge'
@@ -12850,7 +12993,7 @@ async function saveSiteConfig() {
     showToast('Hermes 配置格式有误');
     return;
   }
-  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'fan_commerce', 'fan_qr_import', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'watchlist_hot_sectors', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'fan_commerce', 'fan_qr_import', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });

@@ -7494,7 +7494,6 @@ const KW_REVIEW_PERIOD_CONFIG = {
   day: { label: '洞见', shortLabel: '洞见' },
 };
 const KW_REVIEW_SOURCE_OPTIONS = [
-  { value: 'stock_grid', icon: '▦', label: '九宫格个股展示', desc: '任意搜索并选择最多 9 支股票，生成卡片式个股洞见。' },
   { value: 'voice', icon: '🎙️', label: '语音口述', desc: '录入语音，整理为可编辑的洞见正文。' },
   { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接输入本次洞见正文。' },
   { value: 'file', icon: '📎', label: '文件上传', desc: '上传资料并提取洞见内容。' },
@@ -7526,6 +7525,7 @@ let kwReviewDraft = {
   useVoiceLlmEnhancement: true,
   selectedWatchlist: [],
   stockGridCards: [],
+  stockGridEnabled: false,
   stockGridProvider: '',
   stockGridEndpoint: '',
   stockGridLoading: false,
@@ -9610,8 +9610,7 @@ function kwGetReviewPreviewText() {
   }
   return String(kwReviewDraft.draftReviewText || '').trim()
     || String(kwReviewDraft.generatedPreviewText || '').trim()
-    || kwGetReviewDraftContentText()
-    || (kwReviewDraft.sourceMode === 'stock_grid' ? '今日个股点评' : '');
+    || kwGetReviewDraftContentText();
 }
 
 function kwGetReviewPreviewHtml() {
@@ -10187,7 +10186,7 @@ async function kwEmbedManualReviewText(text) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      text: String(text || '').trim() || (kwReviewDraft.sourceMode === 'stock_grid' ? '今日个股点评' : ''),
+      text: String(text || '').trim(),
       content_html: kwGetReviewPreviewHtml(),
       tenant_slug: tenant.slug || '',
       period: kwReviewDraft.period || 'day',
@@ -10228,6 +10227,11 @@ async function kwPublishReviewContent(text, transcriptionEngine, transcriptModel
       review_summary: payload.review_summary || '',
       user_input_section: payload.user_input_section || {},
       watchlist_analysis_section: payload.watchlist_analysis_section || {},
+      stock_grid_enabled: Boolean(
+        payload.stock_grid_enabled !== undefined
+          ? payload.stock_grid_enabled
+          : kwReviewDraft.stockGridEnabled
+      ),
       stock_grid_cards: payload.stock_grid_cards || kwReviewDraft.stockGridCards || [],
       stock_grid_provider: payload.stock_grid_provider || kwReviewDraft.stockGridProvider || '',
       stock_grid_endpoint: payload.stock_grid_endpoint || kwReviewDraft.stockGridEndpoint || '',
@@ -10879,12 +10883,49 @@ function kwAppendTranscribedText(existingText, incomingText) {
   return current ? `${current}\n\n${next}` : next;
 }
 
+function kwRenderStockGridAppendix(forceLegacy = false) {
+  const enabled = Boolean(kwReviewDraft.stockGridEnabled);
+  const selectedItems = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist : [];
+  const selected = new Set(selectedItems.map((item) => typeof item === 'object' ? String(item.code || item.stock_code || '').trim() : String(item || '').trim()));
+  const rows = Array.isArray(kwStockGridSearchItems) ? kwStockGridSearchItems : [];
+  const selectionPanel = `
+    <div class="stock-grid-authoring-panel" style="margin-top:10px;padding:12px;border:1px solid rgba(47,116,192,.14);border-radius:10px;background:#F7FBFF">
+      <div class="kw-review-runtime-desc">输入股票名称或代码搜索，任意合法证券均可选择，最多 9 支。九宫格会作为本文最后一段发布。</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input id="kw-stock-grid-search" type="text" value="${escapeAttr(kwStockGridSearchQuery)}" placeholder="搜索名称或代码，如 贵州茅台 / 600519" class="kw-review-final-editor" style="min-height:auto;height:40px;flex:1" oninput="kwQueueStockGridSearch(this.value)">
+        <button class="kw-review-input-button" type="button" onclick="kwSearchStockGridCandidates()" ${kwStockGridSearchLoading ? 'disabled' : ''}>${kwStockGridSearchLoading ? '搜索中...' : '搜索'}</button>
+      </div>
+      ${selectedItems.length ? `<div class="stock-grid-selected-list" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px">${selectedItems.map((item) => {
+        const code = String(item.code || item.stock_code || '').trim();
+        const reason = String(item.recommendation_reason || '').trim();
+        const editing = String(kwStockGridReasonEditingCode || '') === code;
+        const price = item.price == null ? '--' : String(item.price);
+        const change = item.change_pct == null ? '--' : `${Number(item.change_pct) >= 0 ? '+' : ''}${item.change_pct}%`;
+        return `<div class="stock-grid-selected-card"><div class="stock-grid-card-head"><div><strong>${escapeHtml(item.name || item.stock_name || code)}</strong><div class="stock-grid-card-meta">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</div></div><div class="stock-grid-card-quote">${item.quote_loading ? '加载中...' : `${escapeHtml(price)}<br>${escapeHtml(change)}`}</div></div><div class="stock-grid-card-spacer"></div><button id="kw-stock-grid-reason-tag-${escapeAttr(code)}" type="button" class="stock-grid-reason-tag ${reason ? 'is-filled' : ''}" aria-expanded="${editing}" onclick="kwToggleStockGridReasonEditor('${escapeAttr(code)}')">${reason ? '已填写' : '填写理由'}</button><div id="kw-stock-grid-reason-copy-${escapeAttr(code)}" class="stock-grid-reason-copy" style="${reason ? '' : 'display:none'}">${escapeHtml(reason)}</div>${editing ? `<textarea class="kw-review-final-editor stock-grid-reason-input" placeholder="填写这只股票的推荐理由" oninput="kwUpdateStockGridReason('${escapeAttr(code)}', this.value)">${escapeHtml(item.recommendation_reason || '')}</textarea>` : ''}<div class="stock-grid-card-actions"><button type="button" class="btn btn-sm btn-outline-secondary" onclick="kwToggleStockGridSelection('${escapeAttr(code)}')">移除</button></div></div>`;
+      }).join('')}</div>` : ''}
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px">
+        ${rows.map((item) => { const code = String(item.code || item.stock_code || '').trim(); const active = selected.has(code); return `<button type="button" class="kw-knowledge-source-pill ${active ? 'active' : ''}" style="text-align:left" onclick="kwToggleStockGridSelection('${escapeAttr(code)}')"><strong>${escapeHtml(item.name || item.stock_name || code)}</strong><span style="display:block;font-size:10px;margin-top:3px;opacity:.72">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</span></button>`; }).join('') || '<div class="kw-review-runtime-desc">请输入名称或代码搜索证券。</div>'}
+      </div>
+      <div class="kw-review-runtime-desc stock-grid-selection-summary" style="margin-top:10px"><span>已选择 ${selected.size} / 9</span><span>可继续搜索并添加其他股票</span></div>
+      <button class="kw-review-input-button" type="button" style="margin-top:10px" onclick="kwRequestStockGridPreview()" ${kwReviewDraft.stockGridLoading || !selected.size ? 'disabled' : ''}>${kwReviewDraft.stockGridLoading ? '生成中...' : '生成 / 更新九宫格'}</button>
+      ${kwReviewDraft.stockGridError ? `<div class="alert alert-warning stock-grid-error mt-3" role="alert">${escapeHtml(kwReviewDraft.stockGridError)} <button type="button" class="btn btn-sm btn-link p-0 align-baseline" onclick="kwRequestStockGridPreview()">重试</button></div>` : ''}
+    </div>`;
+  return `<div class="knowledge-modal-block" style="margin-top:12px;padding:12px 14px;background:#F7FBFF;border:1px solid rgba(47,116,192,.12);border-radius:10px">
+    <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:var(--text-main);font-size:12px;font-weight:700">
+      <input type="checkbox" ${enabled ? 'checked' : ''} onchange="kwToggleReviewStockGridEnabled(this.checked)" style="margin-top:2px">
+      <span>在这篇洞见末尾加入九宫格股票赏析<span style="display:block;margin-top:4px;color:var(--gray-400);font-size:11px;font-weight:400;line-height:1.6">可任意搜索并选择最多 9 支股票，卡片会作为本文最后一段发布。</span></span>
+    </label>
+    ${enabled ? selectionPanel : ''}
+  </div>`;
+}
+
 function kwRenderReviewInputPanel() {
   const titleField = `
     <div style="margin-bottom:12px">
       <label class="kw-knowledge-modal-label" style="display:block;margin-bottom:6px">洞见主题</label>
       <input id="kw-review-title-input" class="kw-knowledge-modal-input" placeholder="输入本次洞见主题，发布后会直接作为文章标题" value="${escapeAttr(kwReviewDraft.reviewTitle || '')}" />
     </div>
+    ${kwRenderStockGridAppendix()}
   `;
   const accessModeField = `
     <div style="margin-bottom:12px">
@@ -10896,33 +10937,6 @@ function kwRenderReviewInputPanel() {
       <div class="kw-review-runtime-desc" style="margin-top:6px">访问范围按每篇洞见单独生效，不会影响其他已发布笔记。</div>
     </div>
   `;
-  if (kwReviewDraft.sourceMode === 'stock_grid') {
-    const selectedItems = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist : [];
-    const selected = new Set(selectedItems.map((item) => typeof item === 'object' ? String(item.code || item.stock_code || '').trim() : String(item || '').trim()));
-    const rows = Array.isArray(kwStockGridSearchItems) ? kwStockGridSearchItems : [];
-    return `
-      <div class="kw-review-intake-panel stock-grid-authoring-panel">${titleField}${accessModeField}
-        <div class="kw-review-runtime-desc">输入股票名称或代码搜索，任意合法证券均可选择，最多 9 支，生成今日一句话点评九宫格。</div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <input id="kw-stock-grid-search" type="text" value="${escapeAttr(kwStockGridSearchQuery)}" placeholder="搜索名称或代码，如 贵州茅台 / 600519" class="kw-review-final-editor" style="min-height:auto;height:40px;flex:1" oninput="kwQueueStockGridSearch(this.value)">
-          <button class="kw-review-input-button" type="button" onclick="kwSearchStockGridCandidates()" ${kwStockGridSearchLoading ? 'disabled' : ''}>${kwStockGridSearchLoading ? '搜索中...' : '搜索'}</button>
-        </div>
-        ${selectedItems.length ? `<div class="stock-grid-selected-list" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px">${selectedItems.map((item) => {
-          const code = String(item.code || item.stock_code || '').trim();
-          const reason = String(item.recommendation_reason || '').trim();
-          const editing = String(kwStockGridReasonEditingCode || '') === code;
-          const price = item.price == null ? '--' : String(item.price);
-          const change = item.change_pct == null ? '--' : `${Number(item.change_pct) >= 0 ? '+' : ''}${item.change_pct}%`;
-          return `<div class="stock-grid-selected-card"><div class="stock-grid-card-head"><div><strong>${escapeHtml(item.name || item.stock_name || code)}</strong><div class="stock-grid-card-meta">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</div></div><div class="stock-grid-card-quote">${item.quote_loading ? '加载中...' : `${escapeHtml(price)}<br>${escapeHtml(change)}`}</div></div><div class="stock-grid-card-spacer"></div><button id="kw-stock-grid-reason-tag-${escapeAttr(code)}" type="button" class="stock-grid-reason-tag ${reason ? 'is-filled' : ''}" aria-expanded="${editing}" onclick="kwToggleStockGridReasonEditor('${escapeAttr(code)}')">${reason ? '已填写' : '填写理由'}</button><div id="kw-stock-grid-reason-copy-${escapeAttr(code)}" class="stock-grid-reason-copy" style="${reason ? '' : 'display:none'}">${escapeHtml(reason)}</div>${editing ? `<textarea class="kw-review-final-editor stock-grid-reason-input" placeholder="填写这只股票的推荐理由" oninput="kwUpdateStockGridReason('${escapeAttr(code)}', this.value)">${escapeHtml(item.recommendation_reason || '')}</textarea>` : ''}<div class="stock-grid-card-actions"><button type="button" class="btn btn-sm btn-outline-secondary" onclick="kwToggleStockGridSelection('${escapeAttr(code)}')">移除</button></div></div>`;
-        }).join('')}</div>` : ''}
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px">
-          ${rows.map((item) => { const code = String(item.code || item.stock_code || '').trim(); const active = selected.has(code); return `<button type="button" class="kw-knowledge-source-pill ${active ? 'active' : ''}" style="text-align:left" onclick="kwToggleStockGridSelection('${escapeAttr(code)}')"><strong>${escapeHtml(item.name || item.stock_name || code)}</strong><span style="display:block;font-size:10px;margin-top:3px;opacity:.72">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</span></button>`; }).join('') || '<div class="kw-review-runtime-desc">请输入名称或代码搜索证券。</div>'}
-        </div>
-        <div class="kw-review-runtime-desc stock-grid-selection-summary" style="margin-top:10px"><span>已选择 ${selected.size} / 9</span><span>可继续搜索并添加其他股票</span></div>
-        ${kwReviewDraft.stockGridError ? `<div class="alert alert-warning stock-grid-error mt-3" role="alert">${escapeHtml(kwReviewDraft.stockGridError)} <button type="button" class="btn btn-sm btn-link p-0 align-baseline" onclick="kwRequestStockGridPreview()">重试</button></div>` : ''}
-      </div>
-    `;
-  }
   if (kwReviewDraft.sourceMode === 'voice') {
     return `
       <div class="kw-review-intake-panel">
@@ -11183,9 +11197,10 @@ function kwEditInsightDraft(draftId) {
   kwReviewDraft.insightDraftId = String(draft.id || '');
   kwReviewDraft.reviewTitle = String(draft.title || '').trim();
   kwReviewDraft.accessMode = draft.access_mode === 'subscriber' ? 'subscriber' : 'public';
-  kwReviewDraft.sourceMode = String(draft.source_mode || 'manual').trim() || 'manual';
+  kwReviewDraft.sourceMode = String(draft.source_mode || 'manual').trim() === 'stock_grid' ? 'manual' : (String(draft.source_mode || 'manual').trim() || 'manual');
   const draftMetadata = draft.metadata && typeof draft.metadata === 'object' ? draft.metadata : {};
   kwReviewDraft.stockGridCards = Array.isArray(draftMetadata.stock_grid_cards) ? draftMetadata.stock_grid_cards.slice(0, 9) : [];
+  kwReviewDraft.stockGridEnabled = Boolean(draftMetadata.stock_grid_enabled || kwReviewDraft.stockGridCards.length);
   kwReviewDraft.stockGridProvider = String(draftMetadata.stock_grid_provider || '');
   kwReviewDraft.stockGridEndpoint = String(draftMetadata.stock_grid_endpoint || '');
   const savedStockGridSelection = Array.isArray(draftMetadata.stock_grid_selection) ? draftMetadata.stock_grid_selection : [];
@@ -11219,7 +11234,7 @@ async function kwSaveReviewDraft() {
     showToast('请先填写洞见主题');
     return;
   }
-  if (kwReviewDraft.sourceMode === 'stock_grid' && !(kwReviewDraft.stockGridCards || []).length) {
+  if (kwReviewDraft.stockGridEnabled && !(kwReviewDraft.stockGridCards || []).length) {
     showToast('请先选择股票并生成九宫格');
     return;
   }
@@ -11239,7 +11254,8 @@ async function kwSaveReviewDraft() {
         source_mode: kwReviewDraft.sourceMode || 'manual',
         access_mode: kwReviewDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
         metadata: {
-          content_kind: kwReviewDraft.sourceMode === 'stock_grid' ? 'stock_grid' : 'insight',
+          content_kind: 'insight',
+          stock_grid_enabled: Boolean(kwReviewDraft.stockGridEnabled),
           stock_grid_cards: kwReviewDraft.stockGridCards || [],
           stock_grid_selection: kwReviewDraft.selectedWatchlist || [],
           stock_grid_provider: kwReviewDraft.stockGridProvider || '',
@@ -11533,20 +11549,12 @@ function kwRenderReviewWizardFooter() {
   let desc = step.desc || '';
   let actions = '';
   if (kwReviewWorkspacePanel === 'input') {
-    if (kwReviewDraft.sourceMode === 'stock_grid') {
-      desc = '搜索并选择任意证券后生成今日一句话点评九宫格。';
-      actions = `
-        <button class="btn-outline" type="button" ${isGenerating || !(kwReviewDraft.selectedWatchlist || []).length ? 'disabled' : ''} onclick="kwSaveReviewDraft()">保存草稿</button>
-        <button class="btn-gold" type="button" ${isGenerating || !(kwReviewDraft.selectedWatchlist || []).length ? 'disabled' : ''} onclick="kwRequestStockGridPreview()">${kwReviewDraft.stockGridLoading ? '生成中...' : '生成九宫格'}</button>
-      `;
-    } else {
-      desc = '确认输入内容后，可以直接预览，也可以进入优化规则。';
-      actions = `
-        <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwSaveReviewDraft()">保存草稿</button>
-        <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">直接预览</button>
-        <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">优化成稿</button>
-      `;
-    }
+    desc = '确认输入内容后，可以直接预览，也可以进入优化规则。';
+    actions = `
+      <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwSaveReviewDraft()">保存草稿</button>
+      <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">直接预览</button>
+      <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">优化成稿</button>
+    `;
   } else if (kwReviewWorkspacePanel === 'generation') {
     const stage = kwReviewDraft.flowStage || 'intake';
     if (stage === 'optimize_rule') {
@@ -11862,16 +11870,30 @@ function kwSetReviewTriggerSourceMode(mode) {
     }
   }
   kwReviewDraft.sourceMode = mode;
-  if (mode !== 'stock_grid') {
-    kwStockGridSearchItems = [];
-    kwStockGridSearchQuery = '';
-  }
+  kwStockGridSearchItems = [];
+  kwStockGridSearchQuery = '';
   kwReviewDraft.generatedPreviewText = '';
   kwReviewDraft.draftReviewText = '';
   kwReviewDraft.previewReady = false;
   kwReviewDraft.flowStage = 'intake';
   kwReviewStructuredPreview = null;
   kwSetReviewWorkspacePanel('input', { render: false });
+  kwRenderReviewStudio();
+}
+
+function kwToggleReviewStockGridEnabled(enabled) {
+  kwSyncReviewDraftFromModal();
+  kwReviewDraft.stockGridEnabled = Boolean(enabled);
+  if (!kwReviewDraft.stockGridEnabled) {
+    kwReviewDraft.stockGridCards = [];
+    kwReviewDraft.stockGridProvider = '';
+    kwReviewDraft.stockGridEndpoint = '';
+    kwReviewDraft.stockGridError = '';
+    kwStockGridSearchItems = [];
+    kwStockGridSearchQuery = '';
+  }
+  kwReviewDraft.previewReady = false;
+  kwReviewStructuredPreview = null;
   kwRenderReviewStudio();
 }
 
@@ -12051,7 +12073,7 @@ function kwPublishReviewDraft() {
   const runtime = ensureKwReviewRuntime();
   if (kwReviewPublishSubmitting) return;
   kwSyncReviewTextInputs();
-  if (kwReviewDraft.sourceMode === 'stock_grid' && !(kwReviewDraft.stockGridCards || []).length) {
+  if (kwReviewDraft.stockGridEnabled && !(kwReviewDraft.stockGridCards || []).length) {
     showToast('请先选择股票并生成九宫格');
     return;
   }
@@ -12092,6 +12114,10 @@ function kwPublishReviewDraft() {
       summary_source: 'llm_user_input_only',
     },
     watchlist_analysis_section: previewPayload.watchlist_analysis_section || {},
+    stock_grid_enabled: Boolean(kwReviewDraft.stockGridEnabled),
+    stock_grid_cards: kwReviewDraft.stockGridCards || [],
+    stock_grid_provider: kwReviewDraft.stockGridProvider || '',
+    stock_grid_endpoint: kwReviewDraft.stockGridEndpoint || '',
     llm_models: llmModels,
   }).then((publishResult) => {
     kwReviewPublishSubmitting = false;
@@ -12231,7 +12257,7 @@ function kwRenderPublishedReviewList() {
         <span class="kw-tag">${escapeHtml(item.period || '')}</span>
         <span class="kw-tag">${escapeHtml(item.access_label || (item.access_mode === 'subscriber' ? '订阅专享' : '常规笔记'))}</span>
         ${item.is_pinned ? '<span class="kw-tag" style="color:#8E6A1E;border-color:rgba(200,169,110,.42);background:rgba(200,169,110,.10)">置顶</span>' : ''}
-        ${item.content_kind === 'stock_grid' ? `<span class="kw-tag">九宫格个股洞见 · ${Math.min(9, Array.isArray(item.stock_grid_cards) ? item.stock_grid_cards.length : 0)} 支股票</span>` : ''}
+        ${item.stock_grid_enabled ? `<span class="kw-tag">含九宫格个股赏析 · ${Math.min(9, Array.isArray(item.stock_grid_cards) ? item.stock_grid_cards.length : 0)} 支股票</span>` : ''}
         ${item.revision_count ? `<span class="kw-tag">第 ${Number(item.revision_count)} 次修改</span>` : ''}
       </div>
       <div class="kw-broadcast-meta">${escapeHtml(item.time || '')} · ${escapeHtml(item.summary || '')}</div>

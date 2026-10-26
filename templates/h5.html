@@ -5015,7 +5015,7 @@ body,
       <div class="h5-segmented-tabs" role="tablist" aria-label="行情视图" style="display:flex;gap:8px;margin:0 0 12px;padding:4px;background:rgba(47,116,192,0.08);border-radius:10px">
         <button id="market-watchlist-tab" type="button" role="tab" aria-selected="true" class="h5-segmented-tab active" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:var(--gold);color:var(--navy);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('watchlist')">自选股列表</button>
         <button id="market-etf-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('etf')">ETF</button>
-        <button id="market-sector-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('sectors')">热门行业</button>
+        <button id="market-sector-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" data-feature-flag="watchlist_hot_sectors" style="display:none;flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('sectors')">热门行业</button>
         <button id="market-overview-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('overview')">市场一览</button>
         <button id="market-macro-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('macro')">宏观经济</button>
       </div>
@@ -5028,19 +5028,19 @@ body,
         </div>
       </div>
       <div id="market-overview-panel" role="tabpanel">
-        <div id="market-overview-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">市场一览由大V选择，AKShare 统一采集后写入共享快照。</div>
+        <div id="market-overview-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">市场数据由 Gangtise OpenAPI 采集并写入共享快照。</div>
         <div id="market-overview-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
           <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实行情...</div>
         </div>
       </div>
       <div id="market-sector-panel" role="tabpanel" style="display:none">
-        <div id="market-sector-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">热门行业由大V选择，AKShare 统一采集申万一级行业快照。</div>
+        <div id="market-sector-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">行业指数由 Gangtise OpenAPI 采集并写入共享快照。</div>
         <div id="market-sector-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
           <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实行业行情...</div>
         </div>
       </div>
       <div id="market-macro-panel" role="tabpanel" style="display:none">
-        <div id="market-macro-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">月度宏观统计由后台通过 AKShare 公开数据源采集后入库，页面只读取数据库快照。</div>
+        <div id="market-macro-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">宏观指标由 Gangtise OpenAPI 采集并写入共享快照。</div>
         <div id="market-macro-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
           <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实宏观数据...</div>
         </div>
@@ -5842,6 +5842,10 @@ function applySiteFeatureFlags() {
     const featureName = el.dataset.feature;
     el.style.display = isFeatureEnabled(featureName) ? '' : 'none';
   });
+  const hotSectorsEnabled = Boolean((((window.SITE_CONFIG || {}).feature_flags || {}).watchlist_hot_sectors));
+  const hotSectorsTab = document.getElementById('market-sector-tab');
+  if (hotSectorsTab) hotSectorsTab.style.display = hotSectorsEnabled ? '' : 'none';
+  if (!hotSectorsEnabled && window.activeMarketView === 'sectors') switchMarketView('watchlist');
   if (currentWatchlistDetail) {
     renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection || 'overview');
   }
@@ -6123,7 +6127,6 @@ const REVIEW_PERIOD_CONFIG = {
   day: { label: '洞见', shortLabel: '洞见', prompt: '', marketFocus: '', aiLabel: '自选股 + 市场行情' },
 };
 const REVIEW_SOURCE_OPTIONS = [
-  { value: 'stock_grid', icon: '▦', label: '九宫格个股展示', desc: '任意搜索并选择最多 9 支股票，生成卡片式个股洞见。' },
   { value: 'voice', icon: '🎙️', label: '语音口述', desc: '收盘后直接口述盘面、行业和个股判断。' },
   { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接写完整洞见正文，再统一发布为前台文章。' },
   { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
@@ -6174,6 +6177,7 @@ let reviewTriggerDraft = {
   useVoiceLlmEnhancement: true,
   selectedWatchlist: [],
   stockGridCards: [],
+  stockGridEnabled: false,
   stockGridLoading: false,
   stockGridError: '',
   watchlistDecision: '',
@@ -8118,6 +8122,7 @@ function buildReviewArticleData(review) {
     avatar: review.avatar,
     periodLabel: review.periodLabel,
     watchlist: review.watchlist || [],
+    stockGridEnabled: Boolean(review.stock_grid_enabled !== undefined ? review.stock_grid_enabled : (review.stockGridCards || []).length),
     stockGridCards: Array.isArray(review.stockGridCards) ? review.stockGridCards : [],
     tags: review.tags || [],
     coverTitle: deriveReviewCoverTitle(review),
@@ -8203,6 +8208,7 @@ function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
     content_text: matched.content_text || matched.summary || '',
     tags: matched.tags || [],
     watchlist,
+    stockGridEnabled: Boolean(matched.stock_grid_enabled !== undefined ? matched.stock_grid_enabled : (matched.stock_grid_cards || []).length),
     stockGridCards: matched.stock_grid_cards || [],
     annotations: [],
     sourceMode: matched.source_mode || 'manual',
@@ -8291,10 +8297,10 @@ function renderReviewArticleCards(articles) {
   return `
     <div class="review-article-list">
       ${articles.map(article => `
-        <div class="review-article-card ${article.contentKind === 'ai_broadcast' ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : ''} ${article.contentKind === 'stock_grid' ? 'stock-grid' : ''}" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
+        <div class="review-article-card ${article.contentKind === 'ai_broadcast' ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : ''} ${article.stockGridEnabled ? 'stock-grid' : ''}" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
           <div class="review-article-cover">
             ${article.contentKind === 'ai_broadcast' ? `<div class="review-article-broadcast-mark">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(article.broadcastLabel || '财经播报')}</div>` : ''}
-            ${article.contentKind === 'stock_grid' ? `<div class="review-article-broadcast-mark">九宫格个股洞见 · ${Math.min(9, Array.isArray(article.stockGridCards) ? article.stockGridCards.length : 0)} 支股票</div>` : ''}
+            ${article.stockGridEnabled ? `<div class="review-article-broadcast-mark">含九宫格个股赏析 · ${Math.min(9, Array.isArray(article.stockGridCards) ? article.stockGridCards.length : 0)} 支股票</div>` : ''}
             ${renderReviewArticleAccessBadge(article)}
             <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
             <div class="review-article-cover-title">${escapeHtml(article.title)}${article.isPinned ? '<span class="review-pin-badge" aria-label="已置顶">置顶</span>' : ''}${article.revisionCount ? `<span class="review-pin-badge">${escapeHtml(article.revisionLabel || `第 ${article.revisionCount} 次修改`)}</span>` : ''}</div>
@@ -8358,7 +8364,7 @@ function renderFeaturedInsightCard() {
   `;
 }
 
-function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 共享快照', syncTime = '', stale = false) {
+function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 Gangtise OpenAPI 共享快照', syncTime = '', stale = false) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false);
   const syncLabel = syncTime ? `${stale ? '最近一次成功同步' : '数据同步时间'}：${syncTime}` : '数据同步时间：暂无同步记录';
   const quoteLabel = rows.some((item) => item.quote_mode === 'daily_close_fallback')
@@ -8383,12 +8389,15 @@ function renderFeedMarketEconomy(items, title, chartId, limit = 10, description 
   return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-bars" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图" style="grid-template-columns:repeat(${Math.max(chartRows.length, 1)},minmax(0,1fr))">${bars}</div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(quoteLabel)} · ${escapeHtml(syncLabel)}</div></div>`;
 }
 
-function renderFeedMarketEconomyPanel(overviewPayload, sectorPayload) {
+function renderFeedMarketEconomyPanel(overviewPayload, etfPayload) {
   const host = document.getElementById('feed-market-economy');
   if (!host) return;
   const overview = overviewPayload && typeof overviewPayload === 'object' ? overviewPayload : {};
-  const sectors = sectorPayload && typeof sectorPayload === 'object' ? sectorPayload : {};
-  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">本租户统一行情快照，展示大V发布的市场与行业指标。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectors.items, '热门行业涨跌', 'feed-sector-chart', 10, '申万一级行业指数行情，按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。', sectors.updated_at, sectors.stale)}${renderFeedMarketEconomy(overview.items, '市场一览涨跌', 'feed-overview-chart', 10, '标准市场指数按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。', overview.updated_at, overview.stale)}</div></div>`;
+  const etfs = etfPayload && typeof etfPayload === 'object' ? etfPayload : {};
+  const industryEtfs = (Array.isArray(etfs.items) ? etfs.items : [])
+    .filter((item) => item && item.available === true && String(item.category || '').trim() === '行业主题')
+    .sort((left, right) => Number(right.change_pct || 0) - Number(left.change_pct || 0));
+  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">行情数据来自 Gangtise OpenAPI 共享快照。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(industryEtfs, 'ETF行业主题涨跌', 'feed-sector-chart', 10, '仅展示有真实行情的行业主题 ETF，按涨跌幅从高到低排列。', etfs.updated_at, etfs.stale)}${renderFeedMarketEconomy(overview.items, '市场一览涨跌', 'feed-overview-chart', 10, '标准市场指数按涨跌幅从高到低排列。', overview.updated_at, overview.stale)}</div></div>`;
 }
 
 function renderMarketQuoteCards(items, type) {
@@ -8449,7 +8458,8 @@ function renderH5MarketDisplayConfig(payload) {
   const macroName = (code) => ((macroRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
   const etfName = (code) => ((etfRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
   const summaryCard = (title, values, labelOf) => `<div class="market-layout-summary-card"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong class="market-layout-summary-title">${title}</strong><span class="market-layout-count">已选 ${values.length} 项</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(values, labelOf, '尚未配置')}</div></div>`;
-  const summary = `<div class="market-layout-summary-grid">${summaryCard('热门行业', settings.sector_names || [], (value) => value)}${summaryCard('市场一览', settings.market_overview_codes || [], marketName)}${summaryCard('宏观经济', settings.macro_economic_codes || [], macroName)}${summaryCard('ETF', settings.etf_codes || [], etfName)}</div>`;
+  const hotSectorsEnabled = Boolean((((window.SITE_CONFIG || {}).feature_flags || {}).watchlist_hot_sectors));
+  const summary = `<div class="market-layout-summary-grid">${hotSectorsEnabled ? summaryCard('热门行业', settings.sector_names || [], (value) => value) : ''}${summaryCard('市场一览', settings.market_overview_codes || [], marketName)}${summaryCard('宏观经济', settings.macro_economic_codes || [], macroName)}${summaryCard('ETF', settings.etf_codes || [], etfName)}</div>`;
   host.innerHTML = `<section class="market-layout-summary ${h5MarketDisplaySummaryExpanded ? '' : 'is-collapsed'}"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="font-size:12px;font-weight:750;color:#183A62">粉丝端行情版面</div><div style="font-size:11px;color:#62758A;margin-top:3px">${settings.configured ? `已发布 · ${escapeHtml(settings.updated_at || '--')}` : '尚未发布，可按需选择，不必填满'}</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button type="button" class="btn btn-light border btn-sm" onclick="toggleH5MarketDisplaySummary()">${h5MarketDisplaySummaryExpanded ? '收起' : '展开'}</button><button type="button" class="btn btn-outline-primary btn-sm" onclick="openH5MarketDisplayModal()">调整版面</button></div></div>${summary}</section>`;
 }
 
@@ -8458,7 +8468,7 @@ function toggleH5MarketDisplaySummary() { h5MarketDisplaySummaryExpanded = !h5Ma
 function openH5MarketDisplayModal() {
   const settings = h5MarketDisplayConfig.settings || {};
   h5MarketDisplayDraft = { market_overview_codes: [...(settings.market_overview_codes || [])], sector_names: [...(settings.sector_names || [])], macro_economic_codes: [...(settings.macro_economic_codes || [])], etf_codes: [...(settings.etf_codes || [])] };
-  h5MarketPickerTab = 'sectors';
+  h5MarketPickerTab = (((window.SITE_CONFIG || {}).feature_flags || {}).watchlist_hot_sectors) ? 'sectors' : 'market';
   h5MarketPickerEtfCategory = '宽基指数';
   renderH5MarketDisplayModal();
   document.getElementById('h5-market-layout-modal')?.classList.add('show');
@@ -8466,7 +8476,11 @@ function openH5MarketDisplayModal() {
 
 function closeH5MarketDisplayModal() { document.getElementById('h5-market-layout-modal')?.classList.remove('show'); }
 
-function setH5MarketPickerTab(tab) { h5MarketPickerTab = tab; renderH5MarketDisplayModal(); }
+function setH5MarketPickerTab(tab) {
+  if (tab === 'sectors' && !(((window.SITE_CONFIG || {}).feature_flags || {}).watchlist_hot_sectors)) return;
+  h5MarketPickerTab = tab;
+  renderH5MarketDisplayModal();
+}
 
 function toggleH5MarketDraftSelection(field, value) {
   const values = [...(h5MarketDisplayDraft[field] || [])];
@@ -8481,6 +8495,8 @@ function renderH5MarketDisplayModal() {
   const host = document.getElementById('h5-market-layout-modal-content');
   if (!host) return;
   const catalog = h5MarketDisplayConfig.catalog || {};
+  const hotSectorsEnabled = Boolean((((window.SITE_CONFIG || {}).feature_flags || {}).watchlist_hot_sectors));
+  if (h5MarketPickerTab === 'sectors' && !hotSectorsEnabled) h5MarketPickerTab = 'market';
   const isSector = h5MarketPickerTab === 'sectors';
   const isMacro = h5MarketPickerTab === 'macro';
   const isEtf = h5MarketPickerTab === 'etf';
@@ -8493,6 +8509,8 @@ function renderH5MarketDisplayModal() {
   const etfSubTabs = isEtf ? `<div class="market-picker-tabs mt-2" data-h5-market-picker-etf-categories="true">${etfCategories.map((category) => `<button type="button" class="market-picker-tab ${category === h5MarketPickerEtfCategory ? 'active' : ''}" onclick="h5MarketPickerEtfCategory='${escapeAttr(category)}';renderH5MarketDisplayModal()">${escapeHtml(category)}</button>`).join('')}</div>` : '';
   const selected = h5MarketDisplayDraft[field] || [];
   host.innerHTML = `<div class="p-3 p-md-4"><div class="d-flex justify-content-between align-items-start gap-3"><div><div class="fw-bold" style="color:#183A62">配置粉丝端行情版面</div><div class="small mt-1" style="color:#62758A">可按需选择任意数量的指标。</div></div><button type="button" class="btn-close" aria-label="关闭" onclick="closeH5MarketDisplayModal()"></button></div><div class="market-picker-tabs mt-3"><button type="button" class="market-picker-tab ${isSector ? 'active' : ''}" data-h5-market-picker="sectors" onclick="setH5MarketPickerTab('sectors')">热门行业</button><button type="button" class="market-picker-tab ${!isSector && !isMacro && !isEtf ? 'active' : ''}" data-h5-market-picker="market" onclick="setH5MarketPickerTab('market')">市场一览</button><button type="button" class="market-picker-tab ${isMacro ? 'active' : ''}" data-h5-market-picker="macro" onclick="setH5MarketPickerTab('macro')">宏观经济</button><button type="button" class="market-picker-tab ${isEtf ? 'active' : ''}" data-h5-market-picker="etf" onclick="setH5MarketPickerTab('etf')">ETF</button></div>${etfSubTabs}<div class="d-flex justify-content-between align-items-center mt-3"><strong style="font-size:13px;color:#183A62">${isSector ? '选择热门行业' : (isMacro ? '选择宏观指标' : (isEtf ? `选择 ETF · ${escapeHtml(h5MarketPickerEtfCategory)}` : '选择市场指标'))}</strong><span class="badge text-bg-light border" style="color:#2F74C0!important;border-color:#CFE2F6!important">已选择 ${selected.length} 项 · 可留空</span></div><div class="row row-cols-3 g-2 mt-1">${options.map((item) => `<div class="col"><button type="button" class="market-picker-tile ${selected.includes(item.value) ? 'is-selected' : ''}" data-h5-market-picker-tile="${escapeAttr(item.value)}" onclick="toggleH5MarketDraftSelection('${field}','${escapeAttr(item.value)}')">${selected.includes(item.value) ? '<span class="market-picker-check">✓</span>' : ''}<span>${escapeHtml(item.label)}</span></button></div>`).join('') || '<div class="col-12 small text-center py-4" style="color:#62758A">暂无可选择的指标</div>'}</div><div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top"><button type="button" class="btn btn-light border" onclick="closeH5MarketDisplayModal()">取消</button><button type="button" class="btn btn-primary" onclick="publishH5MarketDisplayDraft()">发布版面</button></div></div>`;
+  const hotSectorPicker = host.querySelector('[data-h5-market-picker="sectors"]');
+  if (hotSectorPicker && !hotSectorsEnabled) hotSectorPicker.remove();
 }
 
 async function loadH5MarketDisplayConfig() {
@@ -8568,12 +8586,12 @@ async function loadFeedMarketEconomy() {
   window.feedMarketRequestKey = requestKey;
   window.feedMarketRequest = (async () => {
     try {
-      const [sectorResponse, overviewResponse] = await Promise.all([
-        fetch(`/api/market-sectors${query}`, {cache: 'no-store'}),
+      const [etfResponse, overviewResponse] = await Promise.all([
+        fetch('/api/etf-industry-themes', {cache: 'no-store'}),
         fetch(`/api/market-overview${query}`, {cache: 'no-store'}),
       ]);
-      if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
-      const sectors = await sectorResponse.json().catch(() => ({}));
+      if (!etfResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
+      const etfs = await etfResponse.json().catch(() => ({}));
       const overview = await overviewResponse.json().catch(() => ({}));
       if (requestSeq !== window.feedMarketRequestSeq) return;
       const hasItems = (payload) => Array.isArray(payload && payload.items) && payload.items.length > 0;
@@ -8581,12 +8599,12 @@ async function loadFeedMarketEconomy() {
         ? (window.feedMarketLastPayload || {})
         : {};
       const nextOverview = hasItems(overview) ? overview : (previous.overview || overview);
-      const nextSectors = hasItems(sectors) ? sectors : (previous.sectors || sectors);
-      window.feedMarketLastPayload = {overview: nextOverview, sectors: nextSectors};
+      const nextEtfs = hasItems(etfs) ? etfs : (previous.etfs || etfs);
+      window.feedMarketLastPayload = {overview: nextOverview, etfs: nextEtfs};
       window.feedMarketLastPayloadKey = requestKey;
       window.feedMarketRetryCount = 0;
-      renderFeedMarketEconomyPanel(nextOverview, nextSectors);
-      const retryAfterMs = Math.max(Number(sectors.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
+      renderFeedMarketEconomyPanel(nextOverview, nextEtfs);
+      const retryAfterMs = Math.max(Number(etfs.refresh_after_ms || 0), Number(overview.refresh_after_ms || 0));
       if (retryAfterMs && !window.feedMarketOnDemandRetryPending) {
         window.feedMarketOnDemandRetryPending = true;
         window.setTimeout(() => {
@@ -9045,7 +9063,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
         </div>
       ` : '')}
       ${renderReviewWatchlistAnalysisSection(article)}
-      ${renderReviewStockGridSection(article)}
+      ${article.stockGridEnabled ? renderReviewStockGridSection(article) : ''}
       ${false && article.knowledgeAttachments.length ? `
         <div class="review-article-section">
           <div class="review-article-section-title">附加材料</div>
@@ -9355,6 +9373,7 @@ function openReviewTriggerModal(sourceMode) {
   reviewStockGridSearchQuery = '';
   reviewStockGridSearchLoading = false;
   reviewTriggerDraft.stockGridCards = [];
+  reviewTriggerDraft.stockGridEnabled = false;
   reviewTriggerDraft.stockGridLoading = false;
   reviewTriggerDraft.stockGridError = '';
   reviewTriggerDraft.watchlistDecision = 'not_applicable';
@@ -9963,7 +9982,7 @@ async function embedManualReviewText(text) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      text: String(text || '').trim() || (reviewTriggerDraft.sourceMode === 'stock_grid' ? '今日个股点评' : ''),
+      text: String(text || '').trim(),
       content_html: getReviewPreviewHtml(),
       tenant_slug: ((user || {}).tenant || {}).slug || '',
       period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
@@ -10004,6 +10023,11 @@ async function publishReviewContent(text, transcriptionEngine, transcriptModel, 
       review_summary: payload.review_summary || '',
       user_input_section: payload.user_input_section || {},
       watchlist_analysis_section: payload.watchlist_analysis_section || {},
+      stock_grid_enabled: Boolean(
+        payload.stock_grid_enabled !== undefined
+          ? payload.stock_grid_enabled
+          : reviewTriggerDraft.stockGridEnabled
+      ),
       stock_grid_cards: payload.stock_grid_cards || reviewTriggerDraft.stockGridCards || [],
       stock_grid_provider: payload.stock_grid_provider || reviewTriggerDraft.stockGridProvider || '',
       stock_grid_endpoint: payload.stock_grid_endpoint || reviewTriggerDraft.stockGridEndpoint || '',
@@ -10232,7 +10256,7 @@ function isReviewDraftProcessingStage() {
 }
 
 function renderReviewWatchlistSelectionPanel() {
-  if (reviewTriggerDraft.sourceMode !== 'stock_grid') return '';
+  if (!reviewTriggerDraft.stockGridEnabled) return '';
   const selectedItems = Array.isArray(reviewTriggerDraft.selectedWatchlist) ? reviewTriggerDraft.selectedWatchlist : [];
   const selected = new Set(selectedItems.map((item) => typeof item === 'object' ? String(item.code || item.stock_code || '').trim() : String(item || '').trim()));
   const rows = Array.isArray(reviewStockGridSearchItems) ? reviewStockGridSearchItems : [];
@@ -10697,11 +10721,18 @@ function renderReviewTriggerModal(user) {
             `).join('')}
           </div>
         </div>
-        ${reviewTriggerDraft.sourceMode === 'stock_grid' ? renderReviewWatchlistSelectionPanel() : (isReviewInputStage() ? `
+        ${isReviewInputStage() ? `
           <div class="knowledge-modal-block">
             <label class="knowledge-modal-label">输入内容</label>
             ${renderReviewInputPanel()}
           </div>
+          <div class="knowledge-modal-block" style="padding:12px 14px;background:#F7FBFF;border:1px solid rgba(47,116,192,.12);border-radius:10px">
+            <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:var(--text-main);font-size:12px;font-weight:700">
+              <input type="checkbox" ${reviewTriggerDraft.stockGridEnabled ? 'checked' : ''} onchange="toggleReviewStockGridEnabled(this.checked)" style="margin-top:2px">
+              <span>在这篇洞见末尾加入九宫格股票赏析<span style="display:block;margin-top:4px;color:var(--gray-400);font-size:11px;font-weight:400;line-height:1.6">可任意搜索并选择最多 9 支股票，卡片会作为本文最后一段发布。</span></span>
+            </label>
+          </div>
+          ${reviewTriggerDraft.stockGridEnabled ? renderReviewWatchlistSelectionPanel() : ''}
           ${renderReviewPromptPanel()}
         ` : '')}
       ` : ''}
@@ -10872,9 +10903,6 @@ function renderReviewFlowActions() {
   if (reviewTriggerDraft.flowStage === 'optimize_rule') {
     return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
   }
-  if (reviewTriggerDraft.sourceMode === 'stock_grid' && reviewTriggerDraft.flowStage === 'intake') {
-    return '<button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="requestReviewStockGridPreview()">生成九宫格</button>';
-  }
   if (reviewTriggerDraft.flowStage === 'draft_review') {
     return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">进入发布预览</button>';
   }
@@ -10959,6 +10987,16 @@ function setReviewTriggerSourceMode(mode) {
   reviewTriggerDraft.draftReviewText = '';
   reviewTriggerDraft.flowStage = 'intake';
   reviewStructuredPreview = null;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function toggleReviewStockGridEnabled(enabled) {
+  reviewTriggerDraft.stockGridEnabled = !!enabled;
+  if (!reviewTriggerDraft.stockGridEnabled) {
+    reviewTriggerDraft.stockGridCards = [];
+    reviewTriggerDraft.stockGridError = '';
+    reviewTriggerDraft.selectedWatchlist = [];
+  }
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -11249,7 +11287,7 @@ async function saveReviewDraft() {
   if (!isDavCapableUser(user)) return;
   syncReviewDraftFromModal();
   const text = getReviewPreviewText() || getReviewDraftContentText();
-  if (reviewTriggerDraft.sourceMode === 'stock_grid' && !(reviewTriggerDraft.stockGridCards || []).length) {
+  if (reviewTriggerDraft.stockGridEnabled && !(reviewTriggerDraft.stockGridCards || []).length) {
     showToast('请先选择股票并生成九宫格');
     return;
   }
@@ -11268,7 +11306,8 @@ async function saveReviewDraft() {
     source_mode: reviewTriggerDraft.sourceMode || 'manual',
     access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
     metadata: {
-      content_kind: reviewTriggerDraft.sourceMode === 'stock_grid' ? 'stock_grid' : 'insight',
+      content_kind: 'insight',
+      stock_grid_enabled: Boolean(reviewTriggerDraft.stockGridEnabled),
       stock_grid_cards: reviewTriggerDraft.stockGridCards || [],
       stock_grid_selection: reviewTriggerDraft.selectedWatchlist || [],
       stock_grid_provider: reviewTriggerDraft.stockGridProvider || '',
@@ -11343,9 +11382,10 @@ function editInsightDraft(draftId) {
   reviewTriggerDraft.period = 'day';
   reviewTriggerDraft.reviewTitle = String(draft.title || '').trim();
   reviewTriggerDraft.accessMode = draft.access_mode === 'subscriber' ? 'subscriber' : 'public';
-  reviewTriggerDraft.sourceMode = String(draft.source_mode || 'manual').trim() || 'manual';
+  reviewTriggerDraft.sourceMode = String(draft.source_mode || 'manual').trim() === 'stock_grid' ? 'manual' : (String(draft.source_mode || 'manual').trim() || 'manual');
   const draftMetadata = draft.metadata && typeof draft.metadata === 'object' ? draft.metadata : {};
   reviewTriggerDraft.stockGridCards = Array.isArray(draftMetadata.stock_grid_cards) ? draftMetadata.stock_grid_cards.slice(0, 9) : [];
+  reviewTriggerDraft.stockGridEnabled = Boolean(draftMetadata.stock_grid_enabled || reviewTriggerDraft.stockGridCards.length);
   reviewTriggerDraft.stockGridProvider = String(draftMetadata.stock_grid_provider || '');
   reviewTriggerDraft.stockGridEndpoint = String(draftMetadata.stock_grid_endpoint || '');
   const savedStockGridSelection = Array.isArray(draftMetadata.stock_grid_selection) ? draftMetadata.stock_grid_selection : [];
@@ -11769,7 +11809,7 @@ function publishReviewDraft() {
   if (reviewPublishSubmitting) return;
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   syncReviewDraftFromModal();
-  if (reviewTriggerDraft.sourceMode === 'stock_grid' && !(reviewTriggerDraft.stockGridCards || []).length) {
+  if (reviewTriggerDraft.stockGridEnabled && !(reviewTriggerDraft.stockGridCards || []).length) {
     showToast('请先选择股票并生成九宫格');
     return;
   }
@@ -15692,6 +15732,9 @@ let marketSectorItems = [];
 let marketMacroItems = [];
 
 function switchMarketView(view) {
+  const hotSectorsEnabled = Boolean((((window.SITE_CONFIG || {}).feature_flags || {}).watchlist_hot_sectors));
+  if (view === 'sectors' && !hotSectorsEnabled) view = 'watchlist';
+  window.activeMarketView = view;
   const overview = view === 'overview';
   const sectors = view === 'sectors';
   const macro = view === 'macro';
@@ -15811,7 +15854,8 @@ function renderMarketOverview(items) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available);
   const sourceNote = document.getElementById('market-overview-source-note');
   if (sourceNote && rows.some((item) => item && item.demo)) sourceNote.textContent = '当前为演示数据，仅用于页面演示；真实市场快照入库后自动替换。';
-  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = 'AKShare 市场快照正在同步，当前停止展示过期数据。';
+  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = 'Gangtise 市场快照正在同步，当前展示最近一次成功数据。';
+  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = 'Gangtise 市场快照正在同步，当前停止展示过期数据。';
   if (!rows.length && host.querySelector('[data-market-index-code]')) return;
   host.innerHTML = rows.map((item) => {
     const available = item && item.available;
@@ -15858,7 +15902,7 @@ function renderMarketMacro(items) {
   const hiddenMacroCodes = new Set(['source_urban_unemployment', 'source_real_estate_investment_yoy']);
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && !hiddenMacroCodes.has(String(item.indicator_code || '')));
   const sourceNote = document.getElementById('market-macro-source-note');
-  if (sourceNote && rows.some((item) => item && item.stale)) sourceNote.textContent = '宏观数据正在同步，当前展示最近一次 AKShare 真实快照。';
+  if (sourceNote && rows.some((item) => item && item.stale)) sourceNote.textContent = '宏观数据正在同步，当前展示最近一次 Gangtise OpenAPI 真实快照。';
   host.innerHTML = rows.map((item) => {
     const available = Boolean(item && item.available);
     const value = available && Number.isFinite(Number(item.value)) ? Number(item.value).toFixed(2) : '--';
@@ -16225,7 +16269,7 @@ function buildWatchlistIntradaySvg(series, unavailableMessage, source, tradeDate
         <div style="font-size:12px;font-weight:700;color:var(--text-main)">分时曲线</div>
         <div style="font-size:11px;color:var(--gray-400)">当前涨跌 ${changePct >= 0 ? '+' : ''}${Number(changePct || 0).toFixed(2)}%</div>
       </div>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${escapeHtml(tradeDate || String(rows[0].date || '').slice(0, 10))} · AKShare 分钟K · ${rows.length} 个分钟点</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${escapeHtml(tradeDate || String(rows[0].date || '').slice(0, 10))} · Gangtise 分钟K · ${rows.length} 个分钟点</div>
       ${shell.chartHtml}
     </div>
   `;
