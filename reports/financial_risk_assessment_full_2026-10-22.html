@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>洞见智研全面金融风险测评报告</title>
+<style>
+:root{--ink:#17283e;--sub:#596b80;--line:#d8e2ec;--bg:#f3f6fa;--panel:#fff;--navy:#12385f;--blue:#1664a4;--red:#b42318;--amber:#9a5a00;--green:#13734b;--purple:#6842a5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}main{max-width:1320px;margin:auto;padding:24px 20px 60px}.hero{background:linear-gradient(135deg,#102f50,#1d6fa9);color:#fff;border-radius:14px;padding:30px;box-shadow:0 12px 30px #153b5b25}.hero h1{margin:0 0 8px;font-size:29px}.hero p{margin:4px 0;color:#e8f2fa}.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:20px}.metric{padding:11px;border:1px solid #ffffff35;background:#ffffff18;border-radius:9px}.metric b{display:block;font-size:20px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-top:16px;padding:20px;box-shadow:0 4px 15px #163b650b}.panel h2{margin:0 0 12px;color:var(--navy);font-size:19px}.panel h3{margin:17px 0 6px;font-size:15px}.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}.finding{margin:10px 0;padding:11px 14px;border-left:4px solid var(--amber);background:#fff8e9}.critical{border-color:var(--red);background:#fff1ef}.positive{border-color:var(--green);background:#effaf4}.info{border-color:var(--blue);background:#eef6fd}.purple{border-color:var(--purple);background:#f5f1fc}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;vertical-align:top;padding:9px 8px;border-bottom:1px solid var(--line)}th{background:#edf4fa;color:#244b71;white-space:nowrap}.tag{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}.p0{background:#fde3e0;color:var(--red)}.p1{background:#fff0d3;color:var(--amber)}.p2{background:#eaf3fc;color:var(--blue)}.p3{background:#eaf7f0;color:var(--green)}code{background:#eff3f7;border-radius:4px;padding:1px 4px;font-size:12px}.muted,.foot{color:var(--sub);font-size:12px}ul{margin:6px 0;padding-left:22px}.score{font-weight:800;color:var(--blue);white-space:nowrap}.bar{height:10px;background:#e9eef4;border-radius:8px;overflow:hidden}.bar span{display:block;height:100%;background:var(--red)}a{color:var(--blue)}@media(max-width:900px){.metrics,.two{grid-template-columns:1fr}.hero h1{font-size:23px}main{padding:12px}.panel{padding:15px}table{display:block;overflow-x:auto;white-space:normal}}
+</style></head>
+<body><main>
+<section class="hero"><h1>洞见智研全面金融风险测评报告</h1>
+<p>评估日期：2026-10-22 · 对象：gangtise_demo 当前代码、配置、数据访问、任务调度、前端页面和测试资产</p>
+<p>评估视角：中国金融科技审慎监管、金融消费者保护、信息安全与模型风险管理。本文不是监管机构意见、法律意见、牌照结论或渗透测试报告。</p>
+<div class="metrics"><div class="metric"><span>综合等级</span><b>高</b></div><div class="metric"><span>P0 阻断</span><b>2</b></div><div class="metric"><span>P1 高风险</span><b>7</b></div><div class="metric"><span>P2 中风险</span><b>8</b></div><div class="metric"><span>相关回归</span><b>97 通过</b></div><div class="metric"><span>上线判断</span><b>有条件</b></div></div></section>
+
+<section class="panel"><h2>一、监管式执行摘要</h2>
+<div class="finding critical"><b>P0-1：密码治理不达标。</b>代码证据显示用户密码直接写入用户表，并使用明文比较完成登录。该缺陷会放大数据库、备份、日志、内部运维和接口泄露的后果，属于必须先于扩大真实用户规模处理的阻断项。</div>
+<div class="finding critical"><b>P0-2：敏感凭证暴露面过高。</b>工作区存在被版本管理或部署流程引用的 Session/OpenAPI 凭证文件风险；即使报告不展示具体值，也必须按已暴露凭证处理，立即撤销、轮换并检查历史提交、备份和日志。</div>
+<div class="finding"><b>总体判断：</b>系统已经具备多租户、角色、研究内容、市场数据、智能体、付费订阅和后台任务等产品能力，但风险控制仍以应用功能为中心，尚未形成金融业务要求的身份安全、数据可追溯、模型治理、消费者保护和业务连续性闭环。</div>
+<p>在整改完成并取得主体资质、数据授权、个人信息合规、等保/安全评估和容量灾备证据前，建议将产品定位为研究辅助和内容服务工具，不对外宣称证券投资咨询、自动化投资顾问、收益保证或交易决策替代。</p></section>
+
+<section class="panel"><h2>二、测评范围、证据等级与限制</h2>
+<table><tr><th>证据等级</th><th>含义</th><th>本次使用</th></tr>
+<tr><td><span class="tag p0">A 已确认</span></td><td>代码、版本文件或实际测试直接证明</td><td>密码明文、接口字段、Cookie 配置、路由和回归测试</td></tr>
+<tr><td><span class="tag p1">B 高可信推断</span></td><td>代码结构显示存在控制缺口，但需要部署环境或完整调用链复核</td><td>CSRF、限流、SSRF、模型输入、审计和数据新鲜度</td></tr>
+<tr><td><span class="tag p2">C 待补证</span></td><td>不能仅由本地代码证明，需要生产、供应商、法务或演练材料</td><td>数据授权、支付合规、RPO/RTO、渗透、等保和主体资质</td></tr></table>
+<div class="finding info"><b>验证边界：</b>已运行针对性回归测试：<code>PYTHONPATH=. pytest -q tests/test_fan_commerce_bdd.py tests/test_fan_dav_relationship_regression_bdd.py tests/test_daily_quiz_blind_box_bdd.py tests/test_gangtise_credentials.py tests/test_experience_surface_regression_bdd.py</code>，结果为 97 passed、5 warnings。该结果只证明相关业务回归通过，不证明安全、合规、数据准确性、压力容量或生产配置合格。</div></section>
+
+<section class="panel"><h2>三、风险评级总表</h2>
+<table><tr><th>编号</th><th>级别</th><th>主题</th><th>可能后果</th><th>证据/待证</th><th>建议期限</th></tr>
+<tr><td>FR-001</td><td><span class="tag p0">P0</span></td><td>密码明文存储和比较</td><td>账号接管、批量撞库、内部越权</td><td><code>src/domain/core_services.py:7071-7093,7200-7284</code></td><td>立即</td></tr>
+<tr><td>FR-002</td><td><span class="tag p0">P0</span></td><td>Session/OpenAPI 凭证文件治理</td><td>会话伪造、外部 API 滥用、费用和数据源损失</td><td><code>.gangtise_session_secret</code>、<code>.gangtise_openapi_credentials</code></td><td>立即</td></tr>
+<tr><td>FR-003</td><td><span class="tag p1">P1</span></td><td>用户接口可能回传 password</td><td>浏览器、日志、代理或 XSS 泄露凭证</td><td><code>src/web/api_core.py:2118-2120,2240-2295</code></td><td>24小时</td></tr>
+<tr><td>FR-004</td><td><span class="tag p1">P1</span></td><td>Session 缺少 Secure 基线</td><td>HTTPS 配置错误时会话被窃取</td><td><code>src/runtime.py:283-288</code></td><td>上线前</td></tr>
+<tr><td>FR-005</td><td><span class="tag p1">P1</span></td><td>未见统一 CSRF 防护</td><td>登录态发布、导入、任务、权限操作被跨站诱导</td><td><code>src/web/hooks.py:136-169</code></td><td>上线前</td></tr>
+<tr><td>FR-006</td><td><span class="tag p1">P1</span></td><td>注册、登录、AI、上传缺少统一限流</td><td>撞库、批量注册、资源耗尽、模型费用失控</td><td>多处 POST 路由，待生产配置补证</td><td>上线前</td></tr>
+<tr><td>FR-007</td><td><span class="tag p1">P1</span></td><td>URL 抓取和文件解析输入面</td><td>SSRF、恶意文件、压缩炸弹、内网探测</td><td><code>src/web/api_kol.py:1005</code>、<code>src/domain/ai_services.py:11942</code></td><td>上线前</td></tr>
+<tr><td>FR-008</td><td><span class="tag p1">P1</span></td><td>模型/预测/数据结果未统一可信度契约</td><td>历史数据冒充实时、模型幻觉、错误交易判断</td><td>多 Agent、Gangtise、AKShare 路径</td><td>上线前</td></tr>
+<tr><td>FR-009</td><td><span class="tag p1">P1</span></td><td>消费者适当性与营销边界不足</td><td>误导宣传、投诉、非法证券服务风险</td><td>需法务和业务主体补证</td><td>上线前</td></tr>
+<tr><td>FR-010</td><td><span class="tag p2">P2</span></td><td>访问日志含个人和租户信息</td><td>留存、权限、泄露和跨境合规风险</td><td><code>src/web/hooks.py:78-128</code></td><td>30日</td></tr>
+<tr><td>FR-011</td><td><span class="tag p2">P2</span></td><td>发布/消息/推送缺少统一可靠事件机制</td><td>重复推送、状态不一致、无法完整追责</td><td>洞见、播报、消息多步链路</td><td>60日</td></tr>
+<tr><td>FR-012</td><td><span class="tag p2">P2</span></td><td>生产容量和连接池基线不足</td><td>高峰慢、任务堆积、连接耗尽、数据延迟</td><td>需压测、慢查询和生产监控证据</td><td>60日</td></tr>
+<tr><td>FR-013</td><td><span class="tag p2">P2</span></td><td>备份恢复和灾备未完成演练</td><td>数据丢失、恢复超时、重复任务</td><td>脚本存在，不等于恢复成功</td><td>60日</td></tr>
+<tr><td>FR-014</td><td><span class="tag p2">P2</span></td><td>第三方数据和模型供应商依赖</td><td>供应商中断、授权、计费和内容责任不清</td><td>需合同、SLA、授权台账</td><td>90日</td></tr></table></section>
+
+<section class="panel"><h2>四、客户、账号与租户隔离</h2>
+<div class="finding critical"><b>密码与账号：</b>应立即迁移到 Argon2id、bcrypt 或 PBKDF2；存量账号采用强制重置或透明升级。任何用户列表、编辑、导入、错误响应和日志都不得返回密码或固定初始密码。</div>
+<div class="finding"><b>租户关系：</b>当前代码和回归测试显示粉丝、大V和租户关系已有实现基础，但多个 API 仍自行读取 <code>tenant_slug</code>。应统一由认证上下文和 Policy 解析租户，禁止把 URL 参数作为权限依据；补充所有读写接口的跨租户负向测试。</div>
+<table><tr><th>控制</th><th>当前判断</th><th>测评要求</th></tr><tr><td>Admin</td><td>独立角色和后台入口</td><td>MFA、IP/设备风控、敏感操作二次确认、双人复核</td></tr><tr><td>会话</td><td>HttpOnly、SameSite=Lax；未见 Secure</td><td>HTTPS 强制 Secure、TTL、撤销、并发会话和重认证</td></tr><tr><td>登录风控</td><td>未见统一失败计数和锁定基线</td><td>分层限流、异常告警、撞库检测和账号恢复审计</td><tr><td>隐私</td><td>用户手机号、微信标识、来源渠道、互动记录等</td><td>最小化采集、告知同意、访问/更正/删除、留存期限和脱敏</td></tr></table></section>
+
+<section class="panel"><h2>五、市场数据、新闻与研究内容</h2>
+<p>市场一览、热门行业、宏观指标、个股 K 线/分时、新闻、午间/晚间播报和洞见笔记均可能影响用户判断。金融风险不只来自数据源本身，还来自时间语义、缺失数据、缓存回退、模型加工和页面措辞。</p>
+<div class="two"><div><h3>必须统一的数据契约</h3><ul><li><code>source</code>：供应商与接口名称。</li><li><code>as_of</code>：行情所属时间或交易日。</li><li><code>synced_at</code>：本地入库时间。</li><li><code>freshness/status</code>：实时、收盘、历史回退、不可用。</li><li><code>trace_id</code>：外部调用与任务关联。</li><li>原始响应摘要、业务码、可读内容和写库结果。</li></ul></div><div><h3>当前高风险表现</h3><ul><li>HTTP 200 不等于业务内容可用。</li><li>历史 K 线可能被误显示为今日数据。</li><li>接口成功但播报正文为空会造成错误发布状态。</li><li>AKShare/Gangtise 多路径需要授权、计费和优先级台账。</li><li>预测线必须与真实行情明确区分。</li></ul></div></div>
+<div class="finding"><b>监管式要求：</b>页面不得隐式实时调用外部源；外部调用只能由明确 API、缓存刷新或后台任务触发。展示前必须同时校验 HTTP 状态、业务码、内容可用性、数据日期、写库状态和展示状态；不满足时显示明确的历史回退或不可用原因。</div></section>
+
+<section class="panel"><h2>六、模型、智能体与预测风险</h2>
+<table><tr><th>领域</th><th>风险判断</th><th>应建立的控制</th></tr><tr><td>模型清单</td><td>存在 LLM、Gangtise Agent、V4、预测流程和工具编排</td><td>记录模型/版本/用途/责任人/发布日期/停用开关</td></tr><tr><td>可解释性</td><td>输出依赖实时数据、知识库、SSE 和工具结果</td><td>展示数据时间、来源、证据、置信度和失败原因</td></tr><tr><td>预测</td><td>K线未来趋势与历史关键点具有决策影响</td><td>显著标注“模型预测”，保存输入、版本、生成时间和回测结果，禁止收益承诺</td></tr><tr><td>提示注入</td><td>用户文本、URL、文件可能进入模型</td><td>外部内容不具备系统指令权；工具参数白名单和权限隔离</td></tr><tr><td>费用风险</td><td>模型、embedding、新闻和外部行情均可能收费</td><td>按账号/租户/功能限额、超时、熔断、预算和告警</td></tr><tr><td>人工审核</td><td>洞见发布有大V审核流程基础</td><td>草稿、审核、发布、撤回、修订和模型参与信息不可篡改留痕</td></tr></table></section>
+
+<section class="panel"><h2>七、消费者保护、付费与内容责任</h2>
+<div class="finding"><b>适当性：</b>注册、来源渠道、付费/非付费用户、订阅推送和互动问答形成用户画像与权益差异。应明确服务对象、风险承受能力边界、免责声明、未成年人限制、投诉入口、退订和个人信息授权。</div>
+<div class="finding"><b>付费：</b>订单、支付回调、权益开通、到期、退款、撤销和人工确认必须形成状态机。人工标记付费用户不能替代支付验签和可审计订单事实。</div>
+<div class="finding"><b>内容：</b>“利好/利空”、预测、播报和大V复盘必须标明来源、时间和是否为模型生成；禁止稳赚、准确率保证、跟买或替代投资决策的表述。内容撤回应同步消息、列表、详情和搜索索引。</div>
+<div class="finding"><b>互动：</b>评论、答题、盲盒和统计数据应按租户与所属大V隔离，提供举报、屏蔽、删除、审计和异常行为识别机制。</div></section>
+
+<section class="panel"><h2>八、Web/API、上传与前端安全</h2>
+<table><tr><th>面</th><th>发现</th><th>风险</th><th>控制</th></tr><tr><td>CSRF</td><td>统一登录门禁中未见 token 校验</td><td>发布、任务、用户和配置操作被诱导</td><td>CSRF token、Origin 校验、SameSite、敏感操作重认证</td></tr><tr><td>SSRF</td><td><code>fetch_url_preview</code> 和 URL 优化能力</td><td>内网/云元数据探测、重定向绕过</td><td>解析后阻断环回、私网、保留地址和云元数据；限制重定向、超时、响应大小</td></tr><tr><td>上传</td><td>文件、语音、富文本和知识解析</td><td>恶意文件、压缩炸弹、解析器漏洞</td><td>扩展名+MIME+魔数、大小/页数/解压限制、隔离、病毒扫描</td></tr><tr><td>XSS</td><td>存在动态 <code>innerHTML</code> 和富文本展示</td><td>用户内容、模型内容和消息执行脚本</td><td>统一净化白名单、CSP、禁止不可信 HTML 拼接、安全回归</td></tr><tr><td>限流</td><td>未见全局 limiter 基线</td><td>登录、注册、AI、上传和广播被滥用</td><td>按 IP、账号、租户、功能和 provider 分层限流</td></tr><tr><td>响应信息</td><td>若错误返回内部字段或用户存在性</td><td>账号枚举和系统信息泄露</td><td>统一错误码、脱敏、关联 trace_id，不返回凭证和内部堆栈</td></tr></table></section>
+
+<section class="panel"><h2>九、任务、消息、日志与审计</h2>
+<div class="two"><div><h3>已有基础</h3><ul><li>应用、Agent、错误日志分流。</li><li>后台任务有运行状态、停止/重启和 trace_id 设计。</li><li>访问日志记录路径、状态、UA、Referer、租户和角色。</li><li>内容存在发布、修订和置顶能力。</li></ul></div><div><h3>需补齐的金融级控制</h3><ul><li>任务幂等键、租约、超时、重试和取消的最终状态。</li><li>发布、推送、消息和统计使用 Outbox/事件表保证一致性。</li><li>日志集中、防篡改、分级授权、留存期限和告警。</li><li>敏感操作保存前后值、原因、操作者和审批人。</li></ul></div></div>
+<div class="finding info"><b>统一审计字段：</b>所有关键操作至少应记录“谁、何时、以何身份、在哪个租户、对哪个对象、做了什么、使用什么数据/模型、结果、trace_id 和失败原因”。普通应用日志不能替代审计事件。</div></section>
+
+<section class="panel"><h2>十、数据库、架构与业务连续性</h2>
+<table><tr><th>领域</th><th>当前判断</th><th>金融级验收</th></tr><tr><td>数据库</td><td>PostgreSQL、迁移包、发布与回滚脚本较完整</td><td>最小权限账号、迁移双人复核、schema 备份、回滚演练</td></tr><tr><td>连接池</td><td>已有池与 teardown，但需生产观测</td><td>池上限、等待时间、泄漏、statement timeout、慢查询和断连恢复有指标</td></tr><tr><td>Worker/Scheduler</td><td>角色锁和停止脚本存在，历史上有重复进程风险</td><td>单实例租约、优雅退出、僵尸进程清理、重复任务和消息幂等实测</td></tr><tr><td>备份</td><td>已有备份/发布脚本</td><td>加密、异地、多版本、恢复抽样和定期恢复证据</td></tr><tr><td>灾备</td><td>未见生产演练证据</td><td>明确 RPO/RTO，验证 DB 故障、外部源中断、Worker 崩溃和重复推送</td></tr><tr><td>容量</td><td>曾出现 Gunicorn/Worker 内存占用高和载入慢问题</td><td>按角色/接口做 P50/P95/P99、并发、内存、CPU、带宽和第三方耗时基线</td></tr></table></section>
+
+<section class="panel"><h2>十一、整改路线与复测门槛</h2>
+<table><tr><th>阶段</th><th>动作</th><th>必须提交的证据</th></tr><tr><td><span class="tag p0">0-24小时</span></td><td>撤销/轮换所有可能暴露的凭证；清理版本、部署包、日志和备份副本；冻结密码明文新增。</td><td>密钥扫描、旧凭证失效、受控 Secret 读取证明。</td></tr><tr><td><span class="tag p0">1周</span></td><td>密码强哈希迁移；禁止 password 出现在 API、日志、前端和审计；补充强制重置。</td><td>数据库抽样、接口 schema、存储和登录回归证据。</td></tr><tr><td><span class="tag p1">2周</span></td><td>Secure Cookie、CSRF、限流、Admin MFA、租户 Policy、错误脱敏。</td><td>跨站、撞库、越权、重放、枚举和敏感操作测试。</td></tr><tr><td><span class="tag p1">30日</span></td><td>URL/文件/XSS/提示注入治理；数据契约和模型治理；内容审核与预测标识。</td><td>恶意输入测试、模型评估、来源/时间/版本可追溯样例。</td></tr><tr><td><span class="tag p2">60-90日</span></td><td>Outbox、集中审计、压测、备份恢复、灾备和供应商授权台账。</td><td>恢复演练、RPO/RTO、容量报告、SLA/授权和监管材料包。</td></tr></table>
+<div class="finding critical"><b>上线门槛：</b>P0 未关闭前，不建议扩大真实用户，不建议开放多人 Admin，不建议将模型预测用于交易决策宣传。P0 关闭后仍需完成 P1 安全测试、数据授权和业务主体合规审查，才能评估扩大生产范围。</div></section>
+
+<section class="panel"><h2>十二、最终结论与不确定事项</h2>
+<p><b>结论：当前系统具备较好的产品能力和一定工程基础，但金融风险控制尚未闭环，综合风险为高。</b>最大风险不是某一个页面，而是凭证保护、身份权限、外部数据、模型输出、用户权益和运营审计之间缺少统一的控制面。</p>
+<p>本报告没有判断运营主体是否具备证券业务、增值电信、支付、个人信息处理或其他所需资质；没有验证供应商授权合同；没有执行生产渗透测试、真实数据库取证、等保测评、源代码 SAST/DAST 全量扫描、压力测试或灾备恢复。上述事项必须由法务、信息安全、数据合规、业务和运维负责人共同补证。</p>
+<div class="finding positive"><b>正向基础：</b>现有测试已覆盖部分粉丝商业、租户关系、盲盒、凭证和体验回归场景并取得 97 passed；系统也有任务状态、日志分流、数据库发布和回滚等基础。建议将这些能力升级为统一安全控制和可审计证据，而不是继续仅增加页面功能。</div></section>
+
+<section class="panel"><h2>附录：关键证据索引</h2>
+<table><tr><th>位置</th><th>用途</th></tr><tr><td><code>src/domain/core_services.py:7071-7093</code></td><td>登录直接比较用户 password 字段</td></tr><tr><td><code>src/domain/core_services.py:7200-7284</code></td><td>创建用户时直接写入 password</td></tr><tr><td><code>src/web/api_core.py:2118-2120</code></td><td>Admin 用户列表直接返回 list_users</td></tr><tr><td><code>src/web/api_core.py:2240-2295</code></td><td>用户创建/导入接口返回用户集合</td></tr><tr><td><code>src/runtime.py:283-288</code></td><td>Cookie 设置 HttpOnly/SameSite，未见 Secure</td></tr><tr><td><code>src/web/hooks.py:136-169</code></td><td>统一登录门禁，未见 CSRF token 校验</td></tr><tr><td><code>src/web/api_kol.py:1005</code></td><td>URL 预览入口</td></tr><tr><td><code>src/domain/ai_services.py:11942</code></td><td>URL 抓取逻辑</td></tr><tr><td><code>src/web/hooks.py:78-128</code></td><td>访问日志与个人/租户上下文</td></tr><tr><td><code>tests/test_fan_commerce_bdd.py</code> 等5组测试</td><td>97 passed、5 warnings 的相关回归证据</td></tr></table>
+<p class="foot">生成时间：2026-10-22。报告基于当前工作区静态证据和既有测试记录；未修改业务代码、数据库结构、主数据或凭证配置。正式监管报送、上线评审和法律判断应以最新生产配置、合同、制度、测试原始输出和专业机构意见为准。</p></section>
+</main></body></html>

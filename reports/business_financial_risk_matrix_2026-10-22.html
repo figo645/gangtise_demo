@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>洞见智研业务功能金融风险矩阵</title>
+<style>
+:root{--ink:#17283e;--sub:#5b6d81;--line:#d8e2ec;--bg:#f3f6fa;--panel:#fff;--navy:#12385f;--blue:#1766a6;--red:#b42318;--amber:#9a5a00;--green:#13734b;--purple:#6842a5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}main{max-width:1380px;margin:auto;padding:24px 20px 60px}.hero{background:linear-gradient(135deg,#103354,#1d6ea7);color:#fff;border-radius:14px;padding:30px;box-shadow:0 12px 30px #163d6028}.hero h1{margin:0 0 8px;font-size:29px}.hero p{margin:4px 0;color:#e8f2fa}.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:20px}.metric{padding:11px;border:1px solid #ffffff35;background:#ffffff18;border-radius:9px}.metric b{display:block;font-size:21px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-top:16px;padding:20px;box-shadow:0 4px 15px #163b650b}.panel h2{margin:0 0 12px;color:var(--navy);font-size:19px}.panel h3{margin:17px 0 6px;font-size:15px}.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}.finding{margin:10px 0;padding:11px 14px;border-left:4px solid var(--amber);background:#fff8e9}.critical{border-color:var(--red);background:#fff1ef}.positive{border-color:var(--green);background:#effaf4}.info{border-color:var(--blue);background:#eef6fd}.purple{border-color:var(--purple);background:#f5f1fc}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;vertical-align:top;padding:9px 8px;border-bottom:1px solid var(--line)}th{background:#edf4fa;color:#244b71;white-space:nowrap}.tag{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}.p0{background:#fde3e0;color:var(--red)}.p1{background:#fff0d3;color:var(--amber)}.p2{background:#eaf3fc;color:var(--blue)}.p3{background:#eaf7f0;color:var(--green)}code{background:#eff3f7;border-radius:4px;padding:1px 4px;font-size:12px}.muted,.foot{color:var(--sub);font-size:12px}ul{margin:6px 0;padding-left:22px}.bar{height:13px;background:#e7edf4;border-radius:8px;overflow:hidden;margin:5px 0 12px}.bar span{display:block;height:100%}.high{background:var(--red)}.medium{background:#d28a00}.low{background:var(--green)}a{color:var(--blue)}@media(max-width:950px){.metrics,.two{grid-template-columns:1fr}.hero h1{font-size:23px}main{padding:12px}.panel{padding:15px}table{display:block;overflow-x:auto}}
+</style></head><body><main>
+<section class="hero"><h1>洞见智研业务功能金融风险矩阵</h1><p>评估日期：2026-10-22 · 评估对象：当前 gangtise_demo 业务功能与对应技术实现</p><p>评估角度：中国金融科技审慎监管、金融消费者保护、信息安全和模型风险管理。报告不是监管机构正式意见或法律意见。</p><div class="metrics"><div class="metric"><span>业务功能域</span><b>20</b></div><div class="metric"><span>高风险</span><b>13</b></div><div class="metric"><span>中风险</span><b>7</b></div><div class="metric"><span>低风险</span><b>0</b></div><div class="metric"><span>高风险占比</span><b>65%</b></div><div class="metric"><span>建议结论</span><b>先整改后扩容</b></div></div></section>
+
+<section class="panel"><h2>一、风险比例计算口径</h2><p>本报告将系统业务能力归并为 20 个互不重复的功能域。每个功能域按其对用户财产权益、投资判断、个人信息、内容传播、外部数据责任和系统运营连续性的综合影响评估一次。技术漏洞不会在多个功能中重复计数，但会在对应功能的整改要求中列出。</p><table><tr><th>等级</th><th>数量</th><th>比例</th><th>定义</th></tr><tr><td><span class="tag p1">高</span></td><td>13</td><td>65%</td><td>可能直接影响投资判断、用户权益、敏感身份/凭证、付费权益或对外大范围传播；上线前需有强控制和审计证据。</td></tr><tr><td><span class="tag p2">中</span></td><td>7</td><td>35%</td><td>主要影响数据质量、互动秩序、运营效率、模型可信度或审计完整性；需要持续治理和抽样复核。</td></tr><tr><td><span class="tag p3">低</span></td><td>0</td><td>0%</td><td>当前没有可以完全视为低金融风险的功能域；展示、教育或辅助功能仍可能涉及内容、隐私和访问控制。</td></tr><tr><th>合计</th><th>20</th><th>100%</th><th>按业务功能域计算，不代表损失概率或监管处罚概率。</th></tr></table><div class="finding info"><b>重要说明：</b>65% 是“高风险业务功能占全部业务功能的比例”，不是系统发生金融事故的概率，也不是收益损失比例。若按风险暴露权重计算，行情/预测/智能体/洞见发布/付费和权限的权重应高于普通展示功能。</div></section>
+
+<section class="panel"><h2>二、全部业务功能风险总览</h2><table><tr><th>编号</th><th>业务功能</th><th>等级</th><th>直接风险</th><th>监管关注点</th><th>主要证据/入口</th></tr>
+<tr><td>F01</td><td>注册、登录、会话</td><td><span class="tag p1">高</span></td><td>账号接管、撞库、身份冒用</td><td>实名/身份、会话、认证失败、密码保护</td><td><code>/api/h5/login/password</code>、<code>core_services.py</code></td></tr>
+<tr><td>F02</td><td>角色、租户和粉丝关系</td><td><span class="tag p1">高</span></td><td>跨租户看数、越权管理和内容错发</td><td>最小权限、数据隔离、授权可追溯</td><td><code>tenant_slug</code>、角色 Policy、关系回归测试</td></tr>
+<tr><td>F03</td><td>Admin/大V用户管理</td><td><span class="tag p1">高</span></td><td>批量创建、密码泄露、权限扩大</td><td>管理员操作审计、双人复核、敏感字段保护</td><td><code>/api/admin/users</code>、<code>/api/kol/users</code></td></tr>
+<tr><td>F04</td><td>市场指数和行业行情</td><td><span class="tag p1">高</span></td><td>错误或过期数据影响判断</td><td>数据授权、时点、来源、修正和展示准确性</td><td><code>/api/market-overview</code>、指标同步任务</td></tr>
+<tr><td>F05</td><td>个股自选、K线和分时</td><td><span class="tag p1">高</span></td><td>实时性误导、预测和行情错误</td><td>证券数据许可、交易日语义、历史回退、可追溯</td><td><code>/api/watchlist</code>、<code>market_services.py</code></td></tr>
+<tr><td>F06</td><td>基本面、宏观和智能指标</td><td><span class="tag p1">高</span></td><td>指标错误、缺失或被当作实时事实</td><td>统计口径、发布日期、源数据和计算规则</td><td><code>/api/macro-overview</code>、indicator hub</td></tr>
+<tr><td>F07</td><td>新闻源和新闻筛选</td><td><span class="tag p2">中</span></td><td>误导性标题、遗漏、版权和时效风险</td><td>来源授权、去重、过滤规则、发布时间和原文链路</td><td>news sources、新闻聚合任务</td></tr>
+<tr><td>F08</td><td>大V洞见笔记发布</td><td><span class="tag p1">高</span></td><td>研究内容影响用户交易判断</td><td>人工审核、来源、版本、撤回、风险揭示</td><td><code>/api/review/publish</code>、published-insights</td></tr>
+<tr><td>F09</td><td>午间/晚间财经播报</td><td><span class="tag p1">高</span></td><td>批量传播错误内容、重复推送</td><td>任务成功定义、内容可读、订阅、发送和失败追踪</td><td><code>daily_finance_broadcast</code></td></tr>
+<tr><td>F10</td><td>站内消息、私信和推送</td><td><span class="tag p1">高</span></td><td>错误触达、隐私泄露、不可撤回</td><td>接收授权、租户隔离、发送记录、退订和内容审计</td><td><code>/api/dm/*</code>、broadcast</td></tr>
+<tr><td>F11</td><td>小金智能体咨询与任务</td><td><span class="tag p1">高</span></td><td>幻觉、错误建议、工具误调用和成本失控</td><td>模型治理、证据链、人工边界、提示注入防护</td><td><code>/api/hermes/*</code>、agent workflows</td></tr>
+<tr><td>F12</td><td>个股预测和K线预测</td><td><span class="tag p1">高</span></td><td>预测被误解为投资建议或收益承诺</td><td>预测标识、回测、版本、置信度和适当性</td><td><code>/api/ai/forecast</code>、forecast graph</td></tr>
+<tr><td>F13</td><td>知识库、URL和文件导入</td><td><span class="tag p2">中</span></td><td>SSRF、恶意文件、版权和敏感内容外发</td><td>输入安全、来源授权、隔离解析、证据溯源</td><td><code>/api/kol/knowledge/*</code></td></tr>
+<tr><td>F14</td><td>付费商品、订单和订阅</td><td><span class="tag p1">高</span></td><td>收费、权益、退款和投诉风险</td><td>支付验签、订单状态机、消费者权益和对账</td><td><code>/api/h5/tenant/*/commerce</code></td></tr>
+<tr><td>F15</td><td>评论、点赞和社区互动</td><td><span class="tag p2">中</span></td><td>越权可见、违规内容、舆情和骚扰</td><td>内容审核、举报、删除、租户隔离和留痕</td><td><code>/api/watchlist/*/comments</code>、community</td></tr>
+<tr><td>F16</td><td>答题盲盒和用户积分</td><td><span class="tag p2">中</span></td><td>错误金融知识、刷分、未成年人和激励误导</td><td>题库来源、答案审查、反作弊、记录和隐私</td><td><code>/api/quiz/*</code></td></tr>
+<tr><td>F17</td><td>互动洞察和用户画像分析</td><td><span class="tag p2">中</span></td><td>画像误判、过度分析、隐私和歧视</td><td>目的限制、最小化、脱敏、访问审批和留存</td><td><code>/api/kol/business-analytics</code>、analytics</td></tr>
+<tr><td>F18</td><td>后台定时任务和同步控制</td><td><span class="tag p2">中</span></td><td>重复执行、漏发、停不掉、状态假成功</td><td>幂等、锁、超时、取消、重试和统一任务入口</td><td><code>/api/admin/tasks</code>、scheduler/worker</td></tr>
+<tr><td>F19</td><td>开放 API 和第三方接入</td><td><span class="tag p1">高</span></td><td>批量读取、密钥滥用、责任外溢</td><td>Token 生命周期、范围、限流、审计和撤销</td><td><code>/api/open/v1/*</code>、open-api tokens</td></tr>
+<tr><td>F20</td><td>运营分析、日志和合规审计</td><td><span class="tag p2">中</span></td><td>无法追责、个人信息泄露和证据失效</td><td>不可篡改、留存期限、访问审批和告警</td><td><code>/api/admin/access-logs</code>、app/agent logs</td></tr></table></section>
+
+<section class="panel"><h2>三、风险比例可视化</h2><p>按 20 个功能域计算：高风险 13/20，65%；中风险 7/20，35%；低风险 0/20，0%。</p><div><b>高风险 65%</b><div class="bar"><span class="high" style="width:65%"></span></div><b>中风险 35%</b><div class="bar"><span class="medium" style="width:35%"></span></div><b>低风险 0%</b><div class="bar"><span class="low" style="width:0%"></span></div></div><div class="finding critical"><b>风险集中区：</b>F01-F06、F08-F12、F14、F19 共 13 个功能直接涉及身份、行情、研究内容、模型预测、付费权益或外部 API，全部被评为高风险。说明整改重点应放在“用户判断和权益会受到影响”的链路，而不是优先优化低影响展示。</div></section>
+
+<section class="panel"><h2>四、逐项整改要求：身份、数据和用户管理</h2><table><tr><th>功能</th><th>金融监管整改要求</th><th>可追踪/可溯源证据</th><th>验收标准</th></tr>
+<tr><td>F01 注册、登录、会话</td><td>使用强密码哈希；启用 Secure/HttpOnly/SameSite；登录限流、失败锁定、Admin MFA、会话撤销和敏感操作重认证。</td><td>登录事件、失败次数、设备/IP摘要、会话创建/撤销、密码升级记录。</td><td>数据库无明文密码；API/日志无密码；撞库、会话窃取和重放测试通过。</td></tr>
+<tr><td>F02 角色、租户和粉丝关系</td><td>统一 AuthContext + Policy；所有资源按租户和角色后端校验，不能信任 URL 参数或前端隐藏。</td><td>actor、tenant、target、policy_decision、拒绝原因、trace_id。</td><td>粉丝看不到其他大V粉丝；大V不能读其他租户；全量读写接口负向测试通过。</td></tr>
+<tr><td>F03 Admin/大V用户管理</td><td>用户详情和编辑分离敏感字段；禁止返回 password；批量导入、角色变更和状态变更二次确认/双人审批。</td><td>操作者、目标用户、变更前后差异、原因、审批人和结果。</td><td>响应 schema 不含 password；批量重复、越权和误删可恢复且有审计。</td></tr>
+<tr><td>F14 付费商品、订单和订阅</td><td>支付回调验签；订单状态机不可逆越级；权益开通、到期、退款、人工确认和对账分离。</td><td>订单号、支付流水、回调摘要、权益变更、退款、操作人和时间。</td><td>重复回调幂等；金额/权益一致；退款和投诉可还原完整链路。</td></tr>
+</table></section>
+
+<section class="panel"><h2>五、逐项整改要求：行情、指标与新闻</h2><table><tr><th>功能</th><th>金融监管整改要求</th><th>可追踪/可溯源证据</th><th>验收标准</th></tr>
+<tr><td>F04 市场指数和行业行情</td><td>建立数据源授权台账；严格区分交易日、最近收盘、实时、历史回退和不可用；禁止 HTTP 200 直接视为成功。</td><td>source、接口、业务码、as_of、synced_at、原始响应摘要、映射规则、任务 trace。</td><td>上证、深证、热门行业等值与源一致；周末/节假日正确展示最近有效交易日并明确标识。</td></tr>
+<tr><td>F05 个股自选、K线和分时</td><td>明确 AKShare/Gangtise 等来源及许可；K线、分时、预测分离；缓存回退必须告知日期和来源。</td><td>证券代码、市场、交易日、数据源、点数、缓存命中、fallback 原因和展示状态。</td><td>无效市场代码不伪装成功；当日/最近交易日逻辑正确；K线和分时能复核原始数据。</td></tr>
+<tr><td>F06 基本面、宏观和智能指标</td><td>指标定义、单位、频率、发布日期、修订和计算公式版本化；大V选择配置不能改变平台事实数据。</td><td>indicator_code、定义版本、源记录、清洗规则、发布日期、计算批次和发布者。</td><td>每张卡片能回答“值是什么、哪天、来自哪里、怎么算、谁发布”。</td></tr>
+<tr><td>F07 新闻源和新闻筛选</td><td>保存来源、原文 URL、发布时间、抓取时间、版权/授权状态和过滤规则；模型摘要不得替代原文事实。</td><td>source_id、原文哈希、发布时间、抓取批次、去重规则、过滤原因。</td><td>过滤标题可解释；重复新闻可追溯；下架原文或投诉能定位全部派生内容。</td></tr>
+</table></section>
+
+<section class="panel"><h2>六、逐项整改要求：大V内容、播报和消息监管</h2><table><tr><th>功能</th><th>金融监管整改要求</th><th>可追踪/可溯源证据</th><th>验收标准</th></tr>
+<tr><td>F08 大V洞见笔记</td><td>建立草稿→AI辅助→大V审核→发布→修订→撤回状态；强制风险揭示、来源、数据日期和非投资建议声明。</td><td>原始输入、URL/文件、模型版本、人工修改、审核人、发布时间、修订次数、撤回原因。</td><td>列表/详情/消息一致；每次修改有版本标签；撤回后所有展示面和缓存同步。</td></tr>
+<tr><td>F09 午间/晚间播报</td><td>平台统一任务；按接口实际内容识别早/午/晚，不用时间规则硬匹配错误内容；正文为空不得判成功。</td><td>任务批次、report_kind、report_date、接口业务码、可读正文校验、目标用户数、发送结果。</td><td>一次取数不重复推送；失败可重试；接口成功但无正文时状态为内容不可用并告警。</td></tr>
+<tr><td>F10 站内消息、私信和推送</td><td>消息接收授权、租户范围、退订/免打扰、敏感内容分级和删除/撤回；大V与粉丝消息不可跨租户。</td><td>消息 ID、发送者、接收者、租户、内容版本、发送状态、阅读状态、撤回事件。</td><td>单次发布不会重复入站；错误接收可定位和撤回；消息与洞见颜色/标签状态一致。</td></tr>
+<tr><td>F15 评论、点赞和社区互动</td><td>内容审核、举报、屏蔽、删除、敏感词和人工复核；评论权限严格按所属租户和标的范围。</td><td>评论原文哈希、审核结果、审核规则/人、举报、删除原因和关联用户。</td><td>跨租户负向测试通过；违规内容有处置时限和闭环证据。</td></tr>
+</table></section>
+
+<section class="panel"><h2>七、逐项整改要求：智能体、预测和知识输入</h2><table><tr><th>功能</th><th>金融监管整改要求</th><th>可追踪/可溯源证据</th><th>验收标准</th></tr>
+<tr><td>F11 小金智能体咨询/任务</td><td>咨询、任务和工具动作分权；敏感工具白名单；模型只提供研究辅助，不直接执行交易/资金操作；高风险回答人工复核。</td><td>session_id、用户问题摘要、模型/版本、工具、参数摘要、数据时间、证据、输出和失败原因。</td><td>模型失败不能生成空成功；工具越权/提示注入被阻断；用户可看到来源和时间。</td></tr>
+<tr><td>F12 个股预测和K线预测</td><td>明显标注模型预测、预测区间、生成时间和不确定性；保留回测、漂移、失效和人工停用机制。</td><td>证券、输入窗口、模型版本、特征摘要、生成时间、预测结果、回测样本和人工复核。</td><td>预测不与真实K线混淆；禁止收益保证；模型失效有降级和下线开关。</td></tr>
+<tr><td>F13 知识库、URL和文件</td><td>SSRF 防护、文件隔离、大小/类型/解压限制、恶意内容检测；外部文档只作为不可信材料。</td><td>来源 URL、解析器版本、文件哈希、上传者、权限、抽取文本摘要和删除记录。</td><td>私网/元数据 URL 被阻断；恶意文件和超大文件拒绝；知识引用能回到原始材料。</td></tr>
+<tr><td>F16 答题盲盒</td><td>题库金融事实由专业人员审核；答案、解释和版本固定；反作弊与未成年人/激励风险控制。</td><td>题目版本、题库来源、答案审核人、作答记录、重做次数和统计口径。</td><td>四个选项不重复且答案正确；多次作答可追踪；统计不泄露其他租户用户。</td></tr>
+</table></section>
+
+<section class="panel"><h2>八、逐项整改要求：运营、任务、开放 API 和审计</h2><table><tr><th>功能</th><th>金融监管整改要求</th><th>可追踪/可溯源证据</th><th>验收标准</th></tr>
+<tr><td>F17 互动洞察和画像</td><td>限定分析目的和粒度，默认脱敏；禁止用答题/评论画像直接作出不透明收费或权益歧视。</td><td>分析口径、样本范围、字段清单、脱敏规则、操作者和导出记录。</td><td>只显示所属租户；用户数据最小化；导出需授权并可审计。</td></tr>
+<tr><td>F18 定时任务和同步</td><td>Admin 与大V共用同一任务；幂等键、租约、超时、取消、重试、单实例调度和真实状态反馈。</td><td>task_code、run_id、trigger、actor、锁、开始/结束、输入选择、结果、错误和 trace_id。</td><td>重复点击不重复执行；停止最终生效；失败可重试；任务状态与实际进程一致。</td></tr>
+<tr><td>F19 开放 API</td><td>Token 最小范围、可过期、可撤销、不可明文回显；按租户/调用方限流，敏感数据最小返回。</td><td>token_id、调用方、scope、IP、接口、状态码、耗时、计量和撤销事件。</td><td>越权、重放、泄露、超额和撤销测试通过；返回不含密码和内部字段。</td></tr>
+<tr><td>F20 运营分析、日志和审计</td><td>建立不可篡改审计事件；日志分级、脱敏、留存、访问审批、集中告警和应急取证。</td><td>actor、tenant、object、action、before/after、reason、result、trace_id。</td><td>能还原一次发布、支付、任务、用户变更和数据同步的完整链路。</td></tr>
+</table></section>
+
+<section class="panel"><h2>九、跨功能必须建设的统一控制面</h2><div class="two"><div><h3>监管可追踪</h3><ul><li>统一审计事件模型：谁、何时、何地、哪个租户、对什么对象、做了什么、结果如何。</li><li>所有外部数据和模型调用都有 provider、版本、数据时点和 trace_id。</li><li>所有内容有草稿、审核、发布、修订、撤回和消息同步状态。</li><li>所有任务有幂等、锁、超时、重试、取消和最终状态。</li></ul></div><div><h3>监管可溯源</h3><ul><li>行情/指标可回到原始接口响应和清洗映射规则。</li><li>新闻/URL/文件可回到原文、文件哈希和授权状态。</li><li>AI 文章/回答/预测可回到输入摘要、模型版本、工具和证据。</li><li>付费权益可回到订单、支付回调、开通、到期和退款。</li></ul></div></div><div class="finding critical"><b>建议新增的统一状态契约：</b><code>requested → running → provider_success → content_validated → persisted → published → delivered → acknowledged</code>。任一环节失败都必须保留失败原因，不能因为 HTTP 200 或数据库写入成功就标记业务成功。</div></section>
+
+<section class="panel"><h2>十、整改优先级</h2><table><tr><th>期限</th><th>必须完成</th><th>验收证据</th></tr><tr><td><span class="tag p0">立即</span></td><td>密码强哈希、禁止敏感字段回传、轮换已暴露凭证、清理历史副本。</td><td>密钥扫描、数据库抽样、API schema、旧凭证失效。</td></tr><tr><td><span class="tag p1">上线前</span></td><td>租户 Policy、Secure Cookie、CSRF、登录/AI/上传限流、URL/文件/XSS 防护、Admin MFA。</td><td>跨租户、越权、撞库、CSRF、SSRF、恶意文件和 XSS 测试。</td></tr><tr><td><span class="tag p1">上线前</span></td><td>洞见/播报/智能体/预测的来源、版本、人工审核、模型和数据时间治理。</td><td>端到端追踪样例、内容撤回、预测降级、失败状态和重试证据。</td></tr><tr><td><span class="tag p2">30-60日</span></td><td>Outbox、集中审计、数据留存、供应商授权台账、压测、备份恢复、RPO/RTO。</td><td>恢复演练、容量报告、SLA/授权、审计取证和告警闭环。</td></tr></table></section>
+
+<section class="panel"><h2>十一、结论与限制</h2><p><b>按业务功能数量统计，系统高金融风险功能占 65%，中风险占 35%，低风险占 0%。</b>风险主要集中在身份权限、行情与指标、洞见和播报、消息、智能体与预测、付费、开放 API 这些会直接影响用户判断或权益的能力。</p><p>本报告基于当前代码路由、服务函数、配置结构和既有回归测试整理；既有相关测试为 97 passed、5 warnings。测试通过不等于金融合规通过，也不能替代生产渗透测试、供应商授权核验、支付对账、个人信息影响评估、等保测评、容量压测或灾备演练。正式上线和监管沟通前，应由业务、法务、信息安全、数据合规和运维共同签署。</p><div class="finding positive"><b>本次未修改业务代码、数据库结构、主数据或凭证配置。</b>报告仅新增测评文档。</div><p class="foot">生成时间：2026-10-22 · 文件：business_financial_risk_matrix_2026-10-22.html</p></section>
+</main></body></html>
