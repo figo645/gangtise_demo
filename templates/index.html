@@ -1022,6 +1022,7 @@ body.theme-dark .tech-layer {
       <a href="#current-capabilities" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">功能总览</a>
       <a href="#business" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">项目定位</a>
       <a href="#c-core" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">核心能力</a>
+      <a href="#content-compliance" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">内容审核</a>
       <a href="#knowledge-system" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">知识能力</a>
       <a href="#validation" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">验证进展</a>
       <a href="#funnel-flow" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">增长验证</a>
@@ -1128,7 +1129,7 @@ body.theme-dark .tech-layer {
     <div class="summary-grid">
       <div class="summary-main-card">
         <div class="summary-main-title">统一口径：门户负责对外编排，H5 / Web 负责用户工具，工作台负责生产经营，Admin 负责控开治理</div>
-        <div class="summary-main-desc">租户门户是大V自己装修的 CMS 首页，可以拖拽指标卡、洞见模块、研究框架、服务入口和自写内容；H5 与 Web 用户端是同一套用户能力的移动与桌面呈现，均承接基本面、自选股、K线分析、洞见、消息、盲盒与小金智能体，不维护两套业务逻辑。大V工作台 Web 承接粉丝管理、消息、洞见生产、播报任务、指标配置、互动观察和门户编排。纯 Admin 后台只做平台级租户管理、能力控开、审计、任务和分析配置。</div>
+        <div class="summary-main-desc">租户门户是大V自己装修的 CMS 首页，可以拖拽指标卡、洞见模块、研究框架、服务入口和自写内容；H5 与 Web 用户端是同一套用户能力的移动与桌面呈现，均承接基本面、自选股、K线分析、洞见、消息、盲盒与小金智能体，不维护两套业务逻辑。大V工作台 Web 承接粉丝管理、消息、洞见生产、播报任务、指标配置、互动观察和门户编排。纯 Admin 后台负责租户管理、能力控开、审计、任务分析与内容合规。</div>
 
         <div class="summary-flow">
           <div class="summary-flow-item">
@@ -1174,7 +1175,7 @@ body.theme-dark .tech-layer {
         </div>
         <div class="summary-side-card">
           <div class="summary-side-title">工作台与 Admin 的边界</div>
-          <div class="summary-side-desc">工作台负责门户编排、洞见生产、指标与播报配置、知识维护和互动观察；Admin 聚焦平台管理、任务状态和一致性巡检，通过 feature flag 管理能力开放节奏。</div>
+          <div class="summary-side-desc">工作台负责门户编排、洞见生产、指标与播报配置、知识维护和互动观察；Admin 聚焦平台管理、任务状态、一致性巡检与内容合规审核。</div>
         </div>
       </div>
     </div>
@@ -1334,7 +1335,7 @@ body.theme-dark .tech-layer {
       <a href="/admin" class="ix-nav-card">
         <div class="ix-nav-card-icon">⚙️</div>
         <div class="ix-nav-card-title">纯 Admin 后台</div>
-        <div class="ix-nav-card-desc">只保留平台级控制台职责，包括功能控开、租户管理、结算、审计、渠道和全局合规策略，不再承接大V日常工作流。</div>
+        <div class="ix-nav-card-desc">只保留平台级控制台职责，包括功能控开、租户管理、结算、审计、关键词维护和内容合规策略，不再承接大V日常工作流。</div>
         <div class="ix-nav-card-arrow">进入 Admin →</div>
       </a>
     </div>
@@ -1755,6 +1756,57 @@ body.theme-dark .tech-layer {
         <strong style="color:var(--gold)">合规说明：</strong>
         洞见智研 AI 引擎为大V投顾提供有据可查的研究证据链，普通用户看到的是研究框架与来源依据，而不是直接投资建议。所有协同内容都须标注数据来源、风险提示和适用边界，平台 Admin 保留审核、下线与终止合作的权限。
       </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ======================================================
+     SECTION 5.1: 内容合规审核
+====================================================== -->
+<section class="ix-section ix-section-dark" id="content-compliance">
+  <div class="ix-inner">
+    <div class="ix-section-label">Content Compliance</div>
+    <div class="ix-section-title">发布前内容审核与审计</div>
+    <div class="ix-divider"></div>
+    <div class="ix-section-desc">审核在服务端业务写入之前执行，覆盖大V洞见、Open API 发布、用户评论和 K 线标注。命中已启用规则时会拦截写入，并提示用户修改。</div>
+
+    <div class="kol-three-col">
+      <div class="kol-col-card">
+        <div class="kol-col-header">
+          <div class="kol-col-icon">01</div>
+          <div class="kol-col-title">审核业务输入</div>
+        </div>
+        <div class="kol-col-item">洞见标题、正文、富文本和九宫格个股理由</div>
+        <div class="kol-col-item">外部系统通过 Bearer Token 发布的洞见</div>
+        <div class="kol-col-item">用户评论和个股 K 线标注</div>
+        <div class="kol-col-item">规则命中后记录审计，并阻止业务内容落库</div>
+      </div>
+      <div class="kol-col-card">
+        <div class="kol-col-header">
+          <div class="kol-col-icon">02</div>
+          <div class="kol-col-title">识别常见变形</div>
+        </div>
+        <div class="kol-col-item">统一全角、繁体、HTML 实体和 Unicode 兼容字符</div>
+        <div class="kol-col-item">忽略空格、标点、符号和部分不可见字符拆分</div>
+        <div class="kol-col-item">检查换行或分句首字符组成的藏头表达</div>
+        <div class="kol-col-item">规则启发式检测，不能保证发现所有隐晦表达</div>
+      </div>
+      <div class="kol-col-card">
+        <div class="kol-col-header">
+          <div class="kol-col-icon">03</div>
+          <div class="kol-col-title">管理员治理与追溯</div>
+        </div>
+        <div class="kol-col-item">Admin 可新增、修改、停用或删除关键词规则</div>
+        <div class="kol-col-item">覆盖收益承诺、内幕信息、资质营销、交易建议、市场操纵和个人信息等风险</div>
+        <div class="kol-col-item">按来源、风险等级和时间查看统计与命中日志</div>
+        <div class="kol-col-item">日志保留命中规则和内容哈希，不保存提交正文</div>
+      </div>
+    </div>
+
+    <div class="kol-compliance">
+      <div class="kol-compliance-icon">!</div>
+      <div><strong style="color:var(--gold)">能力边界：</strong>关键词与藏头检测用于降低违规内容发布风险，不等同于完整的金融合规判断。规则需持续维护；同音字、语义改写和复杂编码仍可能需要人工审查。</div>
     </div>
   </div>
 </section>
@@ -2344,6 +2396,7 @@ body.theme-dark .tech-layer {
         <a href="/admin" class="footer-col-link">平台主题模式</a>
         <a href="/admin" class="footer-col-link">平台功能控开</a>
         <a href="/admin?section=kols" class="footer-col-link">租户管理</a>
+        <a href="/admin?section=content-moderation" class="footer-col-link">内容审核与审计</a>
         <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="footer-col-link">大V 工作流入口</a>
         <a href="/admin" class="footer-col-link">访问统计</a>
       </div>

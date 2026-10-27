@@ -1,3 +1,5 @@
+import re
+
 from src.runtime import *
 from src.services import *
 from src.domain.ai_services import _is_truthy_flag
@@ -9,16 +11,40 @@ from src.domain.core_services import (
     restart_admin_task,
 )
 from src.domain.content_moderation_services import (
+    ContentModerationBlocked,
+    build_content_moderation_feedback,
     delete_content_moderation_keyword,
+    get_ai_content_moderation_report,
+    get_content_moderation_ai_config,
     get_content_moderation_audit_report,
+    get_content_moderation_settings,
+    html_to_moderation_text,
     list_content_moderation_keywords,
+    save_content_moderation_ai_config,
     save_content_moderation_keyword,
+    save_content_moderation_settings,
 )
 
 H5_WECHAT_STATE_SESSION_KEY = "h5_wechat_login_state"
 H5_WECHAT_NEXT_SESSION_KEY = "h5_wechat_login_next"
 DATABASE_RELEASE_UNLOCK_SESSION_KEY = "database_release_unlock_until"
 DATABASE_RELEASE_UNLOCK_TTL_SECONDS = 10 * 60
+
+
+def _content_moderation_error_response(exc, success_key="ok", title="", body=""):
+    result = getattr(exc, "result", {}) or {}
+    action = str(result.get("action") or "hard_block").strip()
+    categories = sorted({str(item.get("category") or "金融合规") for item in result.get("matches", [])})
+    message = "内容触发复审规则，本次未提交；请调整表述后重试。" if action == "manual_review" else "内容审核未通过，本次内容未保存；请修改相关表述后重试。"
+    feedback = build_content_moderation_feedback(result, title=title, body=body)
+    return jsonify({
+        success_key: False,
+        "error": "content_moderation_blocked",
+        "message": message,
+        "action": action,
+        "categories": categories,
+        "feedback": feedback,
+    }), 422
 
 
 @app.route("/api/public/registration-options")
@@ -165,6 +191,8 @@ def api_open_v1_publish_insight():
             notify_followers=notify_followers,
         )
     except ValueError as exc:
+        if isinstance(exc, ContentModerationBlocked):
+            return _content_moderation_error_response(exc)
         return jsonify({"ok": False, "error": str(exc)}), 400
     snapshot = result.get("snapshot") or {}
     return jsonify({
@@ -523,6 +551,8 @@ def api_review_publish_embed():
             raise ValueError("review_voice_input_disabled")
         if source_mode == "url" and not is_feature_enabled("review_url_input"):
             raise ValueError("review_url_input_disabled")
+        if not str(payload.get("text") or "").strip() and payload.get("stock_grid_cards"):
+            payload["text"] = "九宫格个股洞见"
         if not str(payload.get("text") or "").strip():
             raise ValueError("publish_text_required")
         if not review_title:
@@ -556,6 +586,13 @@ def api_review_publish_embed():
         )
         payload["snapshot_sync_applied"] = True
         payload["snapshot_id"] = str(((snapshot_result.get("snapshot") or {}).get("id")) or "").strip()
+    except ContentModerationBlocked as exc:
+        return _content_moderation_error_response(
+            exc,
+            success_key="success",
+            title=review_title,
+            body="\n".join((str(payload.get("text") or ""), html_to_moderation_text(payload.get("content_html")))),
+        )
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
@@ -570,6 +607,59 @@ def api_review_publish_embed():
         **snapshot_result,
     }
     return jsonify(response_payload)
+
+
+@app.route("/api/review/moderation-check", methods=["POST"])
+def api_review_moderation_check():
+    body = request.get_json(silent=True) or {}
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    if not has_role_capability(role, "dav"):
+        return jsonify({"ok": False, "error": "review_publish_forbidden"}), 403
+    requested_tenant = str(body.get("tenant_slug") or "").strip().lower()
+    account_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    tenant_slug = requested_tenant if role == "admin" else account_tenant
+    if not tenant_slug or (role != "admin" and requested_tenant and requested_tenant != account_tenant):
+        return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
+    card_text = " ".join(
+        " ".join(str(card.get(key) or "") for key in ("recommendation_reason", "summary", "reason", "comment", "title", "description"))
+        for card in (body.get("stock_grid_cards") or []) if isinstance(card, dict)
+    )
+    from src.domain.content_moderation_services import html_to_moderation_text, inspect_and_record_content
+
+    audit_html_text = html_to_moderation_text(body.get("content_html"))
+    audit_text = "\n".join((
+        str(body.get("review_title") or ""),
+        str(body.get("text") or ""),
+        audit_html_text,
+        card_text,
+    ))
+    try:
+        result = inspect_and_record_content(
+            audit_text,
+            "insight",
+            tenant_slug=tenant_slug,
+            actor_user_id=str(current_user.get("id") or current_user.get("username") or ""),
+            actor_name=str(current_user.get("advisor_name") or current_user.get("username") or ""),
+            title=str(body.get("review_title") or ""),
+            body="\n".join((
+                str(body.get("text") or ""),
+                audit_html_text,
+                card_text,
+            )),
+        )
+    except ContentModerationBlocked as exc:
+        return _content_moderation_error_response(
+            exc,
+            title=str(body.get("review_title") or ""),
+            body="\n".join((str(body.get("text") or ""), audit_html_text, card_text)),
+        )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to check review moderation before preview")
+        return jsonify({"ok": False, "error": "content_moderation_check_failed"}), 500
+    return jsonify({"ok": True, "result": result.get("result", "clear")})
 
 
 @app.route("/api/review/prepare-preview", methods=["POST"])
@@ -953,6 +1043,8 @@ def api_save_watchlist_annotation(stock_code):
             created_by_role=actor["user_role"],
             source_client=body.get("source_client") or body.get("entry_point") or "h5",
         )
+    except ContentModerationBlocked as exc:
+        return _content_moderation_error_response(exc)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
@@ -1030,6 +1122,8 @@ def api_save_watchlist_comment(stock_code):
             created_by_role=actor["user_role"],
             source_client=body.get("source_client") or body.get("entry_point") or "h5",
         )
+    except ContentModerationBlocked as exc:
+        return _content_moderation_error_response(exc)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
@@ -2672,11 +2766,23 @@ def api_admin_site_config():
     )
 
 
-@app.route("/api/admin/content-moderation", methods=["GET"])
+@app.route("/api/admin/content-moderation", methods=["GET", "POST"])
 def api_admin_content_moderation():
     current_user = get_current_authenticated_user() or {}
     if str(current_user.get("role") or "").strip().lower() != "admin":
         return jsonify({"ok": False, "error": "admin_required"}), 403
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body.get("algorithm_enabled"), bool):
+            return jsonify({"ok": False, "error": "algorithm_enabled_required"}), 400
+        actor = str(current_user.get("username") or current_user.get("name") or "admin")
+        try:
+            save_content_moderation_settings(body["algorithm_enabled"], actor=actor)
+        except Exception as exc:
+            if is_db_unavailable_error(exc):
+                return jsonify({"ok": False, "error": "database_unavailable"}), 503
+            app.logger.exception("Failed to save content moderation settings")
+            return jsonify({"ok": False, "error": "content_moderation_settings_save_failed"}), 500
     source_type = str(request.args.get("source_type") or "").strip().lower()
     result = str(request.args.get("result") or "").strip().lower()
     try:
@@ -2687,12 +2793,87 @@ def api_admin_content_moderation():
             result=result,
             tenant_slug=request.args.get("tenant_slug", ""),
         )
-        return jsonify({"ok": True, "report": report, "keywords": list_content_moderation_keywords()})
+        return jsonify({
+            "ok": True,
+            "settings": get_content_moderation_settings(),
+            "report": report,
+            "keywords": list_content_moderation_keywords(),
+        })
     except Exception as exc:
         if is_db_unavailable_error(exc):
             return jsonify({"ok": False, "error": "database_unavailable"}), 503
         app.logger.exception("Failed to load content moderation report")
         return jsonify({"ok": False, "error": "content_moderation_load_failed"}), 500
+
+
+@app.route("/api/admin/content-moderation/ai", methods=["GET", "POST"])
+def api_admin_ai_content_moderation():
+    current_user = get_current_authenticated_user() or {}
+    if str(current_user.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "admin_required"}), 403
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        actor = str(current_user.get("username") or current_user.get("name") or "admin")
+        try:
+            requested_model_key = str(body.get("model_key") or "").strip()
+            requested_enabled_by_source = body.get("enabled_by_source")
+            requested_prompts = body.get("prompts")
+            configured_models = normalize_llm_registry_config(get_site_config().get("llm_registry")).get("models", [])
+            selected_model = next((item for item in configured_models if item.get("key") == requested_model_key), None)
+            if not selected_model:
+                return jsonify({"ok": False, "error": "moderation_model_not_found"}), 400
+            if requested_enabled_by_source is not None and not isinstance(requested_enabled_by_source, dict):
+                return jsonify({"ok": False, "error": "moderation_source_switches_invalid"}), 400
+            source_switches = requested_enabled_by_source if isinstance(requested_enabled_by_source, dict) else None
+            wants_ai_moderation = any(bool(source_switches.get(source_type, False)) for source_type in ("insight", "comment", "kline_annotation")) if source_switches is not None else body.get("enabled") is True
+            if wants_ai_moderation and not get_llm_api_key(requested_model_key):
+                return jsonify({"ok": False, "error": "moderation_model_credential_missing", "message": "请先在系统专区的大模型配置中设置并保存该模型的 API Key，再启用智能审核。"}), 400
+            saved = save_content_moderation_ai_config(
+                enabled=body.get("enabled", False),
+                prompt=body.get("prompt"),
+                model_key=requested_model_key,
+                actor=actor,
+                enabled_by_source=source_switches,
+                prompts=requested_prompts,
+            )
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        except Exception as exc:
+            if is_db_unavailable_error(exc):
+                return jsonify({"ok": False, "error": "database_unavailable"}), 503
+            app.logger.exception("Failed to save AI content moderation config")
+            return jsonify({"ok": False, "error": "ai_content_moderation_save_failed"}), 500
+    try:
+        moderation_config = get_content_moderation_ai_config()
+        site_config = get_site_config()
+        models = normalize_llm_registry_config(site_config.get("llm_registry")).get("models", [])
+        model_options = [{
+            "key": item.get("key"),
+            "label": item.get("label"),
+            "model_name": item.get("model_name"),
+            "enabled": item.get("enabled", True) is not False,
+            "credential_configured": bool(get_llm_api_key(item.get("key"))),
+        } for item in models if str(item.get("purpose") or "general") == "general"]
+        if not model_options and models:
+            model_options = [{
+                "key": item.get("key"),
+                "label": item.get("label"),
+                "model_name": item.get("model_name"),
+                "enabled": item.get("enabled", True) is not False,
+                "credential_configured": bool(get_llm_api_key(item.get("key"))),
+            } for item in models]
+        report = get_ai_content_moderation_report(
+            limit=request.args.get("limit", 100),
+            offset=request.args.get("offset", 0),
+            source_type=str(request.args.get("source_type") or "").strip().lower(),
+            result=str(request.args.get("result") or "").strip().lower(),
+        )
+        return jsonify({"ok": True, "config": moderation_config, "models": model_options, "report": report})
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load AI content moderation config and report")
+        return jsonify({"ok": False, "error": "ai_content_moderation_load_failed"}), 500
 
 
 @app.route("/api/admin/content-moderation/keywords", methods=["POST"])

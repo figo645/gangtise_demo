@@ -2113,10 +2113,13 @@
         </button>
         <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="community" data-feature="community" onclick="showSection('community', this)">
-          <span class="admin-nav-icon">&#9998;</span> 帖子审核
+          <span class="admin-nav-icon">&#9998;</span> 内容审核记录
         </div>
         <div class="admin-nav-item" data-section="content-moderation" onclick="showSection('content-moderation', this)">
           <span class="admin-nav-icon">&#9888;</span> 内容审核
+        </div>
+        <div class="admin-nav-item" data-section="content-moderation-ai" onclick="showSection('content-moderation-ai', this)">
+          <span class="admin-nav-icon">&#10024;</span> 智能拦截
         </div>
         <div class="admin-nav-item" data-section="events" data-feature="community" onclick="showSection('events', this)">
           <span class="admin-nav-icon">&#9728;</span> 活动管理
@@ -2849,6 +2852,33 @@
 
       <!-- ===== COMMUNITY ===== -->
       <div id="section-community" style="display:none">
+        <div id="community-real-content">
+          <div class="section-header">
+            <div>
+              <div class="section-title">内容审核记录</div>
+              <div class="section-subtitle">这里展示真实审核审计记录。当前审核发生在洞见、评论和 K 线标注写入前，不存在可以由后台直接发布或驳回的虚拟帖子队列。</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span id="community-moderation-state" class="tag">未加载</span>
+              <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminCommunityModeration(true)">刷新</button>
+            </div>
+          </div>
+          <div class="stats-grid" style="margin-bottom:20px">
+            <div class="stat-card"><div class="stat-label">审核记录</div><div class="stat-value" id="community-moderation-total">--</div><div class="stat-change">真实审计数据</div></div>
+            <div class="stat-card"><div class="stat-label">命中记录</div><div class="stat-value" id="community-moderation-alerts">--</div><div class="stat-change" style="color:#ff7070">规则命中</div></div>
+            <div class="stat-card"><div class="stat-label">高风险记录</div><div class="stat-value" id="community-moderation-high-risk">--</div><div class="stat-change" style="color:#ff7070">需关注</div></div>
+            <div class="stat-card"><div class="stat-label">当前状态</div><div class="stat-value" id="community-moderation-status" style="font-size:18px">--</div><div class="stat-change">以 API 返回为准</div></div>
+          </div>
+          <div class="table-wrap" style="margin-bottom:20px;padding:18px 20px">
+            <div class="table-header" style="padding:0;border:0">
+              <div><div class="table-title">审核审计记录</div><div style="font-size:12px;color:#8899aa;margin-top:6px">不展示用户正文，只展示来源、结果、风险、命中规则和内容哈希。</div></div>
+              <button class="btn-outline" type="button" style="padding:6px 12px;font-size:12px" onclick="showSection('content-moderation')">查看规则与完整日志</button>
+            </div>
+            <div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>时间</th><th>租户</th><th>类型</th><th>提交人</th><th>结果</th><th>风险</th><th>命中规则</th><th>内容哈希</th></tr></thead><tbody id="community-moderation-rows"><tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">正在加载真实审核记录...</td></tr></tbody></table></div>
+          </div>
+        </div>
+        <!-- Legacy community demo queue is intentionally disabled. Real moderation data is shown above. -->
+        <!--
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">今日发帖</div>
@@ -2962,6 +2992,8 @@
             </div>
           </div>
         </div>
+        </div>
+        -->
       </div><!-- end section-community -->
 
 <div id="section-indicator-overview" style="display:none">
@@ -5867,8 +5899,12 @@
       <!-- ===== CONTENT MODERATION ===== -->
       <div id="section-content-moderation" style="display:none">
         <div class="section-header">
-          <div><div class="section-title">内容审核 · 金融合规</div><div class="section-subtitle">对洞见笔记、用户评论和 K 线标注做关键词命中提醒。审核不自动拦截发布；日志仅保存命中词、来源、内容哈希和审计信息，不保存用户正文。</div></div>
-          <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminContentModeration(true)">刷新</button>
+          <div><div class="section-title">内容审核 · 金融合规</div><div class="section-subtitle">对洞见笔记、用户评论和 K 线标注执行算法规则审核。硬阻断会拒绝写入，人工复审会暂缓提交；日志仅保存规则、来源、内容哈希和审计信息，不保存用户正文。</div></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label style="display:flex;gap:7px;align-items:center;font-size:12px;color:var(--text-main)" for="moderation-algorithm-enabled"><input id="moderation-algorithm-enabled" type="checkbox">启用关键词/组合规则审核</label>
+            <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="saveAdminContentModerationSettings()">保存开关</button>
+            <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminContentModeration(true)">刷新</button>
+          </div>
         </div>
         <div class="stats-grid" style="margin-bottom:20px">
           <div class="stat-card"><div class="stat-label">审核记录</div><div class="stat-value" id="moderation-total">--</div></div>
@@ -5881,7 +5917,7 @@
           <div class="config-card"><div class="config-card-title">近 30 日审核趋势</div><div id="moderation-trend" class="feature-note">正在加载审核趋势...</div></div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px;padding:18px 20px">
-          <div class="table-header" style="padding:0;border:0"><div><div class="table-title">关键词规则</div><div style="font-size:12px;color:#8899aa;margin-top:6px">种子词用于发现收益承诺、内幕信息、无资质服务、操纵市场和高风险交易指令；命中只报警，需结合上下文人工判断。</div></div><button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="addAdminModerationKeyword()">新增关键词</button></div>
+          <div class="table-header" style="padding:0;border:0"><div><div class="table-title">关键词规则</div><div style="font-size:12px;color:#8899aa;margin-top:6px">单词规则与组合规则共同生效；组合规则会识别个股指令、未来涨跌判断、重大事项内幕暗示和导流联系，并按规则执行阻断或人工复审。</div></div><button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="addAdminModerationKeyword()">新增关键词</button></div>
           <div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>关键词</th><th>类别</th><th>风险级别</th><th>状态</th><th>说明</th><th>更新人 / 时间</th><th>操作</th></tr></thead><tbody id="moderation-keyword-rows"><tr><td colspan="7" style="text-align:center;color:#8899aa;padding:22px">正在加载关键词...</td></tr></tbody></table></div>
         </div>
         <div class="table-wrap" style="padding:18px 20px">
@@ -5889,6 +5925,50 @@
           <div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>时间</th><th>租户</th><th>类型</th><th>提交人</th><th>结果</th><th>风险</th><th>命中关键词</th><th>内容哈希</th></tr></thead><tbody id="moderation-log-rows"><tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">正在加载审核日志...</td></tr></tbody></table></div>
         </div>
       </div><!-- end section-content-moderation -->
+
+      <div id="section-content-moderation-ai" style="display:none">
+        <div class="section-header">
+          <div><div class="section-title">智能拦截 · Doubao Seed 2.0 mini</div><div class="section-subtitle">关键词规则先行；未命中时调用语义模型初审。这里可查看并修改模型审核逻辑，模型故障默认关闭发布，避免未经审核的内容进入系统。</div></div>
+          <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminAiContentModeration(true)">刷新</button>
+        </div>
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card"><div class="stat-label">智能审核次数</div><div class="stat-value" id="ai-moderation-total">--</div></div>
+          <div class="stat-card"><div class="stat-label">模型拦截 / 复审</div><div class="stat-value" id="ai-moderation-alerts">--</div></div>
+          <div class="stat-card"><div class="stat-label">高风险</div><div class="stat-value" id="ai-moderation-high-risk">--</div></div>
+          <div class="stat-card"><div class="stat-label">当前状态</div><div class="stat-value" id="ai-moderation-status">--</div></div>
+        </div>
+        <div class="config-grid" style="margin-bottom:20px">
+          <div class="config-card">
+            <div class="config-card-title">模型与开关</div>
+            <div style="display:grid;gap:10px;margin-top:12px">
+              <label class="knowledge-modal-label" for="ai-moderation-model">审核模型</label>
+              <select id="ai-moderation-model" class="admin-select"></select>
+              <div style="font-size:12px;color:var(--text-main);font-weight:700">按功能启用智能初审</div>
+              <label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-main)" for="ai-moderation-enabled-insight"><input id="ai-moderation-enabled-insight" type="checkbox">洞见发布</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-main)" for="ai-moderation-enabled-comment"><input id="ai-moderation-enabled-comment" type="checkbox">用户评论</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-main)" for="ai-moderation-enabled-kline"><input id="ai-moderation-enabled-kline" type="checkbox">K 线标注</label>
+              <div id="ai-moderation-model-status" class="feature-note">正在读取模型凭证状态...</div>
+            </div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">审核链路</div>
+          <div class="feature-note" style="line-height:1.8;margin-top:12px">1. 关键词与组合规则命中：立即阻断。<br>2. 未命中且对应功能开关开启：Doubao 语义初审。<br>3. 模型 block：阻断；review：暂缓；allow：继续发布。<br>4. 模型超时、无凭证或返回格式错误：失败关闭，不放行。</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px;padding:18px 20px">
+          <div class="table-header" style="padding:0;border:0"><div><div class="table-title">分场景智能拦截提示词</div><div style="font-size:12px;color:#8899aa;margin-top:6px">三类内容使用不同审核逻辑。提示词会发送给已配置的模型，不要填写 API Key、密码或用户隐私；保存后按场景记录提示词版本。</div></div><button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="saveAdminAiContentModeration()">保存配置</button></div>
+          <div style="display:grid;gap:14px;margin-top:14px">
+            <label style="display:grid;gap:6px;font-size:12px;color:var(--text-main)" for="ai-moderation-prompt-insight"><b>洞见发布</b><span style="color:#8899aa">重点识别长文中的隐蔽个股推荐、藏头诗、藏尾、纵向文字和规避审核表达。</span><textarea id="ai-moderation-prompt-insight" class="knowledge-modal-textarea" style="width:100%;min-height:220px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.7" spellcheck="false"></textarea></label>
+            <label style="display:grid;gap:6px;font-size:12px;color:var(--text-main)" for="ai-moderation-prompt-comment"><b>用户评论</b><span style="color:#8899aa">重点识别短句交易指令、收益承诺、内幕消息、导流和引用违规话术的语境。</span><textarea id="ai-moderation-prompt-comment" class="knowledge-modal-textarea" style="width:100%;min-height:180px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.7" spellcheck="false"></textarea></label>
+            <label style="display:grid;gap:6px;font-size:12px;color:var(--text-main)" for="ai-moderation-prompt-kline"><b>K 线标注</b><span style="color:#8899aa">重点区分客观技术标注与买卖点、目标价、止损位、内幕和隐藏标的。</span><textarea id="ai-moderation-prompt-kline" class="knowledge-modal-textarea" style="width:100%;min-height:180px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.7" spellcheck="false"></textarea></label>
+          </div>
+          <div id="ai-moderation-prompt-meta" style="font-size:11px;color:#8899aa;margin-top:8px">--</div>
+        </div>
+        <div class="table-wrap" style="padding:18px 20px">
+          <div class="table-header" style="padding:0;border:0"><div><div class="table-title">智能审核记录</div><div style="font-size:12px;color:#8899aa;margin-top:6px">不保存正文，仅展示审核结果、模型理由、置信度、模型版本和内容哈希。</div></div><div style="display:flex;gap:8px;align-items:center"><select id="ai-moderation-source-filter" class="admin-select" onchange="loadAdminAiContentModeration(false)"><option value="">全部来源</option><option value="insight">洞见笔记</option><option value="comment">用户评论</option><option value="kline_annotation">K 线标注</option></select><select id="ai-moderation-result-filter" class="admin-select" onchange="loadAdminAiContentModeration(false)"><option value="">全部结果</option><option value="alert">拦截 / 复审</option><option value="clear">放行</option></select></div></div>
+          <div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>时间</th><th>租户</th><th>类型</th><th>结果</th><th>风险</th><th>模型理由</th><th>置信度</th><th>内容哈希</th></tr></thead><tbody id="ai-moderation-log-rows"><tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">正在加载智能审核记录...</td></tr></tbody></table></div>
+        </div>
+      </div><!-- end section-content-moderation-ai -->
 
       <!-- ===== OPEN API ===== -->
       <div id="section-open-api" style="display:none">
@@ -6051,6 +6131,7 @@ const sectionTitles = {
   'open-api':'系统专区 · Open API',
   access:'访问审计',
   'content-moderation':'内容审核 · 金融合规',
+  'content-moderation-ai':'智能拦截 · Doubao 初审',
   'event-analytics':'数据分析 · 埋点分析'
 };
 const analyticsTitles = {
@@ -6681,15 +6762,48 @@ function renderAdminModerationKeywords(items) {
   window.adminModerationKeywords = rows;
 }
 
-function renderAdminModerationLogs(items) {
-  const host = document.getElementById('moderation-log-rows');
+function renderAdminModerationLogs(items, targetId = 'moderation-log-rows') {
+  const host = document.getElementById(targetId);
   if (!host) return;
   const rows = Array.isArray(items) ? items : [];
   host.innerHTML = rows.length ? rows.map((item) => {
     let matches = [];
     try { matches = JSON.parse(item.matched_keywords_json || '[]'); } catch (_) { matches = []; }
-    return `<tr><td>${escapeHtml(item.created_at || '--')}</td><td>${escapeHtml(item.tenant_slug || '--')}</td><td>${escapeHtml(moderationSourceLabel(item.source_type))}</td><td>${escapeHtml(item.actor_name || item.actor_user_id || '--')}</td><td><span class="tag ${item.result === 'alert' ? 'tag-red' : 'tag-green'}">${item.result === 'alert' ? '命中' : '未命中'}</span></td><td>${escapeHtml(moderationRiskLabel(item.risk_level))}</td><td style="max-width:240px">${escapeHtml(matches.map((match) => match.keyword).join('、') || '--')}</td><td style="font-family:monospace;font-size:10px;color:#8899aa">${escapeHtml(item.content_sha256 || '--')}</td></tr>`;
+    const action = matches.some((match) => match.action === 'hard_block_compliance_alert') ? '合规告警·阻断' : matches.some((match) => match.action === 'hard_block') ? '硬阻断' : matches.some((match) => match.action === 'manual_review') ? '暂缓·需复审' : (item.result === 'alert' ? '单词命中·阻断' : '未命中');
+    const actionClass = item.result === 'alert' ? (action.includes('复审') ? 'tag-gold' : 'tag-red') : 'tag-green';
+    return `<tr><td>${escapeHtml(item.created_at || '--')}</td><td>${escapeHtml(item.tenant_slug || '--')}</td><td>${escapeHtml(moderationSourceLabel(item.source_type))}</td><td>${escapeHtml(item.actor_name || item.actor_user_id || '--')}</td><td><span class="tag ${actionClass}">${escapeHtml(action)}</span></td><td>${escapeHtml(moderationRiskLabel(item.risk_level))}</td><td style="max-width:240px">${escapeHtml(matches.map((match) => `${match.id && String(match.id).startsWith('R') ? `${match.id}·` : ''}${match.keyword}`).join('、') || '--')}</td><td style="font-family:monospace;font-size:10px;color:#8899aa">${escapeHtml(item.content_sha256 || '--')}</td></tr>`;
   }).join('') : '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">暂无审核日志。</td></tr>';
+}
+
+async function loadAdminCommunityModeration(showMessage = false) {
+  const state = document.getElementById('community-moderation-state');
+  const rows = document.getElementById('community-moderation-rows');
+  if (state) state.textContent = '加载中';
+  if (rows) rows.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">正在加载真实审核记录...</td></tr>';
+  try {
+    const response = await fetch('/api/admin/content-moderation?limit=100', {cache: 'no-store'});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) throw new Error(data.error || 'content_moderation_load_failed');
+    const report = data.report || {};
+    const summary = report.summary || {};
+    const total = Number(summary.total || 0);
+    const alerts = Number(summary.alerts || 0);
+    const highRisk = Number(summary.high_risk || 0);
+    const status = document.getElementById('community-moderation-status');
+    if (document.getElementById('community-moderation-total')) document.getElementById('community-moderation-total').textContent = total;
+    if (document.getElementById('community-moderation-alerts')) document.getElementById('community-moderation-alerts').textContent = alerts;
+    if (document.getElementById('community-moderation-high-risk')) document.getElementById('community-moderation-high-risk').textContent = highRisk;
+    if (status) status.textContent = total ? '正常' : '暂无记录';
+    renderAdminModerationLogs(report.logs || [], 'community-moderation-rows');
+    if (state) state.textContent = `已加载 ${total} 条`;
+    if (showMessage) showToast('内容审核记录已刷新');
+  } catch (error) {
+    if (state) state.textContent = '加载失败';
+    if (rows) rows.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#ff9b9b;padding:22px">${escapeHtml(error.message || '内容审核记录加载失败')}，请重试。</td></tr>`;
+    const status = document.getElementById('community-moderation-status');
+    if (status) status.textContent = '不可用';
+    showToast(error.message || '内容审核记录加载失败');
+  }
 }
 
 async function loadAdminContentModeration(showMessage = false) {
@@ -6702,6 +6816,9 @@ async function loadAdminContentModeration(showMessage = false) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.ok) throw new Error(data.error || 'content_moderation_load_failed');
   const report = data.report || {};
+  const settings = data.settings || {};
+  const algorithmSwitch = document.getElementById('moderation-algorithm-enabled');
+  if (algorithmSwitch) algorithmSwitch.checked = settings.algorithm_enabled !== false;
   const summary = report.summary || {};
   const total = Number(summary.total || 0);
   document.getElementById('moderation-total').textContent = total;
@@ -6713,6 +6830,105 @@ async function loadAdminContentModeration(showMessage = false) {
   renderAdminModerationKeywords(data.keywords || []);
   renderAdminModerationLogs(report.logs || []);
   if (showMessage) showToast('内容审核数据已刷新');
+}
+
+async function saveAdminContentModerationSettings() {
+  const enabled = Boolean(document.getElementById('moderation-algorithm-enabled')?.checked);
+  const response = await fetch('/api/admin/content-moderation', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({algorithm_enabled: enabled}),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.error || 'content_moderation_settings_save_failed');
+  await loadAdminContentModeration(false);
+  showToast(enabled ? '算法审核已开启' : '算法审核已关闭');
+}
+
+function aiModerationLogPayload(item) {
+  let matches = [];
+  try { matches = JSON.parse(item.matched_keywords_json || '[]'); } catch (_) { matches = []; }
+  return matches.find((match) => match && (match.match_type === 'ai' || match.match_type === 'ai_error')) || {};
+}
+
+function renderAdminAiModerationLogs(items) {
+  const host = document.getElementById('ai-moderation-log-rows');
+  if (!host) return;
+  const rows = Array.isArray(items) ? items : [];
+  host.innerHTML = rows.length ? rows.map((item) => {
+    const ai = aiModerationLogPayload(item);
+    const action = ai.action === 'hard_block' ? '模型拦截' : ai.action === 'manual_review' ? '模型复审' : item.result === 'clear' ? '模型放行' : '模型失败关闭';
+    const klass = action === '模型放行' ? 'tag-green' : action === '模型复审' ? 'tag-gold' : 'tag-red';
+    const confidence = Number.isFinite(Number(ai.confidence)) ? `${Math.round(Number(ai.confidence) * 100)}%` : '--';
+    return `<tr><td>${escapeHtml(item.created_at || '--')}</td><td>${escapeHtml(item.tenant_slug || '--')}</td><td>${escapeHtml(moderationSourceLabel(item.source_type))}</td><td><span class="tag ${klass}">${action}</span></td><td>${escapeHtml(moderationRiskLabel(item.risk_level))}</td><td style="max-width:320px">${escapeHtml(ai.reason || ai.error_code || ai.category || '--')}<br><span style="font-size:10px;color:#8899aa">${escapeHtml(ai.model_name || ai.model_key || '--')} · ${escapeHtml(ai.prompt_version || '--')}</span></td><td>${confidence}</td><td style="font-family:monospace;font-size:10px;color:#8899aa">${escapeHtml(item.content_sha256 || '--')}</td></tr>`;
+  }).join('') : '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:22px">暂无智能审核记录。</td></tr>';
+}
+
+function renderAdminAiModerationModels(models, selectedKey) {
+  const select = document.getElementById('ai-moderation-model');
+  if (!select) return;
+  const rows = Array.isArray(models) ? models : [];
+  select.innerHTML = rows.map((item) => `<option value="${escapeAttr(item.key || '')}" ${item.key === selectedKey ? 'selected' : ''}>${escapeHtml(item.label || item.key || '--')} · ${escapeHtml(item.model_name || '--')}</option>`).join('') || '<option value="">暂无可用模型</option>';
+  const selected = rows.find((item) => item.key === (selectedKey || select.value));
+  const status = document.getElementById('ai-moderation-model-status');
+  if (status) status.innerHTML = selected
+    ? `${selected.credential_configured ? '<span class="tag tag-green">凭证已配置</span>' : '<span class="tag tag-red">凭证未配置</span>'} · 请在“系统专区 · 大模型专区”中维护 API Key。`
+    : '暂无模型配置。';
+}
+
+async function loadAdminAiContentModeration(showMessage = false) {
+  const params = new URLSearchParams({limit: '100'});
+  const source = document.getElementById('ai-moderation-source-filter');
+  const result = document.getElementById('ai-moderation-result-filter');
+  if (source && source.value) params.set('source_type', source.value);
+  if (result && result.value) params.set('result', result.value);
+  const response = await fetch(`/api/admin/content-moderation/ai?${params.toString()}`, {cache: 'no-store'});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.error || 'ai_content_moderation_load_failed');
+  const config = data.config || {};
+  const summary = (data.report || {}).summary || {};
+  document.getElementById('ai-moderation-total').textContent = Number(summary.total || 0);
+  document.getElementById('ai-moderation-alerts').textContent = Number(summary.alerts || 0);
+  document.getElementById('ai-moderation-high-risk').textContent = Number(summary.high_risk || 0);
+  document.getElementById('ai-moderation-status').textContent = config.enabled ? '已启用' : '未启用';
+  const enabledBySource = config.enabled_by_source || {};
+  const sourceSwitches = {
+    insight: document.getElementById('ai-moderation-enabled-insight'),
+    comment: document.getElementById('ai-moderation-enabled-comment'),
+    kline_annotation: document.getElementById('ai-moderation-enabled-kline'),
+  };
+  Object.entries(sourceSwitches).forEach(([sourceType, checkbox]) => {
+    if (checkbox) checkbox.checked = enabledBySource[sourceType] === true || (!Object.keys(enabledBySource).length && config.enabled === true);
+  });
+  const prompts = config.prompts || {};
+  document.getElementById('ai-moderation-prompt-insight').value = prompts.insight || config.prompt || '';
+  document.getElementById('ai-moderation-prompt-comment').value = prompts.comment || config.prompt || '';
+  document.getElementById('ai-moderation-prompt-kline').value = prompts.kline_annotation || config.prompt || '';
+  document.getElementById('ai-moderation-prompt-meta').textContent = `最后修改：${config.updated_by || '--'} · ${config.updated_at || '--'} · 模型：${config.model_key || '--'} · 三类场景独立版本`;
+  renderAdminAiModerationModels(data.models || [], config.model_key || '');
+  renderAdminAiModerationLogs((data.report || {}).logs || []);
+  if (showMessage) showToast('智能审核配置与记录已刷新');
+}
+
+async function saveAdminAiContentModeration() {
+  const model = document.getElementById('ai-moderation-model');
+  const prompts = {
+    insight: String(document.getElementById('ai-moderation-prompt-insight')?.value || '').trim(),
+    comment: String(document.getElementById('ai-moderation-prompt-comment')?.value || '').trim(),
+    kline_annotation: String(document.getElementById('ai-moderation-prompt-kline')?.value || '').trim(),
+  };
+  const enabledBySource = {
+    insight: Boolean(document.getElementById('ai-moderation-enabled-insight')?.checked),
+    comment: Boolean(document.getElementById('ai-moderation-enabled-comment')?.checked),
+    kline_annotation: Boolean(document.getElementById('ai-moderation-enabled-kline')?.checked),
+  };
+  const response = await fetch('/api/admin/content-moderation/ai', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({enabled: Object.values(enabledBySource).some(Boolean), enabled_by_source: enabledBySource, prompts, prompt: prompts.insight, model_key: model ? model.value : ''}),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.message || data.error || 'ai_content_moderation_save_failed');
+  await loadAdminAiContentModeration(false);
+  showToast('智能审核配置已保存');
 }
 
 function moderationPromptPayload(existing = {}) {
@@ -6793,6 +7009,12 @@ function showSection(name, navEl) {
   }
   if (name === 'content-moderation') {
     loadAdminContentModeration(false).catch((error) => showToast(error.message || '内容审核加载失败'));
+  }
+  if (name === 'content-moderation-ai') {
+    loadAdminAiContentModeration(false).catch((error) => showToast(error.message || '智能审核加载失败'));
+  }
+  if (name === 'community') {
+    loadAdminCommunityModeration(false);
   }
   if (name === 'event-analytics') {
     loadEventAnalytics(false);

@@ -30,3 +30,17 @@ def test_index_embeds_only_theme_bootstrap_config(monkeypatch):
     }
     assert large_private_value not in html
     assert len(response.data) < 250_000
+
+
+def test_index_describes_content_moderation_and_links_to_admin_surface():
+    response = app_entry.app.test_client().get("/")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'href="#content-compliance"' in html
+    assert 'id="content-compliance"' in html
+    assert "发布前内容审核与审计" in html
+    assert "Open API 发布、用户评论和 K 线标注" in html
+    assert "藏头表达" in html
+    assert "不能保证发现所有隐晦表达" in html
+    assert 'href="/admin?section=content-moderation"' in html

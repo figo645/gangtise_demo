@@ -427,6 +427,16 @@ DEFAULT_LLM_MODELS = [
         "purpose": "general",
         "enabled": True,
     },
+    {
+        "key": "volcengine-doubao-seed-2.0-mini",
+        "label": "Doubao Seed 2.0 mini · 智能内容审核",
+        "provider": "volcengine",
+        "model_name": "doubao-seed-2-0-mini-260428",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "api_key": "",
+        "purpose": "general",
+        "enabled": True,
+    },
 ]
 DEFAULT_ROLE_CAPABILITIES = {
     "investor": ["h5", "investor"],

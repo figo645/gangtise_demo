@@ -9554,6 +9554,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "146_tenant_published_insight_pinning.sql")
         execute_sql_file(conn, sql_dir / "148_tenant_insight_grid_metadata.sql")
         execute_sql_file(conn, sql_dir / "149_content_moderation.sql")
+        execute_sql_file(conn, sql_dir / "150_content_moderation_mece_rules.sql")
 
 
 def init_db_safe():

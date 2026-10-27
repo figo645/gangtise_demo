@@ -400,6 +400,92 @@ def call_openai_compatible_llm(
     return content
 
 
+def call_openai_responses_llm(
+    model_config,
+    system_prompt,
+    input_text,
+    feature_code="",
+    feature_label="",
+    tenant_slug="",
+    entry_point="",
+    metadata=None,
+    request_timeout_seconds=12,
+):
+    """Call an OpenAI Responses-compatible endpoint and return visible text only."""
+    config = normalize_llm_model_config(model_config)
+    model_name = str(config.get("model_name") or "").strip()
+    api_key = str(config.get("api_key") or "").strip() or get_llm_api_key(config.get("key"))
+    if not model_name:
+        raise RuntimeError("llm_model_name_missing")
+    if not api_key:
+        raise RuntimeError("llm_api_key_missing")
+    endpoint_base = _normalize_openai_compatible_base_url(config.get("base_url"))
+    _validate_llm_model_endpoint(config, feature_code=feature_code or "general")
+    system_text = str(system_prompt or "").strip()
+    user_text = str(input_text or "").strip()
+    request_started = time.perf_counter()
+    session = requests.Session()
+    session.trust_env = False
+    try:
+        response = session.post(
+            f"{endpoint_base}/responses",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": model_name,
+                "instructions": system_text,
+                "input": [{"role": "user", "content": [{"type": "input_text", "text": user_text}]}],
+                "max_output_tokens": 400,
+                "temperature": 0,
+            },
+            timeout=max(5, min(int(request_timeout_seconds or 12), 20)),
+            allow_redirects=False,
+        )
+    except requests.exceptions.Timeout as exc:
+        raise RuntimeError("llm_provider_timeout") from exc
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError("llm_provider_connection_failed") from exc
+    if response.status_code >= 400:
+        raise RuntimeError(f"llm_request_failed:{response.status_code}")
+    payload = response.json()
+    text = str(payload.get("output_text") or "").strip() if isinstance(payload, dict) else ""
+    if not text and isinstance(payload, dict):
+        parts = []
+        for output_item in payload.get("output") or []:
+            for content_item in (output_item or {}).get("content") or []:
+                if isinstance(content_item, dict) and content_item.get("type") in {"output_text", "text"}:
+                    value = str(content_item.get("text") or "").strip()
+                    if value:
+                        parts.append(value)
+        text = "\n".join(parts).strip()
+    if not text:
+        raise RuntimeError("llm_response_text_missing")
+    usage = payload.get("usage") if isinstance(payload, dict) and isinstance(payload.get("usage"), dict) else {}
+    input_tokens = int(usage.get("input_tokens") or 0)
+    output_tokens = int(usage.get("output_tokens") or 0)
+    total_tokens = int(usage.get("total_tokens") or (input_tokens + output_tokens))
+    if total_tokens <= 0:
+        input_tokens = _estimate_token_count(system_text) + _estimate_token_count(user_text)
+        output_tokens = _estimate_token_count(text)
+        total_tokens = input_tokens + output_tokens
+    log_token_usage(
+        usage_type="llm",
+        feature_code=feature_code or "general_llm",
+        feature_label=feature_label or "通用大模型调用",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        model_provider=str(config.get("provider") or "").strip(),
+        model_name=model_name,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        latency_ms=int((time.perf_counter() - request_started) * 1000),
+        request_chars=len(system_text) + len(user_text),
+        response_chars=len(text),
+        metadata=metadata or {},
+    )
+    return text
+
+
 def parse_user_names_with_llm(raw_text, tenant_slug="", entry_point=""):
     """Parse a human-entered name list into a confirmation-safe JSON list.
 
@@ -11812,17 +11898,20 @@ def persist_review_publish_snapshot(
         "is_simulated": False,
         "simulation_label": "",
     }
-    from src.domain.content_moderation_services import inspect_and_record_content
+    from src.domain.content_moderation_services import html_to_moderation_text, inspect_and_record_content
 
-    audit_text = "\n".join([
-        title,
+    audit_body_text = "\n".join([
         cleaned_text,
-        re.sub(r"<[^>]+>", " ", cleaned_html),
+        html_to_moderation_text(cleaned_html),
+        str(polished_input_text or ""),
+        str(normalized_user_input_section.get("display_text") or ""),
+        str(normalized_user_input_section.get("polished_text") or ""),
         " ".join(
-            str(card.get("recommendation_reason") or card.get("summary") or "")
+            " ".join(str(card.get(key) or "") for key in ("recommendation_reason", "summary", "reason", "comment", "title", "description"))
             for card in normalized_stock_grid_cards if isinstance(card, dict)
         ),
     ])
+    audit_text = "\n".join([title, audit_body_text])
     inspect_and_record_content(
         audit_text,
         "insight",
@@ -11830,6 +11919,8 @@ def persist_review_publish_snapshot(
         entity_id=normalized_insight_id or str(external_id or "").strip() or snapshot["id"],
         actor_user_id=dav_id,
         actor_name=speaker_name or tenant.get("advisor") or "",
+        title=title,
+        body=audit_body_text,
     )
     snapshots = append_review_snapshot(tenant_slug, snapshot)
     # An external_id can make this call an idempotent retry. Return the stored

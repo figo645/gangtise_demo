@@ -33,7 +33,7 @@
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
 <script defer src="/static/js/environment_badge.js?v=20261021-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260831-1"></script>
-<link rel="stylesheet" href="/static/css/h5-shell.css?v=20261014-2">
+<link rel="stylesheet" href="/static/css/h5-shell.css?v=20261027-3">
 {% if config.TESTING %}<style>
 /* ===== BASE ===== */
 body { background: var(--surface-2); color: var(--text-main); }
@@ -4090,6 +4090,45 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:rgba(200,169,110,0.10);
 }
 .review-preview-panel { margin-top:12px; }
+.review-moderation-feedback { margin:0 0 12px; padding:12px; border:1px solid #D73A49; border-radius:12px; background:#FFF5F5; color:#5A1B22; }
+.review-moderation-feedback.is-warning { border-color:#B7791F; background:#FFFAF0; color:#744210; }
+.review-moderation-feedback-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.review-moderation-feedback-head strong { display:block; font-size:13px; }
+.review-moderation-feedback-head span { display:block; margin-top:3px; font-size:11px; line-height:1.5; }
+.review-moderation-feedback-close { min-height:32px; border:0; background:transparent; color:inherit; font-size:11px; font-weight:700; cursor:pointer; }
+.review-moderation-feedback-list { display:grid; gap:8px; margin-top:10px; }
+.review-moderation-feedback-item { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:8px; width:100%; padding:10px; text-align:left; border:1px solid rgba(151,35,46,.20); border-radius:9px; background:#FFF; color:inherit; cursor:pointer; }
+.review-moderation-feedback.is-warning .review-moderation-feedback-item { border-color:rgba(151,104,23,.25); }
+.review-moderation-feedback-index { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#D73A49; color:#FFF; font-size:11px; font-weight:800; }
+.review-moderation-feedback.is-warning .review-moderation-feedback-index { background:#B7791F; }
+.review-moderation-feedback-item strong { display:inline; font-size:12px; }
+.review-moderation-feedback-item em { margin-left:6px; font-style:normal; font-size:10px; color:inherit; opacity:.72; }
+.review-moderation-feedback-item small { display:block; margin-top:3px; font-size:11px; line-height:1.55; }
+.review-moderation-feedback-suggestion { color:#7A2E37; }
+.review-moderation-feedback.is-warning .review-moderation-feedback-suggestion { color:#805B19; }
+.review-moderation-feedback-item b { align-self:center; font-size:11px; white-space:nowrap; }
+.review-moderation-reading { margin:0 0 14px; border:1px solid #F1C7CD; border-radius:12px; overflow:hidden; background:#FFF; }
+.review-moderation-reading-head { padding:11px 12px; background:#FFF1F3; color:#7A2E37; }
+.review-moderation-reading-head strong { display:block; font-size:12px; }
+.review-moderation-reading-head span { display:block; margin-top:3px; font-size:11px; line-height:1.5; }
+.review-moderation-reading-title { padding:11px 12px; border-bottom:1px solid #F3F4F6; color:#172033; font-size:14px; font-weight:800; line-height:1.65; }
+.review-moderation-reading-title span { display:block; margin-bottom:3px; color:#8992A4; font-size:10px; font-weight:700; }
+.review-moderation-reading-body { display:grid; gap:10px; padding:12px; }
+.review-moderation-case { padding:12px; border:1px solid #FECDD3; border-radius:8px; background:#FFF; }
+.review-moderation-case-head { display:flex; align-items:center; gap:7px; flex-wrap:wrap; color:#881337; }
+.review-moderation-case-head > span { display:inline-flex; align-items:center; min-height:20px; padding:0 7px; border-radius:999px; background:#FFE4E7; color:#BE123C; font-size:10px; font-weight:800; }
+.review-moderation-case-head strong { font-size:12px; }
+.review-moderation-case-head em { font-size:10px; font-style:normal; color:#9F1239; opacity:.78; }
+.review-moderation-case-label { margin-top:10px; color:#9F1239; font-size:10px; font-weight:800; }
+.review-moderation-example { margin:5px 0 0; padding:10px 11px; border:1px solid #FDA4AF; border-left:4px solid #E11D48; border-radius:6px; background:#FFE4E7; color:#9F1239; font-size:13px; font-weight:700; line-height:1.75; white-space:pre-wrap; }
+.review-moderation-case-copy,.review-moderation-rewrite { margin:4px 0 0; font-size:12px; line-height:1.65; }
+.review-moderation-case-copy { color:#4C1D2A; }
+.review-moderation-rewrite { padding:8px 10px; border-radius:6px; background:#F8FAFC; color:#334155; }
+.review-moderation-edit-button { display:block; width:calc(100% - 24px); min-height:40px; margin:0 12px 12px; border:1px solid #BE123C; border-radius:7px; background:#BE123C; color:#FFF; font-size:13px; font-weight:800; cursor:pointer; }
+.review-moderation-input-highlight { border-color:#D73A49 !important; box-shadow:0 0 0 3px rgba(215,58,73,.16) !important; }
+.review-moderation-section-highlight { outline:2px solid #D73A49; outline-offset:3px; border-radius:8px; }
+::highlight(review-moderation-match) { background:#FFD9D9; color:#5A1B22; text-decoration:underline wavy #D73A49 1.5px; }
+@media (max-width: 600px) { .review-moderation-feedback-item { grid-template-columns:22px minmax(0,1fr); } .review-moderation-feedback-item b { grid-column:2; margin-top:2px; } }
 .review-preview-head { justify-content:space-between; }
 .review-preview-title {
   font-size:14px;
@@ -6197,6 +6236,7 @@ let reviewTriggerDraft = {
   editingPublishedInsightId: '',
   editingPublishedRevisionCount: 0,
   previewReady: false,
+  moderationFeedback: null,
 };
 let reviewStockGridSearchItems = [];
 let reviewStockGridSearchQuery = '';
@@ -9431,9 +9471,7 @@ function getReviewDraftContentText() {
   if (reviewTriggerDraft.sourceMode === 'voice') return String(reviewTriggerDraft.voiceTranscript || '').trim();
   if (reviewTriggerDraft.sourceMode === 'file') return String(reviewTriggerDraft.fileText || '').trim();
   if (reviewTriggerDraft.sourceMode === 'url') return String(reviewTriggerDraft.urlText || '').trim();
-  const temp = document.createElement('div');
-  temp.innerHTML = reviewTriggerDraft.manualHtml || '';
-  return temp.textContent.trim();
+  return richHtmlToPlainText(reviewTriggerDraft.manualHtml || '');
 }
 
 function getReviewPreviewText() {
@@ -9714,7 +9752,11 @@ function normalizeRichHtml(html) {
 function richHtmlToPlainText(html) {
   const temp = document.createElement('div');
   temp.innerHTML = String(html || '');
-  return (temp.textContent || temp.innerText || '').replace(/\u00a0/g, ' ').trim();
+  temp.querySelectorAll('br').forEach((node) => node.replaceWith(document.createTextNode('\n')));
+  temp.querySelectorAll('p, div, li, blockquote, h1, h2, h3, h4, h5, h6').forEach((node) => {
+    node.appendChild(document.createTextNode('\n'));
+  });
+  return (temp.textContent || '').replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function plainTextToRichHtml(text) {
@@ -9997,6 +10039,170 @@ async function embedManualReviewText(text) {
   return data;
 }
 
+function getWriteFailureMessage(data, fallback) {
+  if (data && data.error === 'content_moderation_blocked') {
+    return data.message || (data.action === 'manual_review'
+      ? '内容触发复审规则，本次未提交；请调整表述后重试。'
+      : '内容审核未通过，本次内容未保存；请修改相关表述后重试。');
+  }
+  return (data && (data.message || data.error)) || fallback;
+}
+
+function showWriteFailure(error, fallback) {
+  const blocked = error && error.code === 'content_moderation_blocked';
+  if (blocked && error.feedback) applyReviewModerationFeedback(error.feedback, error.action);
+  showToast((error && error.message) || fallback, blocked ? 6000 : undefined);
+}
+
+const REVIEW_MODERATION_HIGHLIGHT_NAME = 'review-moderation-match';
+
+function clearReviewModerationHighlight() {
+  if (window.CSS && CSS.highlights) CSS.highlights.delete(REVIEW_MODERATION_HIGHLIGHT_NAME);
+  document.querySelectorAll('.review-moderation-section-highlight').forEach((node) => node.classList.remove('review-moderation-section-highlight'));
+}
+
+function renderReviewModerationFeedback() {
+  const feedback = reviewTriggerDraft.moderationFeedback;
+  const items = feedback && Array.isArray(feedback.items) ? feedback.items : [];
+  if (!items.length) return '';
+  const warning = feedback.action === 'manual_review';
+  return `<section class="review-moderation-feedback ${warning ? 'is-warning' : 'is-error'}" role="alert" aria-live="assertive">
+    <div class="review-moderation-feedback-head"><div><strong>${warning ? '需要调整后再提交' : '当前内容不能发布'}</strong><span>${items.length} 处内容需要处理</span></div><button type="button" class="review-moderation-feedback-close" aria-label="关闭审核提示" onclick="clearReviewModerationFeedback()">关闭</button></div>
+    <div class="review-moderation-feedback-list">${items.map((item, index) => `<button type="button" class="review-moderation-feedback-item" onclick="editReviewModerationContent()"><span class="review-moderation-feedback-index">${index + 1}</span><span><strong>${escapeHtml(item.title || '内容审核提示')}</strong><em>${escapeHtml(item.field === 'title' ? '标题' : '正文')}</em><small>${escapeHtml(item.reason || '')}</small><small class="review-moderation-feedback-suggestion">建议：${escapeHtml(item.suggestion || '调整相关表述后重试。')}</small></span><b>修改内容</b></button>`).join('')}</div>
+  </section>`;
+}
+
+function getReviewModerationContentText() {
+  const richText = reviewTriggerDraft.draftReviewHtml || reviewTriggerDraft.manualHtml || '';
+  return String(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.finalDraftText || richHtmlToPlainText(richText) || getReviewDraftContentText() || '').trim();
+}
+
+function renderReviewModerationReading() {
+  const feedback = reviewTriggerDraft.moderationFeedback || {};
+  const items = Array.isArray(feedback.items) ? feedback.items : [];
+  if (!items.length) return '';
+  return `<section class="review-moderation-reading" aria-label="审核问题阅读态">
+    <div class="review-moderation-reading-head"><strong>以下句子需要修改</strong><span>粉红色区域是审核命中的原文。修改后请再次预览。</span></div>
+    <div class="review-moderation-reading-body">${items.map((item, index) => `<article class="review-moderation-case">
+      <div class="review-moderation-case-head"><span>问题 ${index + 1}</span><strong>${escapeHtml(item.title || '内容审核提示')}</strong><em>${escapeHtml(item.field === 'title' ? '标题' : '正文')}</em></div>
+      <div class="review-moderation-case-label">文中原句</div><blockquote class="review-moderation-example">${escapeHtml(item.example || item.matched_text || '未能定位原句，请根据问题说明调整。')}</blockquote>
+      <div class="review-moderation-case-label">问题说明</div><p class="review-moderation-case-copy">${escapeHtml(item.reason || '该表述需要调整。')}</p>
+      <div class="review-moderation-case-label">修改建议</div><p class="review-moderation-case-copy">${escapeHtml(item.suggestion || '请调整相关表述后再次提交。')}</p>
+      <div class="review-moderation-case-label">参考改写</div><p class="review-moderation-rewrite">${escapeHtml(item.rewrite_example || '请使用客观、可核验且不构成交易引导的表达。')}</p>
+    </article>`).join('')}</div>
+    <button type="button" class="review-moderation-edit-button" onclick="editReviewModerationContent()">修改内容</button>
+  </section>`;
+}
+
+function applyReviewModerationFeedback(items, action) {
+  const normalizedItems = Array.isArray(items) ? items : [];
+  reviewTriggerDraft.moderationFeedback = {items: normalizedItems, action: String(action || 'hard_block')};
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = normalizedItems.some((item) => item && item.field === 'title')
+    ? 'intake'
+    : (String(reviewTriggerDraft.draftReviewText || getReviewDraftContentText()).trim() ? 'draft_review' : 'intake');
+  renderReviewTriggerModal(getActiveDemoUser());
+  window.requestAnimationFrame(() => focusReviewModerationFeedback(0));
+}
+
+function clearReviewModerationFeedback() {
+  reviewTriggerDraft.moderationFeedback = null;
+  clearReviewModerationHighlight();
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function editReviewModerationContent() {
+  reviewTriggerDraft.moderationFeedback = null;
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
+  clearReviewModerationHighlight();
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function findReviewTextRange(root, needle) {
+  const search = String(needle || '').trim().toLocaleLowerCase();
+  if (!root || !search) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const index = String(node.nodeValue || '').toLocaleLowerCase().indexOf(search);
+    if (index >= 0) {
+      const range = document.createRange();
+      range.setStart(node, index);
+      range.setEnd(node, index + search.length);
+      return range;
+    }
+  }
+  return null;
+}
+
+function findReviewSentenceRange(root, needle) {
+  const anchor = findReviewTextRange(root, needle);
+  if (!anchor) return null;
+  const element = anchor.startContainer.parentElement;
+  const scope = element && element.closest('p, li, blockquote, h1, h2, h3, h4, h5, h6') || root;
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let text = '';
+  let node;
+  while ((node = walker.nextNode())) {
+    const start = text.length;
+    text += String(node.nodeValue || '');
+    nodes.push({node, start, end: text.length});
+  }
+  const anchorNode = nodes.find((item) => item.node === anchor.startContainer);
+  if (!anchorNode || !text) return anchor;
+  const anchorStart = anchorNode.start + anchor.startOffset;
+  const before = text.slice(0, anchorStart);
+  const boundaryBefore = Math.max(
+    before.lastIndexOf('\n'), before.lastIndexOf('。'), before.lastIndexOf('！'), before.lastIndexOf('？'),
+    before.lastIndexOf('；'), before.lastIndexOf('.'), before.lastIndexOf('!'), before.lastIndexOf('?'), before.lastIndexOf(';'),
+  );
+  const sentenceStart = boundaryBefore < 0 ? 0 : boundaryBefore + 1;
+  const tail = text.slice(anchorStart);
+  const boundaryAfter = tail.search(/[\n。！？；.!?;]/);
+  const sentenceEnd = boundaryAfter < 0 ? text.length : anchorStart + boundaryAfter + 1;
+  const toPoint = (offset) => {
+    const item = nodes.find((entry) => offset >= entry.start && offset <= entry.end) || nodes[nodes.length - 1];
+    return {node: item.node, offset: Math.max(0, Math.min(offset - item.start, item.end - item.start))};
+  };
+  const start = toPoint(sentenceStart);
+  const end = toPoint(sentenceEnd);
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset);
+  return range;
+}
+
+function focusReviewModerationFeedback(index) {
+  const feedback = reviewTriggerDraft.moderationFeedback;
+  const item = feedback && Array.isArray(feedback.items) ? feedback.items[index] : null;
+  if (!item) return;
+  clearReviewModerationHighlight();
+  if (item.field === 'title') {
+    const title = document.getElementById('review-title-input');
+    if (title) {
+      title.classList.add('review-moderation-input-highlight');
+      title.focus();
+      title.setSelectionRange(0, title.value.length);
+    }
+    return;
+  }
+  const editor = document.querySelector('#review-draft-review-input, #review-manual-editor .ql-editor, #review-manual-editor');
+  if (!editor) return;
+  const range = item.highlight_mode === 'sentence'
+    ? findReviewSentenceRange(editor, item.matched_text)
+    : findReviewTextRange(editor, item.matched_text);
+  if (range && window.CSS && CSS.highlights && window.Highlight) CSS.highlights.set(REVIEW_MODERATION_HIGHLIGHT_NAME, new Highlight(range));
+  editor.scrollIntoView({behavior: 'smooth', block: 'center'});
+  if (editor.focus) editor.focus({preventScroll: true});
+  if (range && !(window.CSS && CSS.highlights && window.Highlight)) {
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+}
+
 async function publishReviewContent(text, transcriptionEngine, transcriptModel, extras) {
   const user = getActiveDemoUser();
   await syncLocalWatchlistAnnotationsToServer(reviewTriggerDraft.selectedWatchlist || []);
@@ -10036,7 +10242,11 @@ async function publishReviewContent(text, transcriptionEngine, transcriptModel, 
   });
   const data = await resp.json();
   if (!resp.ok || !data.success) {
-    throw new Error((data && data.error) || 'publish_failed');
+    const error = new Error(getWriteFailureMessage(data, '洞见发布失败，请重试。'));
+    error.code = data && data.error;
+    error.feedback = data && data.feedback;
+    error.action = data && data.action;
+    throw error;
   }
   return data;
 }
@@ -10120,6 +10330,15 @@ function renderReviewInputPanel() {
     <input id="review-title-input" class="knowledge-modal-input" placeholder="输入本次洞见主题，发布后会直接作为文章标题" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" oninput="reviewTriggerDraft.reviewTitle = this.value" />
     </div>
   `;
+  const stockGridAppendix = `
+    <div class="knowledge-modal-block" style="margin:0 0 12px;padding:12px 14px;background:#F7FBFF;border:1px solid rgba(47,116,192,.12);border-radius:10px">
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:var(--text-main);font-size:12px;font-weight:700">
+        <input type="checkbox" ${reviewTriggerDraft.stockGridEnabled ? 'checked' : ''} onchange="toggleReviewStockGridEnabled(this.checked)" style="margin-top:2px">
+        <span>在这篇洞见末尾加入九宫格股票赏析<span style="display:block;margin-top:4px;color:var(--gray-400);font-size:11px;font-weight:400;line-height:1.6">可任意搜索并选择最多 9 支股票，卡片会作为本文最后一段发布。</span></span>
+      </label>
+      ${reviewTriggerDraft.stockGridEnabled ? renderReviewWatchlistSelectionPanel() : ''}
+    </div>
+  `;
   const accessModeField = isDavCapableUser(getActiveDemoUser()) ? `
     <div style="margin-bottom:12px">
       <label class="knowledge-modal-label" style="display:block;margin-bottom:6px">发布范围</label>
@@ -10133,7 +10352,7 @@ function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'voice') {
     return `
       <div class="review-intake-panel">
-        ${titleField}${accessModeField}
+        ${titleField}${accessModeField}${stockGridAppendix}
         <div class="review-intake-toolbar">
           <div class="knowledge-record-status">
             <span class="knowledge-live-dot" style="opacity:${reviewVoiceRecording ? '1' : '0.35'}"></span>
@@ -10161,7 +10380,7 @@ function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'file') {
     return `
       <div class="review-intake-panel">
-        ${titleField}${accessModeField}
+        ${titleField}${accessModeField}${stockGridAppendix}
         <div class="review-intake-toolbar">
           <div class="knowledge-record-status">${reviewFileUploading ? '正在解析文件...' : '支持 PDF、Word、Excel，解析后可继续编辑'}</div>
           <button class="review-input-button" ${reviewFileUploading ? 'disabled' : ''} onclick="captureReviewFileInput()">${reviewFileUploading ? '解析中...' : '点击上传文件'}</button>
@@ -10176,7 +10395,7 @@ function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'url') {
     return `
       <div class="review-intake-panel">
-        ${titleField}${accessModeField}
+        ${titleField}${accessModeField}${stockGridAppendix}
         <div class="review-intake-toolbar" style="align-items:flex-end">
           <div style="flex:1;display:grid;gap:10px">
             <input id="review-url-input" class="knowledge-modal-input" placeholder="输入网页 URL 作为本次洞见补充素材" value="${escapeAttr(reviewTriggerDraft.urlValue || '')}" />
@@ -10196,7 +10415,7 @@ function renderReviewInputPanel() {
   }
   return `
     <div class="review-intake-panel">
-      ${titleField}${accessModeField}
+      ${titleField}${accessModeField}${stockGridAppendix}
       <div class="knowledge-rich-shell">
         <div class="knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，适合作为大V洞见正文编辑。</div>
         <div id="review-manual-editor" class="review-rich-editor"></div>
@@ -10262,9 +10481,6 @@ function renderReviewWatchlistSelectionPanel() {
   const rows = Array.isArray(reviewStockGridSearchItems) ? reviewStockGridSearchItems : [];
   return `
     <div class="knowledge-modal-block stock-grid-authoring-panel">
-      <label class="knowledge-modal-label" for="review-stock-grid-title">洞见主题</label>
-      <input id="review-stock-grid-title" class="knowledge-modal-input" style="margin:6px 0 12px" placeholder="例如：今日重点个股点评" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" oninput="reviewTriggerDraft.reviewTitle = this.value" />
-      <div style="margin-bottom:12px"><label class="knowledge-modal-label">发布范围</label><div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="review-access-scope-tag ${reviewTriggerDraft.accessMode === 'public' ? 'active' : ''}" onclick="setReviewAccessMode('public')">常规笔记</button><button type="button" class="review-access-scope-tag ${reviewTriggerDraft.accessMode === 'subscriber' ? 'active' : ''}" onclick="setReviewAccessMode('subscriber')">订阅专享</button></div></div>
       <label class="knowledge-modal-label">选择今日点评个股</label>
       <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">输入股票名称或代码搜索，任意合法证券均可选择，最多 9 支。每张卡片默认不填写理由，可按需补充。</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -10292,6 +10508,7 @@ function renderReviewWatchlistSelectionPanel() {
         }).join('') || '<div style="font-size:12px;color:var(--gray-400);grid-column:1/-1">请输入名称或代码搜索证券。</div>'}
       </div>
       <div class="stock-grid-selection-summary"><span>已选择 ${selected.size} / 9</span><span>可继续搜索并添加其他股票</span></div>
+      <button type="button" class="review-input-button" style="margin-top:10px;width:100%" onclick="requestReviewStockGridPreview()" ${reviewTriggerDraft.stockGridLoading || !selected.size ? 'disabled' : ''}>${reviewTriggerDraft.stockGridLoading ? '生成中...' : '生成 / 更新九宫格'}</button>
       ${reviewTriggerDraft.stockGridError ? `<div class="alert alert-warning stock-grid-error" role="alert">${escapeHtml(reviewTriggerDraft.stockGridError)} <button type="button" class="btn btn-sm btn-link p-0 align-baseline" onclick="requestReviewStockGridPreview()">重试</button></div>` : ''}
       ${reviewTriggerDraft.stockGridCards.length ? `<div style="margin-top:10px;font-size:11px;color:#2F74C0">已生成 ${reviewTriggerDraft.stockGridCards.length} 张点评卡片，可继续预览和发布。</div>` : ''}
     </div>
@@ -10413,9 +10630,7 @@ async function requestReviewStockGridPreview() {
     reviewTriggerDraft.stockGridProvider = String((data.grid || {}).provider || '');
     reviewTriggerDraft.stockGridEndpoint = String((data.grid || {}).endpoint || '');
     if (!reviewTriggerDraft.stockGridCards.length) throw new Error('stock_grid_empty_result');
-    reviewTriggerDraft.previewReady = true;
-    reviewTriggerDraft.flowStage = 'preview';
-    showToast('今日个股点评已生成');
+    showToast(`九宫格已更新，共 ${reviewTriggerDraft.stockGridCards.length} 支股票`);
   } catch (error) {
     reviewTriggerDraft.stockGridError = error.message || '九宫格生成失败，请稍后重试。';
     showToast(reviewTriggerDraft.stockGridError);
@@ -10697,8 +10912,21 @@ function renderReviewTriggerModal(user) {
   };
   const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
   const modalTitle = isReviewFinalPreview ? '发布前确认' : (hasDavCapabilities ? '发布大V洞见' : '生成智能洞见');
+  const hasModerationFeedback = Boolean(reviewTriggerDraft.moderationFeedback && (reviewTriggerDraft.moderationFeedback.items || []).length);
+  if (hasModerationFeedback) {
+    host.innerHTML = `
+      <div class="modal-title" style="margin-bottom:10px">内容审核结果</div>
+      ${renderReviewModerationFeedback()}
+      ${renderReviewModerationReading()}
+      <div class="modal-actions"><button class="btn-outline" onclick="closeReviewTriggerModal()">关闭</button><button class="btn-gold" onclick="editReviewModerationContent()">修改内容</button></div>
+    `;
+    restoreModalSheetScroll(scrollContentId, scrollSnapshot);
+    restoreReviewPageScroll(pageScrollSnapshot);
+    return;
+  }
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:${isReviewFinalPreview ? '4px' : '10px'}">${modalTitle}</div>
+    ${renderReviewModerationFeedback()}
     ${isReviewFinalPreview ? `
       <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">请确认正文内容，发布后将向粉丝展示。</div>
     ` : (isReviewSetupStage ? `
@@ -10726,13 +10954,6 @@ function renderReviewTriggerModal(user) {
             <label class="knowledge-modal-label">输入内容</label>
             ${renderReviewInputPanel()}
           </div>
-          <div class="knowledge-modal-block" style="padding:12px 14px;background:#F7FBFF;border:1px solid rgba(47,116,192,.12);border-radius:10px">
-            <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:var(--text-main);font-size:12px;font-weight:700">
-              <input type="checkbox" ${reviewTriggerDraft.stockGridEnabled ? 'checked' : ''} onchange="toggleReviewStockGridEnabled(this.checked)" style="margin-top:2px">
-              <span>在这篇洞见末尾加入九宫格股票赏析<span style="display:block;margin-top:4px;color:var(--gray-400);font-size:11px;font-weight:400;line-height:1.6">可任意搜索并选择最多 9 支股票，卡片会作为本文最后一段发布。</span></span>
-            </label>
-          </div>
-          ${reviewTriggerDraft.stockGridEnabled ? renderReviewWatchlistSelectionPanel() : ''}
           ${renderReviewPromptPanel()}
         ` : '')}
       ` : ''}
@@ -11052,9 +11273,7 @@ function syncReviewDraftFromModal() {
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
   if (draftReviewInput) {
     reviewTriggerDraft.draftReviewHtml = String(draftReviewInput.innerHTML || '').trim();
-    const textNode = document.createElement('div');
-    textNode.innerHTML = reviewTriggerDraft.draftReviewHtml;
-    reviewTriggerDraft.draftReviewText = String(textNode.textContent || '').trim();
+    reviewTriggerDraft.draftReviewText = richHtmlToPlainText(reviewTriggerDraft.draftReviewHtml);
   }
   if (structuredUserInput || structuredCombinedText || structuredSectorSummary) {
     reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
@@ -11205,7 +11424,37 @@ async function prepareReviewStructuredPreview() {
   showToast('洞见预览已生成，请审核后发布');
 }
 
-function prepareReviewDirectPreview() {
+async function checkReviewModerationBeforePreview() {
+  const user = getActiveDemoUser();
+  const tenantSlug = String((((user || {}).tenant || {}).slug) || '').trim();
+  try {
+    const response = await fetch('/api/review/moderation-check', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        tenant_slug: tenantSlug,
+        review_title: reviewTriggerDraft.reviewTitle || '',
+        text: getReviewPreviewText(),
+        content_html: getReviewPreviewHtml(),
+        stock_grid_cards: reviewTriggerDraft.stockGridCards || [],
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      if (data && data.error === 'content_moderation_blocked' && data.feedback) {
+        applyReviewModerationFeedback(data.feedback, data.action);
+      }
+      showToast(getWriteFailureMessage(data, '内容审核暂不可用，请稍后重试。'), data && data.error === 'content_moderation_blocked' ? 6000 : undefined);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    showToast('内容审核暂不可用，请稍后重试。');
+    return false;
+  }
+}
+
+async function prepareReviewDirectPreview() {
   reviewTriggerDraft.paragraphMode = 'manual';
   reviewTriggerDraft.skipAiProcessing = true;
   reviewTriggerDraft.generatedPreviewText = '';
@@ -11213,6 +11462,7 @@ function prepareReviewDirectPreview() {
   reviewTriggerDraft.watchlistDecision = 'none';
   reviewTriggerDraft.selectedWatchlist = [];
   reviewStructuredPreview = null;
+  if (!await checkReviewModerationBeforePreview()) return;
   reviewTriggerDraft.previewReady = true;
   reviewTriggerDraft.flowStage = 'preview';
   renderReviewTriggerModal(getActiveDemoUser());
@@ -11235,7 +11485,7 @@ function backToReviewDraftEdit() {
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
-function confirmReviewDraftToPreview() {
+async function confirmReviewDraftToPreview() {
   syncReviewDraftFromModal();
   if (!String(reviewTriggerDraft.draftReviewText || '').trim()) {
     showToast('请先确认或填写 draft 正文');
@@ -11246,19 +11496,21 @@ function confirmReviewDraftToPreview() {
   reviewTriggerDraft.watchlistDecision = 'none';
   reviewTriggerDraft.selectedWatchlist = [];
   reviewStructuredPreview = null;
+  if (!await checkReviewModerationBeforePreview()) return;
   reviewTriggerDraft.previewReady = true;
   reviewTriggerDraft.flowStage = 'preview';
   renderReviewTriggerModal(getActiveDemoUser());
   showToast('洞见草稿已确认，可预览或发布');
 }
 
-function confirmStructuredReviewToPreview() {
+async function confirmStructuredReviewToPreview() {
   syncReviewDraftFromModal();
   reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
   if (!String((((reviewStructuredPreview.user_input_section || {}).display_text) || '')).trim()) {
     showToast('请先确认或填写用户洞见');
     return;
   }
+  if (!await checkReviewModerationBeforePreview()) return;
   reviewTriggerDraft.previewReady = true;
   reviewTriggerDraft.flowStage = 'preview';
   renderReviewTriggerModal(getActiveDemoUser());
@@ -11877,7 +12129,7 @@ function publishReviewDraft() {
   }).catch((error) => {
     reviewPublishSubmitting = false;
     renderReviewTriggerModal(user);
-    showToast(error.message || '发布入库失败');
+    showWriteFailure(error, '发布入库失败');
   });
 }
 
@@ -15599,7 +15851,7 @@ function renderWatchlist() {
   renderFundamentalWatchlistChart();
   renderFundamentalWatchlistBoards();
   renderFundamentalWatchlistBoards('market');
-  renderReviewWatchlistSelectionMode();
+  if (typeof renderReviewWatchlistSelectionMode === 'function') renderReviewWatchlistSelectionMode();
   renderHermesWorkspace();
 }
 
@@ -16610,7 +16862,11 @@ function submitWatchlistComment(stockCode) {
     }),
   }).then(async (resp) => {
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_comment_save_failed');
+    if (!resp.ok || !data.ok) {
+      const error = new Error(getWriteFailureMessage(data, '评论发布失败，请重试。'));
+      error.code = data && data.error;
+      throw error;
+    }
     currentWatchlistDetail.comments = (Array.isArray(currentWatchlistDetail.comments) ? currentWatchlistDetail.comments : [])
       .filter((item) => String(item.id || '') !== String(tempId));
     currentWatchlistDetail.comments = [data.item, ...currentWatchlistDetail.comments];
@@ -16620,7 +16876,7 @@ function submitWatchlistComment(stockCode) {
     currentWatchlistDetail.comments = previousComments;
     if (input) input.value = content;
     renderWatchlistDetail(currentWatchlistDetail, 'comments');
-    showToast(error.message || '评论发布失败');
+    showWriteFailure(error, '评论发布失败');
   });
 }
 
@@ -16785,7 +17041,11 @@ function saveWatchlistAnnotation() {
     }),
   }).then(async (resp) => {
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_save_failed');
+    if (!resp.ok || !data.ok) {
+      const error = new Error(getWriteFailureMessage(data, 'K 线标注保存失败，请重试。'));
+      error.code = data && data.error;
+      throw error;
+    }
     const currentUser = getActiveDemoUser() || {};
     const tenantId = ((currentUser || {}).tenant || {}).id || target.tenantId;
     const nextItems = [
@@ -16799,10 +17059,10 @@ function saveWatchlistAnnotation() {
     showToast('K线标注已保存，洞见会自动引用');
   }).catch((error) => {
     watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
-    closeWatchlistAnnotationModal();
+    if (!error || error.code !== 'content_moderation_blocked') closeWatchlistAnnotationModal();
     redrawCurrentWatchlistDetail();
     renderReviewExperience();
-    showToast(error.message || '标注保存失败');
+    showWriteFailure(error, '标注保存失败');
   });
 }
 
@@ -22203,6 +22463,6 @@ window.addEventListener('storage', (event) => {
 });
 
 removeLegacyWorkbenchDashboardMarkup();
-</script>{% else %}<script defer src="/static/js/h5-app.js?v=20261021-1"></script>{% endif %}
+</script>{% else %}<script defer src="/static/js/h5-app.js?v=20261028-1"></script>{% endif %}
 </body>
 </html>

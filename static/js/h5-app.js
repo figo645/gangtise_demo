@@ -2,6 +2,14 @@
 const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
 let echartsAssetsPromise = null;
 
+function fetchWithTimeout(input, options = {}, timeoutMs = 15000) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const requestOptions = {...options};
+  if (controller) requestOptions.signal = controller.signal;
+  const timeout = window.setTimeout(() => controller?.abort(), Math.max(1000, Number(timeoutMs) || 15000));
+  return fetch(input, requestOptions).finally(() => window.clearTimeout(timeout));
+}
+
 function ensureEchartsAssets() {
   if (window.echarts && window.GangtiseEcharts) return Promise.resolve(window.GangtiseEcharts);
   if (echartsAssetsPromise) return echartsAssetsPromise;
@@ -508,6 +516,7 @@ let reviewTriggerDraft = {
   editingPublishedInsightId: '',
   editingPublishedRevisionCount: 0,
   previewReady: false,
+  moderationFeedback: null,
 };
 const reviewRuntimeStore = {};
 let reviewProductionPage = false;
@@ -729,7 +738,7 @@ async function refreshTenantDashboardRemoteState(options) {
   tenantDashboardLoading = true;
   if (!tenantDashboardLoaded && opts.rerenderFeed) renderFundMacroDashboard({loading: true});
   try {
-    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`);
+    const resp = await fetchWithTimeout(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`, {cache: 'no-store'}, 15000);
     const payload = await resp.json();
     if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_fetch_failed');
     currentTenantDashboardPayload = payload.dashboard || {};
@@ -2886,8 +2895,8 @@ async function loadFeedMarketEconomy() {
   window.feedMarketRequest = (async () => {
     try {
       const [etfResponse, overviewResponse] = await Promise.all([
-        fetch('/api/etf-industry-themes', {cache: 'no-store'}),
-        fetch(`/api/market-overview${query}`, {cache: 'no-store'}),
+        fetchWithTimeout('/api/etf-industry-themes', {cache: 'no-store'}, 12000),
+        fetchWithTimeout(`/api/market-overview${query}`, {cache: 'no-store'}, 12000),
       ]);
       if (!etfResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
       const etfs = await etfResponse.json().catch(() => ({}));
@@ -3731,9 +3740,7 @@ function getReviewDraftContentText() {
   if (reviewTriggerDraft.sourceMode === 'voice') return String(reviewTriggerDraft.voiceTranscript || '').trim();
   if (reviewTriggerDraft.sourceMode === 'file') return String(reviewTriggerDraft.fileText || '').trim();
   if (reviewTriggerDraft.sourceMode === 'url') return String(reviewTriggerDraft.urlText || '').trim();
-  const temp = document.createElement('div');
-  temp.innerHTML = reviewTriggerDraft.manualHtml || '';
-  return temp.textContent.trim();
+  return richHtmlToPlainText(reviewTriggerDraft.manualHtml || '');
 }
 
 function getReviewPreviewText() {
@@ -3760,6 +3767,7 @@ let reviewDraftJobState = null;
 let reviewDraftCancellationRequested = false;
 const reviewDraftCancelResolvers = {};
 let reviewPublishSubmitting = false;
+let reviewModerationChecking = false;
 let activeInsightDraftId = '';
 let insightDrafts = [];
 let insightDraftsLoading = false;
@@ -4045,7 +4053,11 @@ function normalizeRichHtml(html) {
 function richHtmlToPlainText(html) {
   const temp = document.createElement('div');
   temp.innerHTML = String(html || '');
-  return (temp.textContent || temp.innerText || '').replace(/\u00a0/g, ' ').trim();
+  temp.querySelectorAll('br').forEach((node) => node.replaceWith(document.createTextNode('\n')));
+  temp.querySelectorAll('p, div, li, blockquote, h1, h2, h3, h4, h5, h6').forEach((node) => {
+    node.appendChild(document.createTextNode('\n'));
+  });
+  return (temp.textContent || '').replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function plainTextToRichHtml(text) {
@@ -4310,6 +4322,172 @@ async function embedManualReviewText(text) {
   return data;
 }
 
+function getWriteFailureMessage(data, fallback) {
+  if (data && data.error === 'content_moderation_blocked') {
+    return data.message || (data.action === 'manual_review'
+      ? '内容触发复审规则，本次未提交；请调整表述后重试。'
+      : '内容审核未通过，本次内容未保存；请修改相关表述后重试。');
+  }
+  return (data && (data.message || data.error)) || fallback;
+}
+
+function showWriteFailure(error, fallback) {
+  const blocked = error && error.code === 'content_moderation_blocked';
+  if (blocked && error.feedback) applyReviewModerationFeedback(error.feedback, error.action);
+  showToast((error && error.message) || fallback, blocked ? 6000 : undefined);
+}
+
+const REVIEW_MODERATION_HIGHLIGHT_NAME = 'review-moderation-match';
+
+function clearReviewModerationHighlight() {
+  if (window.CSS && CSS.highlights) CSS.highlights.delete(REVIEW_MODERATION_HIGHLIGHT_NAME);
+  document.querySelectorAll('.review-moderation-section-highlight').forEach((node) => node.classList.remove('review-moderation-section-highlight'));
+}
+
+function renderReviewModerationFeedback() {
+  const feedback = reviewTriggerDraft.moderationFeedback;
+  const items = feedback && Array.isArray(feedback.items) ? feedback.items : [];
+  if (!items.length) return '';
+  const warning = feedback.action === 'manual_review';
+  return `<section class="review-moderation-feedback ${warning ? 'is-warning' : 'is-error'}" role="alert" aria-live="assertive">
+    <div class="review-moderation-feedback-head"><div><strong>${warning ? '需要调整后再提交' : '当前内容不能发布'}</strong><span>${items.length} 处内容需要处理</span></div><button type="button" class="review-moderation-feedback-close" aria-label="关闭审核提示" onclick="clearReviewModerationFeedback()">关闭</button></div>
+    <div class="review-moderation-feedback-list">${items.map((item, index) => `<button type="button" class="review-moderation-feedback-item" onclick="editReviewModerationContent()"><span class="review-moderation-feedback-index">${index + 1}</span><span><strong>${escapeHtml(item.title || '内容审核提示')}</strong><em>${escapeHtml(item.field === 'title' ? '标题' : '正文')}</em><small>${escapeHtml(item.reason || '')}</small><small class="review-moderation-feedback-suggestion">建议：${escapeHtml(item.suggestion || '调整相关表述后重试。')}</small></span><b>修改内容</b></button>`).join('')}</div>
+  </section>`;
+}
+
+function getReviewModerationContentText() {
+  const richText = reviewTriggerDraft.draftReviewHtml || reviewTriggerDraft.manualHtml || '';
+  return String(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.finalDraftText || richHtmlToPlainText(richText) || getReviewDraftContentText() || '').trim();
+}
+
+function renderReviewModerationReading() {
+  const feedback = reviewTriggerDraft.moderationFeedback || {};
+  const items = Array.isArray(feedback.items) ? feedback.items : [];
+  if (!items.length) return '';
+  return `<section class="review-moderation-reading" aria-label="审核问题阅读态">
+    <div class="review-moderation-reading-head"><strong>以下句子需要修改</strong><span>粉红色区域是审核命中的原文。修改后请再次预览。</span></div>
+    <div class="review-moderation-reading-body">${items.map((item, index) => `<article class="review-moderation-case">
+      <div class="review-moderation-case-head"><span>问题 ${index + 1}</span><strong>${escapeHtml(item.title || '内容审核提示')}</strong><em>${escapeHtml(item.field === 'title' ? '标题' : '正文')}</em></div>
+      <div class="review-moderation-case-label">文中原句</div><blockquote class="review-moderation-example">${escapeHtml(item.example || item.matched_text || '未能定位原句，请根据问题说明调整。')}</blockquote>
+      <div class="review-moderation-case-label">问题说明</div><p class="review-moderation-case-copy">${escapeHtml(item.reason || '该表述需要调整。')}</p>
+      <div class="review-moderation-case-label">修改建议</div><p class="review-moderation-case-copy">${escapeHtml(item.suggestion || '请调整相关表述后再次提交。')}</p>
+      <div class="review-moderation-case-label">参考改写</div><p class="review-moderation-rewrite">${escapeHtml(item.rewrite_example || '请使用客观、可核验且不构成交易引导的表达。')}</p>
+    </article>`).join('')}</div>
+    <button type="button" class="review-moderation-edit-button" onclick="editReviewModerationContent()">修改内容</button>
+  </section>`;
+}
+
+function applyReviewModerationFeedback(items, action) {
+  const normalizedItems = Array.isArray(items) ? items : [];
+  reviewTriggerDraft.moderationFeedback = {items: normalizedItems, action: String(action || 'hard_block')};
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = normalizedItems.some((item) => item && item.field === 'title')
+    ? 'intake'
+    : (String(reviewTriggerDraft.draftReviewText || getReviewDraftContentText()).trim() ? 'draft_review' : 'intake');
+  renderReviewTriggerModal(getActiveDemoUser());
+  window.requestAnimationFrame(() => focusReviewModerationFeedback(0));
+}
+
+function clearReviewModerationFeedback() {
+  reviewTriggerDraft.moderationFeedback = null;
+  clearReviewModerationHighlight();
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function editReviewModerationContent() {
+  reviewTriggerDraft.moderationFeedback = null;
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
+  clearReviewModerationHighlight();
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function findReviewTextRange(root, needle) {
+  const search = String(needle || '').trim().toLocaleLowerCase();
+  if (!root || !search) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const index = String(node.nodeValue || '').toLocaleLowerCase().indexOf(search);
+    if (index >= 0) {
+      const range = document.createRange();
+      range.setStart(node, index);
+      range.setEnd(node, index + search.length);
+      return range;
+    }
+  }
+  return null;
+}
+
+function findReviewSentenceRange(root, needle) {
+  const anchor = findReviewTextRange(root, needle);
+  if (!anchor) return null;
+  const element = anchor.startContainer.parentElement;
+  const scope = element && element.closest('p, li, blockquote, h1, h2, h3, h4, h5, h6') || root;
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let text = '';
+  let node;
+  while ((node = walker.nextNode())) {
+    const start = text.length;
+    text += String(node.nodeValue || '');
+    nodes.push({node, start, end: text.length});
+  }
+  const anchorNode = nodes.find((item) => item.node === anchor.startContainer);
+  if (!anchorNode || !text) return anchor;
+  const anchorStart = anchorNode.start + anchor.startOffset;
+  const before = text.slice(0, anchorStart);
+  const boundaryBefore = Math.max(
+    before.lastIndexOf('\n'), before.lastIndexOf('。'), before.lastIndexOf('！'), before.lastIndexOf('？'),
+    before.lastIndexOf('；'), before.lastIndexOf('.'), before.lastIndexOf('!'), before.lastIndexOf('?'), before.lastIndexOf(';'),
+  );
+  const sentenceStart = boundaryBefore < 0 ? 0 : boundaryBefore + 1;
+  const tail = text.slice(anchorStart);
+  const boundaryAfter = tail.search(/[\n。！？；.!?;]/);
+  const sentenceEnd = boundaryAfter < 0 ? text.length : anchorStart + boundaryAfter + 1;
+  const toPoint = (offset) => {
+    const item = nodes.find((entry) => offset >= entry.start && offset <= entry.end) || nodes[nodes.length - 1];
+    return {node: item.node, offset: Math.max(0, Math.min(offset - item.start, item.end - item.start))};
+  };
+  const start = toPoint(sentenceStart);
+  const end = toPoint(sentenceEnd);
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset);
+  return range;
+}
+
+function focusReviewModerationFeedback(index) {
+  const feedback = reviewTriggerDraft.moderationFeedback;
+  const item = feedback && Array.isArray(feedback.items) ? feedback.items[index] : null;
+  if (!item) return;
+  clearReviewModerationHighlight();
+  if (item.field === 'title') {
+    const title = document.getElementById('review-title-input');
+    if (title) {
+      title.classList.add('review-moderation-input-highlight');
+      title.focus();
+      title.setSelectionRange(0, title.value.length);
+    }
+    return;
+  }
+  const editor = document.querySelector('#review-draft-review-input, #review-manual-editor .ql-editor, #review-manual-editor');
+  if (!editor) return;
+  const range = item.highlight_mode === 'sentence'
+    ? findReviewSentenceRange(editor, item.matched_text)
+    : findReviewTextRange(editor, item.matched_text);
+  if (range && window.CSS && CSS.highlights && window.Highlight) {
+    CSS.highlights.set(REVIEW_MODERATION_HIGHLIGHT_NAME, new Highlight(range));
+  }
+  editor.scrollIntoView({behavior: 'smooth', block: 'center'});
+  if (editor.focus) editor.focus({preventScroll: true});
+  if (range && !(window.CSS && CSS.highlights && window.Highlight)) {
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+}
+
 async function publishReviewContent(text, transcriptionEngine, transcriptModel, extras) {
   const user = getActiveDemoUser();
   await syncLocalWatchlistAnnotationsToServer(reviewTriggerDraft.selectedWatchlist || []);
@@ -4349,9 +4527,49 @@ async function publishReviewContent(text, transcriptionEngine, transcriptModel, 
   });
   const data = await resp.json();
   if (!resp.ok || !data.success) {
-    throw new Error((data && data.error) || 'publish_failed');
+    const error = new Error(getWriteFailureMessage(data, '洞见发布失败，请重试。'));
+    error.code = data && data.error;
+    error.feedback = data && data.feedback;
+    error.action = data && data.action;
+    throw error;
   }
   return data;
+}
+
+async function checkReviewModerationBeforePreview() {
+  if (reviewModerationChecking) return false;
+  const user = getActiveDemoUser();
+  reviewModerationChecking = true;
+  renderReviewTriggerModal(user);
+  showToast('正在检查内容合规，请稍候...', 1400);
+  try {
+    const response = await fetch('/api/review/moderation-check', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        tenant_slug: ((user || {}).tenant || {}).slug || '',
+        review_title: String(reviewTriggerDraft.reviewTitle || '').trim(),
+        text: getReviewPreviewText(),
+        content_html: getReviewPreviewHtml(),
+        stock_grid_cards: reviewTriggerDraft.stockGridCards || [],
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      if (data && data.error === 'content_moderation_blocked' && data.feedback) {
+        applyReviewModerationFeedback(data.feedback, data.action);
+      }
+      showToast((data && data.message) || '内容审核暂不可用，请稍后重试。');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    showToast('内容审核暂不可用，请稍后重试。');
+    return false;
+  } finally {
+    reviewModerationChecking = false;
+    if (reviewTriggerDraft.moderationFeedback) renderReviewTriggerModal(user);
+  }
 }
 
 function editPublishedReviewArticle(articleId) {
@@ -4584,8 +4802,6 @@ function renderReviewWatchlistSelectionPanel() {
   const rows = Array.isArray(reviewStockGridSearchItems) ? reviewStockGridSearchItems : [];
   return `
     <div class="knowledge-modal-block stock-grid-authoring-panel">
-      <label class="knowledge-modal-label" for="review-stock-grid-title">洞见主题</label>
-      <input id="review-stock-grid-title" class="knowledge-modal-input" style="margin:6px 0 12px" placeholder="例如：今日重点个股点评" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" oninput="reviewTriggerDraft.reviewTitle = this.value" />
       <label class="knowledge-modal-label">选择今日点评个股</label>
       <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">输入股票名称或代码搜索，任意合法证券均可选择，最多 9 支。每张卡片默认不填写理由，可按需补充。</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -4604,6 +4820,7 @@ function renderReviewWatchlistSelectionPanel() {
         ${rows.map((item) => { const code = String(item.code || item.stock_code || '').trim(); const name = String(item.name || item.stock_name || code).trim(); const active = selected.has(code); return `<button type="button" class="review-watchlist-chip selectable ${active ? 'active' : ''}" style="text-align:left;padding:10px;border-radius:10px" onclick="toggleReviewStockGridSelection('${escapeAttr(code)}')"><strong>${escapeHtml(name)}</strong><span style="display:block;font-size:10px;margin-top:3px;opacity:.72">${escapeHtml(code)} · ${escapeHtml(item.market || '')}</span></button>`; }).join('') || '<div style="font-size:12px;color:var(--gray-400);grid-column:1/-1">请输入名称或代码搜索证券。</div>'}
       </div>
       <div class="stock-grid-selection-summary"><span>已选择 ${selected.size} / 9</span></div>
+      <button type="button" class="review-input-button" style="margin-top:10px;width:100%" onclick="requestReviewStockGridPreview()" ${reviewTriggerDraft.stockGridLoading || !selected.size ? 'disabled' : ''}>${reviewTriggerDraft.stockGridLoading ? '生成中...' : '生成 / 更新九宫格'}</button>
       ${reviewTriggerDraft.stockGridError ? `<div class="alert alert-warning stock-grid-error" role="alert">${escapeHtml(reviewTriggerDraft.stockGridError)} <button type="button" class="btn btn-sm btn-link p-0 align-baseline" onclick="requestReviewStockGridPreview()">重试</button></div>` : ''}
     </div>
   `;
@@ -4708,9 +4925,7 @@ async function requestReviewStockGridPreview() {
     reviewTriggerDraft.stockGridProvider = String((data.grid || {}).provider || '');
     reviewTriggerDraft.stockGridEndpoint = String((data.grid || {}).endpoint || '');
     if (!reviewTriggerDraft.stockGridCards.length) throw new Error('stock_grid_empty_result');
-    reviewTriggerDraft.previewReady = true;
-    reviewTriggerDraft.flowStage = 'preview';
-    showToast('今日个股点评已生成');
+    showToast(`九宫格已更新，共 ${reviewTriggerDraft.stockGridCards.length} 支股票`);
   } catch (error) { reviewTriggerDraft.stockGridError = error.message || '九宫格生成失败，请稍后重试。'; showToast(reviewTriggerDraft.stockGridError); }
   finally { reviewTriggerDraft.stockGridLoading = false; renderReviewTriggerModal(user); }
 }
@@ -4987,8 +5202,21 @@ function renderReviewTriggerModal(user) {
   };
   const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
   const modalTitle = isReviewFinalPreview ? '发布前确认' : (hasDavCapabilities ? '发布大V洞见' : '生成智能洞见');
+  const hasModerationFeedback = Boolean(reviewTriggerDraft.moderationFeedback && (reviewTriggerDraft.moderationFeedback.items || []).length);
+  if (hasModerationFeedback) {
+    host.innerHTML = `
+      <div class="modal-title" style="margin-bottom:10px">内容审核结果</div>
+      ${renderReviewModerationFeedback()}
+      ${renderReviewModerationReading()}
+      <div class="modal-actions"><button class="btn-outline" onclick="closeReviewTriggerModal()">关闭</button><button class="btn-gold" onclick="editReviewModerationContent()">修改内容</button></div>
+    `;
+    restoreModalSheetScroll(scrollContentId, scrollSnapshot);
+    restoreReviewPageScroll(pageScrollSnapshot);
+    return;
+  }
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:${isReviewFinalPreview ? '4px' : '10px'}">${modalTitle}</div>
+    ${renderReviewModerationFeedback()}
     ${isReviewFinalPreview ? `
       <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">请确认正文内容，发布后将向粉丝展示。</div>
     ` : (isReviewSetupStage ? `
@@ -5017,7 +5245,7 @@ function renderReviewTriggerModal(user) {
             ${renderReviewInputPanel()}
           </div>
           ${renderReviewPromptPanel()}
-        ` : '')}
+        ` : ''}
       ` : ''}
       ${isReviewDraftProcessingStage() ? `
         <div class="knowledge-modal-block">
@@ -5180,6 +5408,9 @@ function renderReviewFlowActions() {
   if (reviewPublishSubmitting) {
     return '<button class="btn-outline" disabled>请稍候</button><button class="btn-gold" disabled>发布中...</button>';
   }
+  if (reviewModerationChecking) {
+    return '<button class="btn-outline" disabled>请稍候</button><button class="btn-gold" disabled aria-busy="true"><span class="ui-action-spinner"></span>正在检查内容...</button>';
+  }
   if (reviewDraftGenerating || reviewPreviewGenerating) {
     return '<button class="btn-outline" onclick="cancelReviewAsyncJob()">停止生成</button><button class="btn-gold" disabled>处理中...</button>';
   }
@@ -5269,6 +5500,16 @@ function setReviewTriggerSourceMode(mode) {
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
+function toggleReviewStockGridEnabled(enabled) {
+  reviewTriggerDraft.stockGridEnabled = !!enabled;
+  if (!reviewTriggerDraft.stockGridEnabled) {
+    reviewTriggerDraft.stockGridCards = [];
+    reviewTriggerDraft.stockGridError = '';
+    reviewTriggerDraft.selectedWatchlist = [];
+  }
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
 function confirmReviewWatchlistSelection() {
   showToast('洞见发布不再包含独立的股票分析阶段，请直接审核洞见草稿。');
 }
@@ -5321,9 +5562,7 @@ function syncReviewDraftFromModal() {
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
   if (draftReviewInput) {
     reviewTriggerDraft.draftReviewHtml = String(draftReviewInput.innerHTML || '').trim();
-    const textNode = document.createElement('div');
-    textNode.innerHTML = reviewTriggerDraft.draftReviewHtml;
-    reviewTriggerDraft.draftReviewText = String(textNode.textContent || '').trim();
+    reviewTriggerDraft.draftReviewText = richHtmlToPlainText(reviewTriggerDraft.draftReviewHtml);
   }
   if (structuredUserInput || structuredCombinedText || structuredSectorSummary) {
     reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
@@ -5474,7 +5713,8 @@ async function prepareReviewStructuredPreview() {
   showToast('洞见预览已生成，请审核后发布');
 }
 
-function prepareReviewDirectPreview() {
+async function prepareReviewDirectPreview() {
+  syncReviewDraftFromModal();
   reviewTriggerDraft.paragraphMode = 'manual';
   reviewTriggerDraft.skipAiProcessing = true;
   reviewTriggerDraft.generatedPreviewText = '';
@@ -5482,6 +5722,7 @@ function prepareReviewDirectPreview() {
   reviewTriggerDraft.watchlistDecision = 'none';
   reviewTriggerDraft.selectedWatchlist = [];
   reviewStructuredPreview = null;
+  if (!await checkReviewModerationBeforePreview()) return;
   reviewTriggerDraft.previewReady = true;
   reviewTriggerDraft.flowStage = 'preview';
   renderReviewTriggerModal(getActiveDemoUser());
@@ -5504,7 +5745,7 @@ function backToReviewDraftEdit() {
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
-function confirmReviewDraftToPreview() {
+async function confirmReviewDraftToPreview() {
   syncReviewDraftFromModal();
   if (!String(reviewTriggerDraft.draftReviewText || '').trim()) {
     showToast('请先确认或填写 draft 正文');
@@ -5515,19 +5756,21 @@ function confirmReviewDraftToPreview() {
   reviewTriggerDraft.watchlistDecision = 'none';
   reviewTriggerDraft.selectedWatchlist = [];
   reviewStructuredPreview = null;
+  if (!await checkReviewModerationBeforePreview()) return;
   reviewTriggerDraft.previewReady = true;
   reviewTriggerDraft.flowStage = 'preview';
   renderReviewTriggerModal(getActiveDemoUser());
   showToast('洞见草稿已确认，可预览或发布');
 }
 
-function confirmStructuredReviewToPreview() {
+async function confirmStructuredReviewToPreview() {
   syncReviewDraftFromModal();
   reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
   if (!String((((reviewStructuredPreview.user_input_section || {}).display_text) || '')).trim()) {
     showToast('请先确认或填写用户洞见');
     return;
   }
+  if (!await checkReviewModerationBeforePreview()) return;
   reviewTriggerDraft.previewReady = true;
   reviewTriggerDraft.flowStage = 'preview';
   renderReviewTriggerModal(getActiveDemoUser());
@@ -6151,7 +6394,7 @@ function publishReviewDraft() {
   }).catch((error) => {
     reviewPublishSubmitting = false;
     renderReviewTriggerModal(user);
-    showToast(error.message || '发布入库失败');
+    showWriteFailure(error, '发布入库失败');
   });
 }
 
@@ -9873,7 +10116,7 @@ function renderWatchlist() {
   renderFundamentalWatchlistChart();
   renderFundamentalWatchlistBoards();
   renderFundamentalWatchlistBoards('market');
-  renderReviewWatchlistSelectionMode();
+  if (typeof renderReviewWatchlistSelectionMode === 'function') renderReviewWatchlistSelectionMode();
   renderHermesWorkspace();
 }
 
@@ -10106,7 +10349,7 @@ async function loadMarketEtf() {
   const host = document.getElementById('market-etf-list');
   if (!host) return;
   try {
-    const response = await fetch(`/api/etf-overview${marketSnapshotTenantQuery()}`);
+    const response = await fetchWithTimeout(`/api/etf-overview${marketSnapshotTenantQuery()}`, {cache: 'no-store'}, 12000);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.ok === false) throw new Error(payload.error || 'etf_overview_failed');
     marketEtfLoaded = true;
@@ -10150,7 +10393,7 @@ async function loadMarketOverview() {
   const requestSeq = ++marketOverviewRequestSeq;
   marketOverviewRequest = (async () => {
     try {
-      const response = await fetch(`/api/market-overview${marketSnapshotTenantQuery()}`);
+      const response = await fetchWithTimeout(`/api/market-overview${marketSnapshotTenantQuery()}`, {cache: 'no-store'}, 12000);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_overview_failed');
       const items = Array.isArray(payload.items) ? payload.items : [];
@@ -10218,7 +10461,7 @@ async function loadMarketMacro() {
   const requestSeq = ++marketMacroRequestSeq;
   marketMacroRequest = (async () => {
     try {
-      const response = await fetch(`/api/macro-overview${marketSnapshotTenantQuery()}`);
+      const response = await fetchWithTimeout(`/api/macro-overview${marketSnapshotTenantQuery()}`, {cache: 'no-store'}, 12000);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok === false) throw new Error(payload.error || 'macro_overview_failed');
       const items = Array.isArray(payload.items) ? payload.items : [];
@@ -10887,7 +11130,11 @@ function submitWatchlistComment(stockCode) {
     }),
   }).then(async (resp) => {
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_comment_save_failed');
+    if (!resp.ok || !data.ok) {
+      const error = new Error(getWriteFailureMessage(data, '评论发布失败，请重试。'));
+      error.code = data && data.error;
+      throw error;
+    }
     currentWatchlistDetail.comments = (Array.isArray(currentWatchlistDetail.comments) ? currentWatchlistDetail.comments : [])
       .filter((item) => String(item.id || '') !== String(tempId));
     currentWatchlistDetail.comments = [data.item, ...currentWatchlistDetail.comments];
@@ -10897,7 +11144,7 @@ function submitWatchlistComment(stockCode) {
     currentWatchlistDetail.comments = previousComments;
     if (input) input.value = content;
     renderWatchlistDetail(currentWatchlistDetail, 'comments');
-    showToast(error.message || '评论发布失败');
+    showWriteFailure(error, '评论发布失败');
   });
 }
 
@@ -11062,7 +11309,11 @@ function saveWatchlistAnnotation() {
     }),
   }).then(async (resp) => {
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_save_failed');
+    if (!resp.ok || !data.ok) {
+      const error = new Error(getWriteFailureMessage(data, 'K 线标注保存失败，请重试。'));
+      error.code = data && data.error;
+      throw error;
+    }
     const currentUser = getActiveDemoUser() || {};
     const tenantId = ((currentUser || {}).tenant || {}).id || target.tenantId;
     const nextItems = [
@@ -11076,10 +11327,10 @@ function saveWatchlistAnnotation() {
     showToast('K线标注已保存，洞见会自动引用');
   }).catch((error) => {
     watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
-    closeWatchlistAnnotationModal();
+    if (!error || error.code !== 'content_moderation_blocked') closeWatchlistAnnotationModal();
     redrawCurrentWatchlistDetail();
     renderReviewExperience();
-    showToast(error.message || '标注保存失败');
+    showWriteFailure(error, '标注保存失败');
   });
 }
 
@@ -14848,11 +15099,31 @@ let toastTimer = null;
 function showToast(msg, duration) {
   duration = duration || 2000;
   const toast = document.getElementById('toast');
+  if (!toast) return;
   toast.textContent = msg;
+  toast.setAttribute('role', 'status');
+  toast.setAttribute('aria-live', 'polite');
+  toast.classList.remove('show');
+  void toast.offsetWidth;
   toast.classList.add('show');
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
 }
+
+function installGlobalButtonPressFeedback() {
+  const mark = (button) => {
+    if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
+    button.classList.remove('ui-action-press');
+    void button.offsetWidth;
+    button.classList.add('ui-action-press');
+    window.setTimeout(() => button.classList.remove('ui-action-press'), 260);
+  };
+  document.addEventListener('pointerdown', (event) => mark(event.target.closest('button')), true);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') mark(event.target.closest && event.target.closest('button'));
+  }, true);
+}
+installGlobalButtonPressFeedback();
 
 let wbSmartIndicatorEditingCode = '';
 let wbSmartIndicatorSelectedCodes = [];

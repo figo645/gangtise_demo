@@ -698,7 +698,8 @@ GANGTISE_INDICATOR_REGISTRY = {
         "query_kind": "macro_latest",
         "macro_key": "cpi_yoy",
         "unit": "%",
-        "search_keyword": "中国CPI同比",
+        "search_keyword": "CPI:中国",
+        "search_keywords": ("CPI:中国", "中国CPI同比", "中国CPI"),
     },
     "source_ppi": {
         "indicator_name": "中国PPI同比",
@@ -706,7 +707,8 @@ GANGTISE_INDICATOR_REGISTRY = {
         "query_kind": "macro_latest",
         "macro_key": "ppi_yoy",
         "unit": "%",
-        "search_keyword": "中国PPI同比",
+        "search_keyword": "PPI:中国",
+        "search_keywords": ("PPI:中国", "中国PPI同比", "中国PPI"),
     },
     "source_manufacturing_pmi": {
         "indicator_name": "中国制造业PMI",
@@ -714,7 +716,8 @@ GANGTISE_INDICATOR_REGISTRY = {
         "query_kind": "macro_latest",
         "macro_key": "manufacturing_pmi",
         "unit": "点",
-        "search_keyword": "制造业PMI",
+        "search_keyword": "PMI:中国:制造业",
+        "search_keywords": ("PMI:中国:制造业", "制造业PMI", "中国制造业PMI"),
     },
     "source_industrial_production_yoy": {
         "indicator_name": "规模以上工业增加值同比",
@@ -722,7 +725,8 @@ GANGTISE_INDICATOR_REGISTRY = {
         "query_kind": "macro_latest",
         "macro_key": "industrial_production_yoy",
         "unit": "%",
-        "search_keyword": "规模以上工业增加值同比",
+        "search_keyword": "工业增加值:中国",
+        "search_keywords": ("工业增加值:中国", "规模以上工业增加值同比", "工业增加值同比"),
     },
     "source_retail_sales_yoy": {
         "indicator_name": "社会消费品零售总额同比",
@@ -730,7 +734,8 @@ GANGTISE_INDICATOR_REGISTRY = {
         "query_kind": "macro_latest",
         "macro_key": "retail_sales_yoy",
         "unit": "%",
-        "search_keyword": "社会消费品零售总额同比",
+        "search_keyword": "社会消费品零售:中国",
+        "search_keywords": ("社会消费品零售:中国", "社会消费品零售总额同比", "社会消费品零售"),
     },
     "source_fixed_asset_investment_yoy": {
         "indicator_name": "固定资产投资累计同比",
@@ -738,7 +743,8 @@ GANGTISE_INDICATOR_REGISTRY = {
         "query_kind": "macro_latest",
         "macro_key": "fixed_asset_investment_yoy",
         "unit": "%",
-        "search_keyword": "固定资产投资累计同比",
+        "search_keyword": "固定资产投资:中国",
+        "search_keywords": ("固定资产投资:中国", "固定资产投资累计同比", "固定资产投资"),
     },
     "source_urban_unemployment": {
         "indicator_name": "全国城镇调查失业率",
@@ -1677,6 +1683,18 @@ def choose_gangtise_indicator_candidate(items, keyword="", preferred_indicator_i
     return (exact or rows)[0]
 
 
+def gangtise_indicator_name_matches_keyword(indicator_name, keyword):
+    """Match a search alias without requiring provider punctuation/order."""
+    name = str(indicator_name or "").strip().lower()
+    query = str(keyword or "").strip().lower()
+    if not name or not query:
+        return False
+    if query in name:
+        return True
+    terms = [term for term in re.split(r"[^0-9a-z\u4e00-\u9fff]+", query) if term]
+    return bool(terms) and all(term in name for term in terms)
+
+
 def _parse_gangtise_trade_date(value):
     """Return a market date only for unambiguous Gangtise trade-date values."""
     text = str(value or "").strip()
@@ -2249,18 +2267,48 @@ def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", 
             "duration_ms": int(duration or 0),
             "source_meta": {"type": "index_kline", "path": GANGTISE_INDEX_KLINE_DAILY_PATH, "securityCode": entry["security_code"]},
         }
-    search_payload = {"keyword": entry.get("search_keyword") or entry.get("indicator_name") or indicator_code, "Limit": 20}
-    search_status, search_response, search_duration = post_gangtise_openapi_json("/application/open-alternative/EDB/search", search_payload, token=token, timeout=30)
-    selected = choose_gangtise_indicator_candidate(
-        search_response.get("data") or [],
-        keyword=entry.get("search_keyword") or entry.get("indicator_name") or indicator_code,
-        preferred_indicator_id=entry.get("preferred_indicator_id") or "",
+    search_keywords = tuple(entry.get("search_keywords") or ()) or (
+        entry.get("search_keyword") or entry.get("indicator_name") or indicator_code,
     )
-    search_keyword = str(entry.get("search_keyword") or entry.get("indicator_name") or indicator_code).strip().lower()
+    search_status, search_response, search_duration = 0, {}, 0
+    selected = None
+    selected_keyword = ""
+    for candidate_keyword in search_keywords:
+        candidate_keyword = str(candidate_keyword or "").strip()
+        if not candidate_keyword:
+            continue
+        candidate_status, candidate_response, candidate_duration = post_gangtise_openapi_json(
+            "/application/open-alternative/EDB/search",
+            {"keyword": candidate_keyword, "Limit": 20},
+            token=token,
+            timeout=30,
+        )
+        search_duration += int(candidate_duration or 0)
+        search_status, search_response = candidate_status, candidate_response
+        candidate_rows = candidate_response.get("data") or [] if isinstance(candidate_response, dict) else []
+        candidate = choose_gangtise_indicator_candidate(
+            candidate_rows,
+            keyword=candidate_keyword,
+            preferred_indicator_id=entry.get("preferred_indicator_id") or "",
+        )
+        candidate_name = str((candidate or {}).get("indicatorName") or "").strip().lower()
+        if candidate_rows and not gangtise_indicator_name_matches_keyword(candidate_name, candidate_keyword):
+            candidate = next(
+                (
+                    row for row in candidate_rows
+                    if isinstance(row, dict)
+                    and gangtise_indicator_name_matches_keyword(row.get("indicatorName"), candidate_keyword)
+                ),
+                None,
+            )
+            candidate_name = str((candidate or {}).get("indicatorName") or "").strip().lower()
+        if is_gangtise_openapi_success(candidate_status, candidate_response) and candidate and gangtise_indicator_name_matches_keyword(candidate_name, candidate_keyword):
+            selected = candidate
+            selected_keyword = candidate_keyword
+            break
+    search_keyword = selected_keyword or str(search_keywords[0] or "").strip().lower()
     selected_name = str((selected or {}).get("indicatorName") or "").strip().lower()
     preferred_id = str(entry.get("preferred_indicator_id") or "").strip()
-    if selected and not preferred_id and search_keyword and search_keyword not in selected_name:
-        selected = None
     if not is_gangtise_openapi_success(search_status, search_response) or not selected:
         return {
             "ok": False,
@@ -2268,7 +2316,7 @@ def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", 
             "points": [],
             "response": search_response,
             "duration_ms": search_duration,
-            "source_meta": {"type": "edb_search", "keyword": search_payload["keyword"]},
+            "source_meta": {"type": "edb_search", "keywords": list(search_keywords)},
         }
     expected_name = str(entry.get("expected_indicator_name") or "").strip()
     expected_source = str(entry.get("expected_data_source") or "").strip()
@@ -2320,6 +2368,7 @@ def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", 
             "path": "/application/open-alternative/EDB/getData",
             "indicatorId": selected.get("indicatorId") or "",
             "indicatorName": selected.get("indicatorName") or "",
+            "searchKeyword": selected_keyword,
             "unit": selected.get("unit") or "",
         },
     }
@@ -7461,8 +7510,14 @@ def build_macro_economic_payload(tenant_slug=""):
         preserved = _apply_tenant_selection(stale)
         preserved["stale"] = True
         preserved["message"] = "宏观数据正在同步，当前展示最近一次真实快照"
+        refresh = request_market_snapshot_refresh()
+        preserved["refreshing"] = True
+        preserved["refresh_queued"] = bool(refresh.get("queued"))
         return preserved
-    return _apply_tenant_selection({"ok": True, "snapshot_version": 12, "items": [], "source": "Gangtise OpenAPI", "refreshing": True, "message": "后台正在同步 Gangtise 宏观数据"})
+    refresh = request_market_snapshot_refresh()
+    empty = _apply_tenant_selection({"ok": True, "snapshot_version": 12, "items": [], "source": "Gangtise OpenAPI", "refreshing": True, "message": "后台正在同步 Gangtise 宏观数据"})
+    empty["refresh_queued"] = bool(refresh.get("queued"))
+    return empty
 
 
 _market_snapshot_refresh_lock = threading.Lock()

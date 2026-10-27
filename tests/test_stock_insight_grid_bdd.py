@@ -219,6 +219,7 @@ class StockInsightGridBddTest(unittest.TestCase):
         self.assertIn('stockGridEnabled ? renderReviewStockGridSection(article)', h5_app)
         self.assertIn('含九宫格个股赏析', h5_app)
         self.assertIn('function renderReviewWatchlistSelectionPanel()', h5_app)
+        self.assertIn('function toggleReviewStockGridEnabled(enabled)', h5_app)
         self.assertIn('/api/review/stock-grid-preview', h5_app)
         self.assertIn('stock_grid_selection: reviewTriggerDraft.selectedWatchlist || []', h5_app)
         self.assertIn('const draftMetadata = draft.metadata && typeof draft.metadata === \'object\' ? draft.metadata : {};', h5_app)

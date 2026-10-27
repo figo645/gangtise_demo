@@ -3020,7 +3020,8 @@ class ReviewModuleBddTest(unittest.TestCase):
             mock.patch.object(ai_services, "append_message_thread", side_effect=RuntimeError("message store unavailable")), \
             mock.patch.object(ai_services, "append_broadcast_history", side_effect=RuntimeError("broadcast store unavailable")), \
             mock.patch.object(ai_services, "push_broadcast_to_fan_threads", side_effect=RuntimeError("fan thread store unavailable")), \
-            mock.patch.object(ai_services, "list_users", return_value=[]):
+            mock.patch.object(ai_services, "list_users", return_value=[]), \
+            mock.patch("src.domain.content_moderation_services.inspect_and_record_content", return_value={"result": "clear", "risk_level": "none", "matches": []}):
             result = ai_services.persist_review_publish_snapshot(
                 tenant_slug=self.tenant_slug,
                 text="正文已入库",

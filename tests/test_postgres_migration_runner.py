@@ -18,6 +18,10 @@ def test_schema_only_classification_matches_historic_schema_migrations():
     assert runner._migration_scope("002_app_core_tables.sql") == "schema"
     assert runner._migration_scope("132_analytics_events.sql") == "schema"
     assert runner._migration_scope("145_reconcile_tenant_registry_references.sql") == "schema"
+    assert runner._migration_scope("149_content_moderation.sql") == "schema"
+    assert runner._migration_scope("150_content_moderation_mece_rules.sql") == "schema"
+    assert runner._migration_scope("151_content_moderation_user_rules.sql") == "schema"
+    assert runner._migration_scope("152_content_moderation_certainty_rules.sql") == "schema"
     assert runner._migration_scope("100_seed_master_data.sql") == "master_data"
     assert runner._migration_scope("106_security_master_seed.sql") == "master_data"
 
@@ -35,7 +39,7 @@ def test_runner_uses_postgres_lock_transaction_and_checksum_ledger():
 def test_current_release_manifest_includes_the_domain_and_open_api_migrations():
     manifest = json.loads((ROOT / "jenkinsfiles/database/release-manifest.json").read_text(encoding="utf-8"))
     migrations = {item["name"] for item in manifest["migrations"]}
-    assert manifest["release_version"] == "v1.1.29"
+    assert manifest["release_version"] == "v1.1.32"
     assert migrations == {
         "137_open_api_insight_tokens.sql",
         "138_tenant_published_insights.sql",
@@ -46,12 +50,16 @@ def test_current_release_manifest_includes_the_domain_and_open_api_migrations():
         "143_domain_tenant_ownership.sql",
         "144_message_domain_user_identity.sql",
         "145_reconcile_tenant_registry_references.sql",
+        "149_content_moderation.sql",
+        "150_content_moderation_mece_rules.sql",
+        "151_content_moderation_user_rules.sql",
+        "152_content_moderation_certainty_rules.sql",
     }
     assert runner._load_release_manifest(
         ROOT / "jenkinsfiles/database/release-manifest.json",
         ROOT / "sql/postgres",
         schema_only=True,
-    )["release_version"] == "v1.1.29"
+    )["release_version"] == "v1.1.32"
     ordered_names = [item["name"] for item in manifest["migrations"]]
     assert ordered_names.index("145_reconcile_tenant_registry_references.sql") < ordered_names.index("142_domain_foreign_keys.sql")
     assert ordered_names.index("145_reconcile_tenant_registry_references.sql") < ordered_names.index("143_domain_tenant_ownership.sql")

@@ -1692,6 +1692,14 @@ body { background: var(--surface-2); color: var(--text-main); }
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+button:not([disabled]) { touch-action:manipulation; transition:transform .16s ease-out, box-shadow .16s ease-out, opacity .16s ease-out; }
+button:not([disabled]):active { transform:scale(.975); }
+button.ui-action-press { animation:kwActionPress .22s ease-out; }
+button[aria-busy="true"] { cursor:progress; }
+.ui-action-spinner { display:inline-block; width:12px; height:12px; margin-right:6px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; vertical-align:-2px; animation:kwActionSpin .7s linear infinite; }
+@keyframes kwActionPress { 0% { transform:scale(1); } 42% { transform:scale(.965); } 100% { transform:scale(1); } }
+@keyframes kwActionSpin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { button:not([disabled]), button.ui-action-press { transition:none; animation:none; } .ui-action-spinner { animation:none; } }
 .kw-kpi-row {
   display:grid;
   grid-template-columns:repeat(5,1fr);
@@ -3178,6 +3186,45 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   outline:none;
   font-family:var(--font-main);
 }
+.kw-review-moderation-feedback { margin:0 0 12px; padding:14px; border:1px solid #D73A49; border-radius:12px; background:#FFF5F5; color:#5A1B22; }
+.kw-review-moderation-feedback.is-warning { border-color:#B7791F; background:#FFFAF0; color:#744210; }
+.kw-review-moderation-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.kw-review-moderation-head strong { display:block; font-size:13px; }
+.kw-review-moderation-head span { display:block; margin-top:3px; font-size:11px; line-height:1.5; }
+.kw-review-moderation-close { min-height:32px; border:0; background:transparent; color:inherit; font-size:11px; font-weight:700; cursor:pointer; }
+.kw-review-moderation-list { display:grid; gap:8px; margin-top:10px; }
+.kw-review-moderation-item { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:9px; width:100%; padding:10px; color:inherit; text-align:left; background:#FFF; border:1px solid rgba(151,35,46,.20); border-radius:9px; cursor:pointer; }
+.kw-review-moderation-feedback.is-warning .kw-review-moderation-item { border-color:rgba(151,104,23,.25); }
+.kw-review-moderation-index { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; color:#FFF; background:#D73A49; font-size:11px; font-weight:800; }
+.kw-review-moderation-feedback.is-warning .kw-review-moderation-index { background:#B7791F; }
+.kw-review-moderation-item strong { display:inline; font-size:12px; }
+.kw-review-moderation-item em { margin-left:6px; color:inherit; font-size:10px; font-style:normal; opacity:.72; }
+.kw-review-moderation-item small { display:block; margin-top:3px; font-size:11px; line-height:1.55; }
+.kw-review-moderation-suggestion { color:#7A2E37; }
+.kw-review-moderation-feedback.is-warning .kw-review-moderation-suggestion { color:#805B19; }
+.kw-review-moderation-item b { align-self:center; white-space:nowrap; font-size:11px; }
+.kw-review-moderation-reading { margin:0 0 14px; overflow:hidden; border:1px solid #F1C7CD; border-radius:10px; background:#FFF; }
+.kw-review-moderation-reading-head { padding:12px 14px; background:#FFF1F3; color:#7A2E37; }
+.kw-review-moderation-reading-head strong { display:block; font-size:13px; }
+.kw-review-moderation-reading-head span { display:block; margin-top:3px; font-size:11px; line-height:1.5; }
+.kw-review-moderation-reading-title { padding:12px 14px; border-bottom:1px solid #F3F4F6; color:#172033; font-size:14px; font-weight:800; line-height:1.65; }
+.kw-review-moderation-reading-title span { display:block; margin-bottom:3px; color:#8992A4; font-size:10px; font-weight:700; }
+.kw-review-moderation-reading-body { display:grid; gap:10px; padding:12px 14px 14px; }
+.kw-review-moderation-case { padding:12px; border:1px solid #FECDD3; border-radius:8px; background:#FFF; }
+.kw-review-moderation-case-head { display:flex; align-items:center; gap:7px; flex-wrap:wrap; color:#881337; }
+.kw-review-moderation-case-head > span { display:inline-flex; align-items:center; min-height:20px; padding:0 7px; border-radius:999px; background:#FFE4E7; color:#BE123C; font-size:10px; font-weight:800; }
+.kw-review-moderation-case-head strong { font-size:12px; }
+.kw-review-moderation-case-head em { font-size:10px; font-style:normal; color:#9F1239; opacity:.78; }
+.kw-review-moderation-case-label { margin-top:10px; color:#9F1239; font-size:10px; font-weight:800; }
+.kw-review-moderation-example { margin:5px 0 0; padding:10px 11px; border:1px solid #FDA4AF; border-left:4px solid #E11D48; border-radius:6px; background:#FFE4E7; color:#9F1239; font-size:13px; font-weight:700; line-height:1.75; white-space:pre-wrap; }
+.kw-review-moderation-case-copy,.kw-review-moderation-rewrite { margin:4px 0 0; font-size:12px; line-height:1.65; }
+.kw-review-moderation-case-copy { color:#4C1D2A; }
+.kw-review-moderation-rewrite { padding:8px 10px; border-radius:6px; background:#F8FAFC; color:#334155; }
+.kw-review-moderation-edit-button { display:block; min-width:140px; min-height:40px; margin:0 14px 14px; padding:0 16px; border:1px solid #BE123C; border-radius:7px; background:#BE123C; color:#FFF; font-size:13px; font-weight:800; cursor:pointer; }
+.kw-review-moderation-input-highlight { border-color:#D73A49 !important; box-shadow:0 0 0 3px rgba(215,58,73,.16) !important; }
+.kw-review-moderation-section-highlight { outline:2px solid #D73A49; outline-offset:3px; border-radius:8px; }
+::highlight(kw-review-moderation-match) { background:#FFD9D9; color:#5A1B22; text-decoration:underline wavy #D73A49 1.5px; }
+@media (max-width: 760px) { .kw-review-moderation-item { grid-template-columns:22px minmax(0,1fr); } .kw-review-moderation-item b { grid-column:2; } }
 .kw-review-rich-toolbar { margin-bottom:10px; }
 .kw-review-rich-editor {
   min-height:400px;
@@ -7551,6 +7598,7 @@ let kwReviewDraft = {
   finalDraftText: '',
   finalDraftHtml: '',
   previewReady: false,
+  moderationFeedback: null,
 };
 let kwStockGridSearchItems = [];
 let kwStockGridSearchQuery = '';
@@ -9633,6 +9681,7 @@ let kwReviewDraftGenerating = false;
 let kwReviewDraftJobState = null;
 let kwReviewCancellationRequested = false;
 let kwReviewPublishSubmitting = false;
+let kwReviewModerationChecking = false;
 let kwKnowledgeVoiceRecorder = null;
 let kwKnowledgeVoiceChunks = [];
 let kwKnowledgeVoiceUploading = false;
@@ -10240,9 +10289,199 @@ async function kwPublishReviewContent(text, transcriptionEngine, transcriptModel
   });
   const data = await resp.json();
   if (!resp.ok || !data.success) {
-    throw new Error((data && data.error) || 'publish_failed');
+    const error = new Error((data && (data.message || data.error)) || 'publish_failed');
+    error.code = data && data.error;
+    error.feedback = data && data.feedback;
+    error.action = data && data.action;
+    throw error;
   }
   return data;
+}
+
+const KW_REVIEW_MODERATION_HIGHLIGHT_NAME = 'kw-review-moderation-match';
+
+function kwClearReviewModerationHighlight() {
+  if (window.CSS && CSS.highlights) CSS.highlights.delete(KW_REVIEW_MODERATION_HIGHLIGHT_NAME);
+  document.querySelectorAll('.kw-review-moderation-section-highlight').forEach((node) => node.classList.remove('kw-review-moderation-section-highlight'));
+}
+
+function kwRenderReviewModerationFeedback() {
+  const feedback = kwReviewDraft.moderationFeedback;
+  const items = feedback && Array.isArray(feedback.items) ? feedback.items : [];
+  if (!items.length) return '';
+  const warning = feedback.action === 'manual_review';
+  return `<section class="kw-review-moderation-feedback ${warning ? 'is-warning' : 'is-error'}" role="alert" aria-live="assertive">
+    <div class="kw-review-moderation-head"><div><strong>${warning ? '需要调整后再提交' : '当前内容不能发布'}</strong><span>${items.length} 处内容需要处理</span></div><button type="button" class="kw-review-moderation-close" onclick="kwClearReviewModerationFeedback()">关闭</button></div>
+    <div class="kw-review-moderation-list">${items.map((item, index) => `<button type="button" class="kw-review-moderation-item" onclick="kwEditReviewModerationContent()"><span class="kw-review-moderation-index">${index + 1}</span><span><strong>${escapeHtml(item.title || '内容审核提示')}</strong><em>${escapeHtml(item.field === 'title' ? '标题' : '正文')}</em><small>${escapeHtml(item.reason || '')}</small><small class="kw-review-moderation-suggestion">建议：${escapeHtml(item.suggestion || '调整相关表述后重试。')}</small></span><b>修改内容</b></button>`).join('')}</div>
+  </section>`;
+}
+
+function kwGetReviewModerationContentText() {
+  const richText = kwReviewDraft.draftReviewHtml || kwReviewDraft.manualHtml || '';
+  return String(kwReviewDraft.draftReviewText || kwReviewDraft.finalDraftText || kwKnowledgeHtmlToPlainText(richText) || kwGetReviewDraftContentText() || '').trim();
+}
+
+function kwRenderReviewModerationReading() {
+  const feedback = kwReviewDraft.moderationFeedback || {};
+  const items = Array.isArray(feedback.items) ? feedback.items : [];
+  if (!items.length) return '';
+  return `<section class="kw-review-moderation-reading" aria-label="审核问题阅读态">
+    <div class="kw-review-moderation-reading-head"><strong>以下句子需要修改</strong><span>粉红色区域是审核命中的原文。修改后请再次预览。</span></div>
+    <div class="kw-review-moderation-reading-body">${items.map((item, index) => `<article class="kw-review-moderation-case">
+      <div class="kw-review-moderation-case-head"><span>问题 ${index + 1}</span><strong>${escapeHtml(item.title || '内容审核提示')}</strong><em>${escapeHtml(item.field === 'title' ? '标题' : '正文')}</em></div>
+      <div class="kw-review-moderation-case-label">文中原句</div><blockquote class="kw-review-moderation-example">${escapeHtml(item.example || item.matched_text || '未能定位原句，请根据问题说明调整。')}</blockquote>
+      <div class="kw-review-moderation-case-label">问题说明</div><p class="kw-review-moderation-case-copy">${escapeHtml(item.reason || '该表述需要调整。')}</p>
+      <div class="kw-review-moderation-case-label">修改建议</div><p class="kw-review-moderation-case-copy">${escapeHtml(item.suggestion || '请调整相关表述后再次提交。')}</p>
+      <div class="kw-review-moderation-case-label">参考改写</div><p class="kw-review-moderation-rewrite">${escapeHtml(item.rewrite_example || '请使用客观、可核验且不构成交易引导的表达。')}</p>
+    </article>`).join('')}</div>
+    <button type="button" class="kw-review-moderation-edit-button" onclick="kwEditReviewModerationContent()">修改内容</button>
+  </section>`;
+}
+
+function kwApplyReviewModerationFeedback(items, action) {
+  const normalizedItems = Array.isArray(items) ? items : [];
+  kwReviewDraft.moderationFeedback = {items: normalizedItems, action: String(action || 'hard_block')};
+  kwReviewDraft.previewReady = false;
+  kwReviewDraft.flowStage = normalizedItems.some((item) => item && item.field === 'title')
+    ? 'intake'
+    : (String(kwReviewDraft.draftReviewText || kwGetReviewDraftContentText()).trim() ? 'draft_review' : 'intake');
+  kwReviewWorkspacePanel = 'input';
+  kwRenderReviewStudio();
+  window.requestAnimationFrame(() => kwFocusReviewModerationFeedback(0));
+}
+
+function kwClearReviewModerationFeedback() {
+  kwReviewDraft.moderationFeedback = null;
+  kwClearReviewModerationHighlight();
+  kwRenderReviewStudio();
+}
+
+function kwEditReviewModerationContent() {
+  kwReviewDraft.moderationFeedback = null;
+  kwReviewDraft.previewReady = false;
+  kwReviewDraft.flowStage = kwReviewDraft.generatedPreviewText ? 'draft_review' : 'intake';
+  kwReviewWorkspacePanel = 'input';
+  kwClearReviewModerationHighlight();
+  kwRenderReviewStudio();
+}
+
+async function kwCheckReviewModerationBeforePreview() {
+  if (kwReviewModerationChecking) return false;
+  const tenant = window.ACTIVE_TENANT || {};
+  kwReviewModerationChecking = true;
+  kwRenderReviewStudio();
+  showToast('正在检查内容合规，请稍候...');
+  try {
+    const response = await fetch('/api/review/moderation-check', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        tenant_slug: String(tenant.slug || '').trim(),
+        review_title: kwReviewDraft.reviewTitle || '',
+        text: kwGetReviewPreviewText(),
+        content_html: kwGetReviewPreviewHtml(),
+        stock_grid_cards: kwReviewDraft.stockGridCards || [],
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      if (data && data.error === 'content_moderation_blocked' && data.feedback) {
+        kwApplyReviewModerationFeedback(data.feedback, data.action);
+      }
+      showToast((data && data.message) || '内容审核暂不可用，请稍后重试。');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    showToast('内容审核暂不可用，请稍后重试。');
+    return false;
+  } finally {
+    kwReviewModerationChecking = false;
+    if (kwReviewDraft.moderationFeedback) kwRenderReviewStudio();
+  }
+}
+
+function kwFindReviewTextRange(root, needle) {
+  const search = String(needle || '').trim().toLocaleLowerCase();
+  if (!root || !search) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const at = String(node.nodeValue || '').toLocaleLowerCase().indexOf(search);
+    if (at >= 0) {
+      const range = document.createRange();
+      range.setStart(node, at);
+      range.setEnd(node, at + search.length);
+      return range;
+    }
+  }
+  return null;
+}
+
+function kwFindReviewSentenceRange(root, needle) {
+  const anchor = kwFindReviewTextRange(root, needle);
+  if (!anchor) return null;
+  const element = anchor.startContainer.parentElement;
+  const scope = element && element.closest('p, li, blockquote, h1, h2, h3, h4, h5, h6') || root;
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let text = '';
+  let node;
+  while ((node = walker.nextNode())) {
+    const start = text.length;
+    text += String(node.nodeValue || '');
+    nodes.push({node, start, end: text.length});
+  }
+  const anchorNode = nodes.find((item) => item.node === anchor.startContainer);
+  if (!anchorNode || !text) return anchor;
+  const anchorStart = anchorNode.start + anchor.startOffset;
+  const before = text.slice(0, anchorStart);
+  const boundaryBefore = Math.max(
+    before.lastIndexOf('\n'), before.lastIndexOf('。'), before.lastIndexOf('！'), before.lastIndexOf('？'),
+    before.lastIndexOf('；'), before.lastIndexOf('.'), before.lastIndexOf('!'), before.lastIndexOf('?'), before.lastIndexOf(';'),
+  );
+  const sentenceStart = boundaryBefore < 0 ? 0 : boundaryBefore + 1;
+  const tail = text.slice(anchorStart);
+  const boundaryAfter = tail.search(/[\n。！？；.!?;]/);
+  const sentenceEnd = boundaryAfter < 0 ? text.length : anchorStart + boundaryAfter + 1;
+  const toPoint = (offset) => {
+    const item = nodes.find((entry) => offset >= entry.start && offset <= entry.end) || nodes[nodes.length - 1];
+    return {node: item.node, offset: Math.max(0, Math.min(offset - item.start, item.end - item.start))};
+  };
+  const start = toPoint(sentenceStart);
+  const end = toPoint(sentenceEnd);
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset);
+  return range;
+}
+
+function kwFocusReviewModerationFeedback(index) {
+  const feedback = kwReviewDraft.moderationFeedback;
+  const item = feedback && Array.isArray(feedback.items) ? feedback.items[index] : null;
+  if (!item) return;
+  kwClearReviewModerationHighlight();
+  if (item.field === 'title') {
+    const input = document.getElementById('kw-review-title-input');
+    if (!input) return;
+    input.classList.add('kw-review-moderation-input-highlight');
+    input.focus();
+    input.setSelectionRange(0, input.value.length);
+    return;
+  }
+  const editor = document.querySelector('#kw-review-draft-review-input, #kw-review-manual-editor .ql-editor, #kw-review-manual-editor');
+  if (!editor) return;
+  const range = item.highlight_mode === 'sentence'
+    ? kwFindReviewSentenceRange(editor, item.matched_text)
+    : kwFindReviewTextRange(editor, item.matched_text);
+  if (range && window.CSS && CSS.highlights && window.Highlight) CSS.highlights.set(KW_REVIEW_MODERATION_HIGHLIGHT_NAME, new Highlight(range));
+  editor.scrollIntoView({behavior: 'smooth', block: 'center'});
+  if (editor.focus) editor.focus({preventScroll: true});
+  if (range && !(window.CSS && CSS.highlights && window.Highlight)) {
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
 }
 
 function kwGetReviewStudioConfig() {
@@ -10516,7 +10755,7 @@ function kwBackToReviewDraftEdit() {
   kwRenderReviewStudio();
 }
 
-function kwConfirmReviewDraftToPreview() {
+async function kwConfirmReviewDraftToPreview() {
   kwSyncReviewDraftFromModal();
   if (!String(kwReviewDraft.draftReviewText || '').trim()) {
     showToast('请先确认或填写 Draft 正文');
@@ -10531,6 +10770,7 @@ function kwConfirmReviewDraftToPreview() {
   kwStockGridSearchLoading = false;
   kwReviewStructuredPreview = null;
   kwReviewDraft.finalDraftText = String(kwReviewDraft.draftReviewText || '').trim();
+  if (!await kwCheckReviewModerationBeforePreview()) return;
   kwReviewDraft.previewReady = true;
   kwReviewDraft.flowStage = 'preview';
   kwReviewWorkspacePanel = 'preview';
@@ -10588,7 +10828,7 @@ function kwConfirmStructuredReviewToPreview() {
   showToast('已进入最终预览');
 }
 
-function kwPrepareReviewDirectPreview() {
+async function kwPrepareReviewDirectPreview() {
   if (!kwValidateReviewIntakeReady()) return;
   kwReviewDraft.paragraphMode = 'manual';
   kwReviewDraft.skipAiProcessing = true;
@@ -10597,6 +10837,7 @@ function kwPrepareReviewDirectPreview() {
   kwReviewDraft.watchlistDecision = 'not_applicable';
   kwReviewDraft.selectedWatchlist = [];
   kwReviewStructuredPreview = null;
+  if (!await kwCheckReviewModerationBeforePreview()) return;
   kwReviewDraft.previewReady = true;
   kwReviewDraft.flowStage = 'preview';
   kwReviewWorkspacePanel = 'preview';
@@ -11545,14 +11786,14 @@ function kwRenderReviewWizardFooter() {
   const currentIndex = Math.max(0, kwGetReviewWorkspacePanelIndex(kwReviewWorkspacePanel));
   const total = KW_REVIEW_WORKSPACE_PANELS.length;
   const step = KW_REVIEW_WORKSPACE_PANELS[currentIndex] || KW_REVIEW_WORKSPACE_PANELS[0];
-  const isGenerating = kwReviewDraftGenerating || kwReviewPreviewGenerating || kwReviewPublishSubmitting;
+  const isGenerating = kwReviewDraftGenerating || kwReviewPreviewGenerating || kwReviewPublishSubmitting || kwReviewModerationChecking;
   let desc = step.desc || '';
   let actions = '';
   if (kwReviewWorkspacePanel === 'input') {
     desc = '确认输入内容后，可以直接预览，也可以进入优化规则。';
     actions = `
       <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwSaveReviewDraft()">保存草稿</button>
-      <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">直接预览</button>
+      <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">${kwReviewModerationChecking ? '<span class="ui-action-spinner"></span>正在检查内容...' : '直接预览'}</button>
       <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">优化成稿</button>
     `;
   } else if (kwReviewWorkspacePanel === 'generation') {
@@ -12159,7 +12400,8 @@ function kwPublishReviewDraft() {
     showToast((publishResult && publishResult.message) || '洞见已发布');
   }).catch((error) => {
     kwReviewPublishSubmitting = false;
-    kwRenderReviewStudio();
+    if (error && error.code === 'content_moderation_blocked' && error.feedback) kwApplyReviewModerationFeedback(error.feedback, error.action);
+    else kwRenderReviewStudio();
     showToast(error.message || '发布入库失败');
   });
 }
@@ -12395,6 +12637,7 @@ function kwRenderReviewStudio() {
   const paragraphCfg = KW_REVIEW_PARAGRAPH_OPTIONS.find(item => item.value === runtime.paragraphMode) || KW_REVIEW_PARAGRAPH_OPTIONS[0];
   const selectedKnowledge = kwGetReviewSelectedKnowledge();
   const selectedCards = kwGetReviewSelectedCards();
+  const hasModerationFeedback = Boolean(kwReviewDraft.moderationFeedback && (kwReviewDraft.moderationFeedback.items || []).length);
   // A new review must start with a blank title; the last published title is
   // runtime history, not input for the next review.
   kwReviewDraft.reviewTitle = kwReviewDraft.reviewTitle || '';
@@ -12417,14 +12660,31 @@ function kwRenderReviewStudio() {
   if (inputModeHost) kwRenderReviewInputModeRow();
   if (watchlistHost) kwRenderReviewWatchlistSelector();
   if (intakeHost) {
-    intakeHost.innerHTML = kwRenderReviewInputPanel();
-    if (kwReviewWorkspacePanel === 'input') intakeHost.insertAdjacentHTML('beforeend', kwRenderInsightDraftLibrary());
+    intakeHost.innerHTML = hasModerationFeedback
+      ? `${kwRenderReviewModerationFeedback()}${kwRenderReviewModerationReading()}`
+      : `${kwRenderReviewModerationFeedback()}${kwRenderReviewInputPanel()}`;
+    if (!hasModerationFeedback && kwReviewWorkspacePanel === 'input') intakeHost.insertAdjacentHTML('beforeend', kwRenderInsightDraftLibrary());
   }
-  if (stageActionsHost) kwRenderReviewStageActions();
+  if (stageActionsHost) {
+    if (hasModerationFeedback) {
+      stageActionsHost.innerHTML = '<button type="button" class="btn-outline" onclick="kwClearReviewModerationFeedback()">关闭提示</button><button type="button" class="btn-gold" onclick="kwEditReviewModerationContent()">修改内容</button>';
+    } else {
+      kwRenderReviewStageActions();
+    }
+  }
   if (progressHost) progressHost.innerHTML = kwRenderReviewDraftProgressPanel();
-  if (stageResultsHost) kwRenderReviewStageResults();
-  if (previewHost) kwRenderReviewPreviewWorkspace();
-  if (wizardFooterHost) kwRenderReviewWizardFooter();
+  if (stageResultsHost) {
+    if (hasModerationFeedback) stageResultsHost.innerHTML = '';
+    else kwRenderReviewStageResults();
+  }
+  if (previewHost) {
+    if (hasModerationFeedback) previewHost.innerHTML = '';
+    else kwRenderReviewPreviewWorkspace();
+  }
+  if (wizardFooterHost) {
+    if (hasModerationFeedback) wizardFooterHost.innerHTML = '';
+    else kwRenderReviewWizardFooter();
+  }
   if (runtimeHost) {
     runtimeHost.innerHTML = `
       <div class="kw-review-runtime-item">
@@ -13714,10 +13974,29 @@ function showToast(message) {
   const toast = document.getElementById('toast');
   if (!toast) return;
   toast.textContent = message;
+  toast.setAttribute('role', 'status');
+  toast.setAttribute('aria-live', 'polite');
+  toast.classList.remove('show');
+  void toast.offsetWidth;
   toast.classList.add('show');
   clearTimeout(window.__kwToastTimer);
   window.__kwToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
 }
+
+function installWorkbenchButtonPressFeedback() {
+  const mark = (button) => {
+    if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
+    button.classList.remove('ui-action-press');
+    void button.offsetWidth;
+    button.classList.add('ui-action-press');
+    window.setTimeout(() => button.classList.remove('ui-action-press'), 260);
+  };
+  document.addEventListener('pointerdown', (event) => mark(event.target.closest('button')), true);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') mark(event.target.closest && event.target.closest('button'));
+  }, true);
+}
+installWorkbenchButtonPressFeedback();
 
 function getKwWorkbenchStats() {
   return (window.WORKBENCH_DATA && window.WORKBENCH_DATA.stats) || {};

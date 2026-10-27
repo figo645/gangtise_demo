@@ -1,7 +1,7 @@
 {
-  "release_version": "v1.1.29",
-  "release_date": "2026-09-22",
-  "description": "洞见发布、Open API、消息中心、知识域与租户归属结构升级。",
+  "release_version": "v1.1.32",
+  "release_date": "2026-10-27",
+  "description": "补充确定性收益承诺识别与发布前合规阻断。",
   "migrations": [
     {"name": "137_open_api_insight_tokens.sql", "scope": "schema", "sha256": "e0554feeeeea1d70076fc58a70283525d7952e91902b0270fc19101324e2e6b1"},
     {"name": "138_tenant_published_insights.sql", "scope": "schema", "sha256": "e5733f1a4d3910b0f6c7ec6f622eea691a12352c1d74ca78a1a451973d3db353"},
@@ -11,6 +11,10 @@
     {"name": "145_reconcile_tenant_registry_references.sql", "scope": "schema", "sha256": "0eb6e53a4e4d93f24f69fd6a083bafe6bb63a44102145224fbf22a5fb81811c7"},
     {"name": "142_domain_foreign_keys.sql", "scope": "schema", "sha256": "24a0dd9e11427f3b1c0254fbbf58866933c6f5ed7914bc0f248974ec930a7888"},
     {"name": "143_domain_tenant_ownership.sql", "scope": "schema", "sha256": "0e68178a4d7ad2b8a2c9f7edfbf991e00c52d1da0b3bb14c61b2f231d2318978"},
-    {"name": "144_message_domain_user_identity.sql", "scope": "schema", "sha256": "a0a6ccd1613470100d0036c1a6187235ef48613d73069db69d718194a93d78fd"}
+    {"name": "144_message_domain_user_identity.sql", "scope": "schema", "sha256": "a0a6ccd1613470100d0036c1a6187235ef48613d73069db69d718194a93d78fd"},
+    {"name": "149_content_moderation.sql", "scope": "schema", "sha256": "46f185b80c1a40dde67752125c0f1385f2cf8e4a6913d777818788b081314001"},
+    {"name": "150_content_moderation_mece_rules.sql", "scope": "schema", "sha256": "690fe170a07397b9eec0f8e9c859bbe418fe27ec94ecb7621dcfc6568138a9fa"},
+    {"name": "151_content_moderation_user_rules.sql", "scope": "schema", "sha256": "a8358bd0f866c5375ad41b0b6c1cd22368ce203998e26e6625dc6da82a79f8ee"},
+    {"name": "152_content_moderation_certainty_rules.sql", "scope": "schema", "sha256": "1a6c46c8db95987a5849fda8b9e6389781798214027c0ef44218a01b2c5ec824"}
   ]
 }
