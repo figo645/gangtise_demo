@@ -10111,6 +10111,7 @@ def save_watchlist_kline_annotation(
         entity_id=f"{normalized_code}:{normalized_index}:{payload['created_by_user_id']}",
         actor_user_id=payload["created_by_user_id"],
         actor_name=payload["created_by_name"],
+        subject_security={"code": normalized_code, "name": payload["stock_name"]},
     )
     existing = db.execute(
         """
@@ -10680,6 +10681,7 @@ def save_watchlist_comment(
         entity_id=f"{normalized_code}:{payload['created_by_user_id']}:{payload['created_at']}",
         actor_user_id=payload["created_by_user_id"],
         actor_name=payload["created_by_name"],
+        subject_security={"code": normalized_code, "name": payload["stock_name"]},
     )
     db.execute(
         """

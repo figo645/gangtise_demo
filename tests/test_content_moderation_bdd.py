@@ -43,29 +43,24 @@ class _ModerationDb:
         self.committed = True
 
 
-def test_content_submission_records_alert_and_blocks_without_persisting_plaintext():
+def test_risk_education_is_allowed_and_audit_does_not_store_plaintext():
     fake_db = _ModerationDb()
     content = "这不是稳赚承诺，只是风险提示。"
     with app.app_context(), patch("src.domain.core_services.get_db", return_value=fake_db):
-        try:
-            content_moderation_services.inspect_and_record_content(
-                content, "insight", tenant_slug="laowang", entity_id="insight-1",
-                actor_user_id="dav-1", actor_name="财经老王",
-            )
-            assert False, "matched content must be blocked"
-        except ContentModerationBlocked as exc:
-            result = exc.result
+        result = content_moderation_services.inspect_and_record_content(
+            content, "insight", tenant_slug="laowang", entity_id="insight-1",
+            actor_user_id="dav-1", actor_name="财经老王",
+        )
 
-    assert result["result"] == "alert"
-    assert result["risk_level"] == "high"
-    assert result["matches"][0]["keyword"] == "稳赚"
+    assert result["result"] == "clear"
+    assert result["risk_level"] == "none"
     assert result["content_sha256"] == hashlib.sha256(content.encode("utf-8")).hexdigest()
     assert content not in json.dumps(fake_db.audit_insert, ensure_ascii=False)
     assert fake_db.audit_insert[8] == result["content_sha256"]
     assert fake_db.committed is True
 
 
-def test_content_submission_normalizes_punctuation_traditional_text_and_line_initials():
+def test_content_submission_normalizes_punctuation_without_treating_line_initials_as_a_violation():
     fake_db = _ModerationDb()
     fake_db.rules = [
         {"id": 1, "keyword": "稳赚", "category": "收益承诺", "risk_level": "high"},
@@ -76,25 +71,19 @@ def test_content_submission_normalizes_punctuation_traditional_text_and_line_ini
             content_moderation_services.inspect_and_record_content("穩-賺", "comment")
             assert False, "traditional/punctuation variant must be blocked"
         except ContentModerationBlocked as exc:
-            assert exc.result["matches"][0]["match_type"] == "direct"
+            assert exc.result["matches"][0]["match_type"] == "direct_contextual"
 
     fake_db = _ModerationDb()
     fake_db.rules = [{"id": 2, "keyword": "内幕", "category": "内幕信息", "risk_level": "high"}]
     with app.app_context(), patch("src.domain.core_services.get_db", return_value=fake_db):
-        try:
-            content_moderation_services.inspect_and_record_content("内心观察\n幕落不代表趋势结束", "kline_annotation")
-            assert False, "line-initial hidden keyword must be blocked"
-        except ContentModerationBlocked as exc:
-            assert exc.result["matches"][0]["match_type"] == "line_initials"
+        result = content_moderation_services.inspect_and_record_content("内心观察\n幕落不代表趋势结束", "kline_annotation")
+    assert result["result"] == "clear"
 
     fake_db = _ModerationDb()
     fake_db.rules = [{"id": 2, "keyword": "内幕", "category": "内幕信息", "risk_level": "high"}]
     with app.app_context(), patch("src.domain.core_services.get_db", return_value=fake_db):
-        try:
-            content_moderation_services.inspect_and_record_content("内看盘面，幕察资金", "insight")
-            assert False, "clause-initial hidden keyword must be blocked"
-        except ContentModerationBlocked as exc:
-            assert exc.result["matches"][0]["match_type"] == "line_initials"
+        result = content_moderation_services.inspect_and_record_content("内看盘面，幕察资金", "insight")
+    assert result["result"] == "clear"
 
 
 def test_content_submission_without_match_records_clear_result():
@@ -313,7 +302,7 @@ def test_insight_ai_prompt_enforces_non_bypassable_title_and_hidden_security_gua
     assert "分行首字、末字" in prompt
 
 
-def test_insight_ai_allow_is_downgraded_when_the_content_discloses_hidden_stock_recommendation():
+def test_insight_ai_does_not_downgrade_literary_text_without_a_verifiable_security():
     config = {
         "enabled": True,
         "enabled_by_source": {"insight": True, "comment": False, "kline_annotation": False},
@@ -339,9 +328,8 @@ def test_insight_ai_allow_is_downgraded_when_the_content_discloses_hidden_stock_
             body=flattened_body,
         )
 
-    assert verdict["verdict"] == "review"
-    assert verdict["category"] == "隐蔽证券推荐"
-    assert "人工复核" in verdict["reason"]
+    assert verdict["verdict"] == "allow"
+    assert verdict["reason"] == "普通盘面分析"
 
 
 def test_insight_model_request_contains_explicit_title_and_body():
@@ -456,45 +444,41 @@ def test_insider_terms_block_submission_and_record_high_risk_compliance_alert():
     assert fake_db.audit_insert[5:7] == ("alert", "high")
 
 
-def test_security_plus_trade_action_is_audited_and_hard_blocked_end_to_end():
+def test_technical_buy_signal_for_a_security_is_allowed_end_to_end():
     fake_db = _ModerationDb()
     fake_db.rules = []
     with app.app_context(), \
         patch("src.domain.core_services.get_db", return_value=fake_db), \
         patch.object(content_moderation_services, "_security_names", return_value=("贵州茅台",)):
-        try:
-            content_moderation_services.inspect_and_record_content(
-                "贵州茅台股价图表显示买入信号", "insight", tenant_slug="laowang",
-            )
-            assert False, "security plus trade action must be blocked"
-        except ContentModerationBlocked as exc:
-            result = exc.result
+        result = content_moderation_services.inspect_and_record_content(
+            "贵州茅台股价图表显示买入信号，仍需观察成交量。", "insight", tenant_slug="laowang",
+        )
 
-    assert result["action"] == "hard_block"
-    assert any(item["id"] == "R1" for item in result["matches"])
-    assert fake_db.audit_insert[5:7] == ("alert", "high")
+    assert result["action"] == "allow"
+    assert fake_db.audit_insert[5:7] == ("clear", "none")
 
 
-def test_context_rules_apply_r1_to_r5_and_allow_market_data_context_for_r2():
+def test_context_rules_require_a_target_and_prohibited_speech_act():
     service = content_moderation_services
     security_names = ("贵州茅台",)
 
-    r1 = service._combination_matches("贵州茅台近期数据显示买入", security_names)
+    r1 = service._combination_matches("贵州茅台现在立即买入", security_names)
     assert any(item["id"] == "R1" and item["action"] == "hard_block" for item in r1)
 
-    r2 = service._combination_matches("买入逻辑值得讨论", security_names)
+    r2 = service._combination_matches("买入逻辑值得讨论", security_names, subject_security={"code": "600519", "name": "贵州茅台"})
     assert any(item["id"] == "R2" and item["action"] == "manual_review" for item in r2)
-    r2_market_context = service._combination_matches("买入信号的历史行情数据", security_names)
+    r2_market_context = service._combination_matches("买入信号的历史行情数据", security_names, subject_security={"code": "600519"})
     assert not any(item["id"] == "R2" for item in r2_market_context)
     for term in (
         "成交额", "成交量", "主力净流入", "大单买入", "大单卖出", "北向资金买入",
         "买入额", "卖出额", "换手率", "涨跌幅", "市盈率", "市净率", "历史分位",
         "估值分位", "资金流向",
     ):
-        contextual_matches = service._combination_matches(f"买入信号参考{term}", security_names)
+        contextual_matches = service._combination_matches(f"买入信号参考{term}", security_names, subject_security={"code": "600519"})
         assert not any(item["id"] == "R2" for item in contextual_matches), term
 
-    r3 = service._combination_matches("明天可能反弹", security_names)
+    assert not service._combination_matches("明天可能反弹", security_names)
+    r3 = service._combination_matches("贵州茅台明天可能反弹", security_names)
     assert any(item["id"] == "R3" and item["action"] == "manual_review" for item in r3)
 
     r4 = service._combination_matches("重组消息来自内部渠道", security_names)
@@ -550,17 +534,69 @@ def test_hidden_stock_rule_does_not_flag_normal_multiline_market_commentary():
     assert content_moderation_services._hidden_security_matches(content, ("银行科技",)) == []
 
 
-def test_explicit_acrostic_with_promotional_context_requires_review_without_security_master_match():
+def test_formal_policy_allows_normal_insight_comment_and_kline_analysis():
+    scenarios = (
+        ("insight", "股市分强弱，机会藏细节。", None),
+        ("comment", "我昨天买入后今天回撤，仍在观察成交量。不要相信稳赚不赔的带单宣传。", {"code": "600519", "name": "贵州茅台"}),
+        ("kline_annotation", "放量突破20日均线，观察成交量能否持续。历史回测中该形态曾出现买入信号。", {"code": "600519", "name": "贵州茅台"}),
+    )
+    for source_type, content, subject_security in scenarios:
+        fake_db = _ModerationDb()
+        fake_db.rules = [{"id": 1, "keyword": "稳赚", "category": "收益承诺", "risk_level": "high"}]
+        with app.app_context(), patch("src.domain.core_services.get_db", return_value=fake_db):
+            result = content_moderation_services.inspect_and_record_content(
+                content,
+                source_type,
+                tenant_slug="laowang",
+                subject_security=subject_security,
+            )
+        assert result["result"] == "clear", source_type
+        assert result["action"] == "allow", source_type
+
+
+def test_formal_policy_blocks_targeted_solicitation_insider_claim_and_kline_order():
+    scenarios = (
+        ("insight", "贵州茅台（600519）重组消息来自内部渠道，建议大家提前布局。", None, "R4"),
+        ("comment", "600519马上买入，保证涨，跟我上车。", {"code": "600519", "name": "贵州茅台"}, "R1"),
+        ("kline_annotation", "此处全仓买入，明天涨停。", {"code": "600519", "name": "贵州茅台"}, "R1"),
+    )
+    for source_type, content, subject_security, expected_rule in scenarios:
+        fake_db = _ModerationDb()
+        fake_db.rules = []
+        with app.app_context(), patch("src.domain.core_services.get_db", return_value=fake_db):
+            with pytest.raises(ContentModerationBlocked) as exc_info:
+                content_moderation_services.inspect_and_record_content(
+                    content,
+                    source_type,
+                    tenant_slug="laowang",
+                    subject_security=subject_security,
+                )
+        assert exc_info.value.result["action"] in {"hard_block", "hard_block_compliance_alert"}
+        assert any(match["id"] == expected_rule for match in exc_info.value.result["matches"])
+
+
+def test_combination_policy_blocks_off_platform_financial_solicitation_for_all_sources():
+    for source_type in ("insight", "comment", "kline_annotation"):
+        fake_db = _ModerationDb()
+        fake_db.rules = []
+        with app.app_context(), patch("src.domain.core_services.get_db", return_value=fake_db):
+            with pytest.raises(ContentModerationBlocked) as exc_info:
+                content_moderation_services.inspect_and_record_content(
+                    "想跟单的加微信联系我。",
+                    source_type,
+                    tenant_slug="laowang",
+                    subject_security={"code": "600519", "name": "贵州茅台"} if source_type != "insight" else None,
+                )
+        assert any(match["id"] == "R5" for match in exc_info.value.result["matches"])
+
+
+def test_explicit_acrostic_without_a_verifiable_security_is_allowed():
     flattened_content = (
         "市场如镜，有心者可从细节捕捉线索。广场熙攘间，消费暗潮涌。"
         "百业复苏时，零售露端倪。股市分强弱，机会藏细节。份量看长期，静水流深处。"
         "后市可期待。以上仅为文字游戏，藏头诗欢迎有心人自行破解。"
     )
-    matches = content_moderation_services._hidden_security_matches(flattened_content, ())
-
-    assert len(matches) == 1
-    assert matches[0]["id"] == "R7"
-    assert matches[0]["action"] == "manual_review"
+    assert content_moderation_services._hidden_security_matches(flattened_content, ()) == []
 
 
 def test_html_to_moderation_text_preserves_author_blocks_and_breaks():
@@ -1059,7 +1095,7 @@ def test_domain_write_paths_stop_before_business_persistence_when_moderation_blo
         patch.object(market_services, "get_watchlist_detail_by_code", return_value=details["600519"]), \
         patch.object(market_services, "_resolve_user_pk", return_value="user-pk"), \
         patch.object(market_services, "_label_watchlist_comment_without_llm", return_value={}), \
-        patch("src.domain.content_moderation_services.inspect_and_record_content", side_effect=blocked), \
+        patch("src.domain.content_moderation_services.inspect_and_record_content", side_effect=blocked) as moderation, \
         patch.object(ai_services, "get_tenant_by_slug", return_value=tenant), \
         patch.object(ai_services, "append_review_snapshot") as append_snapshot:
         for write in (
@@ -1082,3 +1118,9 @@ def test_domain_write_paths_stop_before_business_persistence_when_moderation_blo
     assert not any("insert into watchlist_comments" in sql for sql in db.execute_calls)
     assert not any("insert into watchlist_kline_annotations" in sql for sql in db.execute_calls)
     append_snapshot.assert_not_called()
+    stock_bound_calls = [
+        call for call in moderation.call_args_list
+        if len(call.args) >= 2 and call.args[1] in {"comment", "kline_annotation"}
+    ]
+    assert len(stock_bound_calls) == 2
+    assert all(call.kwargs["subject_security"] == {"code": "600519", "name": "贵州茅台"} for call in stock_bound_calls)
