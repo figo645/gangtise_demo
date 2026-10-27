@@ -128,6 +128,29 @@ def _public_tables(connection):
         return [row[0] for row in cursor.fetchall()]
 
 
+def _canonical_constraint_definition(definition):
+    """Normalize PostgreSQL display-only casts before structural comparison.
+
+    ``pg_get_constraintdef`` differs by PostgreSQL version: an expression
+    comparing a varchar column to a varchar array may be rendered as either
+    ``character varying`` or ``character varying::text``. Both resolve to the
+    same check-constraint semantics, so treating the display cast as drift
+    makes final equivalence fail after a safe release.
+    """
+    canonical = re.sub(
+        r"::character varying::text",
+        "::character varying",
+        str(definition or ""),
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"(?<=character varying)\]::text\[\]",
+        "]",
+        canonical,
+        flags=re.IGNORECASE,
+    )
+
+
 def _table_schema(connection, table_name):
     with connection.cursor() as cursor:
         cursor.execute(
@@ -147,7 +170,10 @@ def _table_schema(connection, table_name):
                ORDER BY conname""",
             (table_name,),
         )
-        constraints = [list(row) for row in cursor.fetchall()]
+        constraints = [
+            [name, constraint_type, _canonical_constraint_definition(definition)]
+            for name, constraint_type, definition in cursor.fetchall()
+        ]
         cursor.execute(
             """SELECT indexname, indexdef FROM pg_indexes
                WHERE schemaname = 'public' AND tablename = %s

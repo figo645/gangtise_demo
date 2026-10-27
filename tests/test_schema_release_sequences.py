@@ -3,6 +3,13 @@ from unittest.mock import patch
 from tools import audit_database_release_diff as schema_diff
 
 
+def test_constraint_equivalence_ignores_postgres_display_only_varchar_to_text_cast():
+    local = "CHECK (result::text = ANY (ARRAY['clear'::character varying, 'alert'::character varying]::text[]))"
+    staging = "CHECK (result::text = ANY (ARRAY['clear'::character varying::text, 'alert'::character varying::text]))"
+
+    assert schema_diff._canonical_constraint_definition(local) == schema_diff._canonical_constraint_definition(staging)
+
+
 def test_final_schema_equivalence_does_not_fail_for_target_only_master_data_ledger_history():
     report = {
         "generated_at": "2026-09-17 12:33:01",
