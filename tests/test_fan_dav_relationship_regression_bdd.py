@@ -76,6 +76,86 @@ class FanDavRelationshipRegressionBddTest(unittest.TestCase):
         created = next(item for item in saved_config["tenants"] if item["slug"] == slug)
         self.assertEqual(created["advisor"], "duoge")
 
+    def test_given_reserved_username_tenant_when_new_dav_is_created_then_it_is_claimed(self):
+        config = {
+            "tenants": [
+                copy.deepcopy(TENANTS[0]),
+                {
+                    "id": "tenant_jasonchen",
+                    "slug": "jasonchen",
+                    "name": "财经老王研究院",
+                    "short_name": "老王",
+                    "advisor": "",
+                },
+            ],
+            "default_tenant_slug": "laowang",
+        }
+        saved_config = {}
+
+        def find_tenant(slug, site_config=None):
+            for tenant in (site_config or config).get("tenants", []):
+                if tenant["slug"] == slug:
+                    return tenant
+            return {}
+
+        def save_config(saved):
+            saved_config.update(copy.deepcopy(saved))
+            return saved
+
+        with patch.object(core_services, "get_site_config", return_value=config), patch.object(
+            core_services,
+            "get_tenant_configs",
+            side_effect=lambda source=None: copy.deepcopy((source or config)["tenants"]),
+        ), patch.object(core_services, "save_site_config", side_effect=save_config), patch.object(
+            core_services, "get_tenant_by_slug", side_effect=find_tenant
+        ), patch.object(core_services, "_sync_tenant_registry_row") as sync_registry:
+            slug = core_services.provision_dav_tenant("jasonchen")
+
+        self.assertEqual(slug, "jasonchen")
+        claimed = next(item for item in saved_config["tenants"] if item["slug"] == "jasonchen")
+        self.assertEqual(claimed["advisor"], "jasonchen")
+        self.assertEqual(claimed["name"], "jasonchen研究空间")
+        sync_registry.assert_called_with("jasonchen", "jasonchen研究空间")
+
+    def test_given_legacy_wrong_dav_binding_when_repaired_then_account_moves_to_owned_tenant(self):
+        legacy_user = {
+            "id": 9,
+            "username": "jasonchen",
+            "role": "dav",
+            "tenant_slug": "laowang",
+            "advisor_name": "",
+        }
+        db = unittest.mock.Mock()
+        with patch.object(core_services, "get_tenant_by_slug", side_effect=_tenant), patch.object(
+            core_services, "provision_dav_tenant", return_value="jasonchen"
+        ), patch.object(core_services, "get_db", return_value=db):
+            result = core_services.reconcile_dav_tenant_relationships([legacy_user])
+
+        self.assertEqual(result["repaired_davs"], 1)
+        db.execute.assert_called_once()
+        self.assertEqual(db.execute.call_args.args[1][0:2], ("jasonchen", ""))
+        db.commit.assert_called_once()
+
+    def test_given_verified_legacy_dav_login_then_login_result_uses_repaired_tenant(self):
+        legacy_user = {
+            "id": 9,
+            "username": "jasonchen",
+            "password": "secret123",
+            "role": "dav",
+            "tenant_slug": "laowang",
+            "status": "active",
+        }
+        repaired_user = {**legacy_user, "tenant_slug": "jasonchen"}
+        with patch.object(core_services, "get_user_by_username", side_effect=[legacy_user, repaired_user]), patch.object(
+            core_services,
+            "repair_dav_tenant_before_login",
+            side_effect=lambda user: repaired_user,
+        ) as repair:
+            result = core_services.verify_platform_password_login("jasonchen", "secret123")
+
+        repair.assert_called_once_with(legacy_user)
+        self.assertEqual(result["tenant_slug"], "jasonchen")
+
     def test_given_fan_assignment_when_normalized_then_tenant_and_advisor_are_canonical(self):
         with app_entry.app.app_context(), patch.object(core_services, "get_tenant_by_slug", side_effect=_tenant), patch.object(
             core_services, "get_site_config", return_value={"role_capabilities": {"investor": ["h5"]}}

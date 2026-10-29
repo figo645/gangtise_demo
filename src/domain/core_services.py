@@ -6849,9 +6849,51 @@ def provision_dav_tenant(username):
         raise ValueError("username_required")
     site_config = get_site_config()
     tenants = get_tenant_configs(site_config)
+    raw_tenants = normalize_tenant_configs(site_config.get("tenants"))
+    raw_tenants_by_slug = {
+        str(item.get("slug") or "").strip().lower(): item
+        for item in raw_tenants
+        if str(item.get("slug") or "").strip()
+    }
+
+    def canonical_tenant_name(tenant):
+        raw_tenant = raw_tenants_by_slug.get(str(tenant.get("slug") or "").strip().lower()) or {}
+        return str(raw_tenant.get("name") or tenant.get("name") or f"{normalized_username}研究空间").strip()
+
     for tenant in tenants:
         if str(tenant.get("advisor") or "").strip() == normalized_username:
+            # tenant_registry is a display override. Keep a stale registry row
+            # from making a newly repaired DAv look like another DAv.
+            _sync_tenant_registry_row(tenant.get("slug"), canonical_tenant_name(tenant))
             return str(tenant.get("slug") or "").strip().lower()
+
+    preferred_slug = slugify_code(normalized_username, "dav")[:48]
+    preferred_tenant = next(
+        (
+            tenant
+            for tenant in tenants
+            if str(tenant.get("slug") or "").strip().lower() == preferred_slug
+            and not str(tenant.get("advisor") or "").strip()
+        ),
+        None,
+    )
+    if preferred_tenant:
+        claimed_tenant = {
+            **preferred_tenant,
+            "advisor": normalized_username,
+            "name": f"{normalized_username}研究空间",
+            "short_name": normalized_username,
+        }
+        next_config = dict(site_config)
+        next_config["tenants"] = [
+            claimed_tenant if str(item.get("slug") or "").strip().lower() == preferred_slug else item
+            for item in tenants
+        ]
+        saved = save_site_config(next_config)
+        tenant = get_tenant_by_slug(preferred_slug, saved)
+        _sync_tenant_registry_row(preferred_slug, tenant.get("name") or f"{normalized_username}研究空间")
+        return str(tenant.get("slug") or "").strip().lower()
+
     slug = _allocate_dav_tenant_slug(normalized_username, tenants)
     tenants.append({
         "id": f"tenant_{slug}",
@@ -6953,6 +6995,16 @@ def reconcile_dav_tenant_relationships(users=None):
     if repaired_davs or reassigned_fans:
         db.commit()
     return {"repaired_davs": repaired_davs, "reassigned_fans": reassigned_fans}
+
+
+def repair_dav_tenant_before_login(user):
+    """Repair a legacy DAv binding after credentials have been verified."""
+    if not isinstance(user, dict) or str(user.get("role") or "").strip().lower() != "dav":
+        return user
+    result = reconcile_dav_tenant_relationships([user])
+    if not result.get("repaired_davs"):
+        return user
+    return get_user_by_username(user.get("username")) or user
 
 
 def update_user_account(user_id, username, password="", tenant_slug=None, role=None, advisor_name=None, scope_tenant_slug=None):
@@ -7094,7 +7146,7 @@ def verify_h5_password_login(username, password):
         raise ValueError("user_disabled")
     if not compare_digest(str(user.get("password") or ""), str(password or "")):
         raise ValueError("password_invalid")
-    return user
+    return repair_dav_tenant_before_login(user)
 
 
 def verify_platform_password_login(username, password):
@@ -7107,7 +7159,7 @@ def verify_platform_password_login(username, password):
         raise ValueError("user_disabled")
     if not compare_digest(str(user.get("password") or ""), str(password or "")):
         raise ValueError("password_invalid")
-    return user
+    return repair_dav_tenant_before_login(user)
 
 
 def bind_user_wechat_identity(user_id, openid="", unionid="", nickname=""):
